@@ -1,0 +1,183 @@
+{
+  "id": "unread-voice",
+  "title": "未读",
+  "input": {
+    "theme": "都市情感",
+    "character": "主播陈白；前同事周予（不露面，只出现在锁屏通知和语音）",
+    "conflict": "陈白今晚必须把直播间旧成片全部下架；账号被周予远程登出",
+    "hook": "锁屏弹出一条语音转写——是她从未发给任何人的那句「别等我。」"
+  },
+  "characters": [
+    {
+      "id": "chenbai",
+      "name": "陈白",
+      "color": "#39C5BB",
+      "anchor": "二十四岁东亚女性，亚麻短发，黑色背心，耳返还挂着，直播灯把脸打得很白"
+    },
+    {
+      "id": "zhouyu",
+      "name": "周予",
+      "color": "#7B8CFF",
+      "anchor": "二十六岁东亚男性，声音轻而熟，本片不露面，只出现在锁屏通知和语音气泡"
+    }
+  ],
+  "setting": {
+    "place": "出租屋直播角落，背景是浅色窗帘和补光灯",
+    "time": "深夜",
+    "light": "补光灯冷白，手机屏幕青绿，房间其余很暗"
+  },
+  "shots": [
+    {
+      "id": "s1",
+      "order": 1,
+      "purpose": "建立：她在关直播，这一分钟要结束",
+      "shotSize": "ms",
+      "motionId": "cut",
+      "durationSec": 2,
+      "cast": ["chenbai"],
+      "line": "今晚到这里。",
+      "lineSpeaker": "chenbai",
+      "prop": "none",
+      "alts": [
+        {
+          "id": "s1",
+          "order": 1,
+          "purpose": "建立：她在关直播，这一分钟要结束",
+          "shotSize": "ms",
+          "motionId": "follow",
+          "durationSec": 2,
+          "cast": ["chenbai"],
+          "line": "今晚到这里。",
+          "lineSpeaker": "chenbai",
+          "prop": "none"
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "order": 2,
+      "purpose": "欲望：旧成片必须立刻下架",
+      "shotSize": "ecu",
+      "motionId": "push_in",
+      "durationSec": 3,
+      "cast": ["chenbai"],
+      "line": "下架。全部。",
+      "lineSpeaker": "chenbai",
+      "prop": "none",
+      "alts": [
+        {
+          "id": "s2",
+          "order": 2,
+          "purpose": "欲望：旧成片必须立刻下架",
+          "shotSize": "ecu",
+          "motionId": "push_in",
+          "durationSec": 3,
+          "cast": ["chenbai"],
+          "line": "旧成片不能再留。",
+          "lineSpeaker": "chenbai",
+          "prop": "none"
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "order": 3,
+      "purpose": "阻碍：账号被远程登出",
+      "shotSize": "ws",
+      "motionId": "pull_out",
+      "durationSec": 3,
+      "cast": ["chenbai"],
+      "line": "",
+      "prop": "lock",
+      "alts": [
+        {
+          "id": "s3",
+          "order": 3,
+          "purpose": "阻碍：账号被远程登出",
+          "shotSize": "ws",
+          "motionId": "cut",
+          "durationSec": 3,
+          "cast": ["chenbai"],
+          "line": "",
+          "prop": "lock"
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "order": 4,
+      "purpose": "升级：一条未读语音进来",
+      "shotSize": "cu",
+      "motionId": "enter_stage",
+      "durationSec": 3,
+      "cast": ["chenbai"],
+      "line": "一条语音。",
+      "prop": "note",
+      "alts": [
+        {
+          "id": "s4",
+          "order": 4,
+          "purpose": "升级：一条未读语音进来",
+          "shotSize": "cu",
+          "motionId": "pan_left",
+          "durationSec": 3,
+          "cast": ["chenbai"],
+          "line": "一条语音。",
+          "prop": "note"
+        }
+      ]
+    },
+    {
+      "id": "s5",
+      "order": 5,
+      "purpose": "信息：转写是她没发出去的那句",
+      "shotSize": "ecu",
+      "motionId": "push_in",
+      "durationSec": 4,
+      "cast": ["chenbai"],
+      "line": "别等我。这是我的草稿。",
+      "lineSpeaker": "chenbai",
+      "prop": "note",
+      "alts": [
+        {
+          "id": "s5",
+          "order": 5,
+          "purpose": "信息：转写是她没发出去的那句",
+          "shotSize": "ecu",
+          "motionId": "push_in",
+          "durationSec": 4,
+          "cast": ["chenbai"],
+          "line": "这句话我没发出去过。",
+          "lineSpeaker": "chenbai",
+          "prop": "note"
+        }
+      ]
+    },
+    {
+      "id": "s6",
+      "order": 6,
+      "purpose": "钩子：门外的人说他等到了",
+      "shotSize": "ms",
+      "motionId": "follow",
+      "durationSec": 3,
+      "cast": ["chenbai"],
+      "line": "我等到了。",
+      "lineSpeaker": "zhouyu",
+      "prop": "none",
+      "alts": [
+        {
+          "id": "s6",
+          "order": 6,
+          "purpose": "钩子：门外的人说他等到了",
+          "shotSize": "ms",
+          "motionId": "cut",
+          "durationSec": 3,
+          "cast": ["chenbai"],
+          "line": "我等到了。",
+          "lineSpeaker": "zhouyu",
+          "prop": "none"
+        }
+      ]
+    }
+  ]
+}

@@ -36,7 +36,7 @@ description: Compile WebLockShot Story JSON into the 9:16 GSAP animatic stage. U
 type Story = {
   id: string
   title: string
-  input: { character: string; conflict: string; hook: string }
+  input: { theme: string; character: string; conflict: string; hook: string }
   characters: { id: string; name: string; color: string; anchor: string }[]
   setting: { place: string; time: string; light: string }
   shots: Shot[] // 长度必须为 6

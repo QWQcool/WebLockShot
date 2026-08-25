@@ -36,6 +36,7 @@ export const MOTION_LABEL: Record<MotionId, string> = {
 }
 
 export type StoryInput = {
+  theme: string
   character: string
   conflict: string
   hook: string

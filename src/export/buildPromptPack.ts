@@ -1,1 +1,1 @@
-export { buildPromptPack, type PromptDialect } from './templates'
+export { buildPromptPack } from './templates'

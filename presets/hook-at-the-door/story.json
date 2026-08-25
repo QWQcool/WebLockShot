@@ -2,6 +2,7 @@
   "id": "hook-at-the-door",
   "title": "门缝",
   "input": {
+    "theme": "悬疑租房",
     "character": "租客林夏；房东赵叔（从不露面，只留字条和门锁声）",
     "conflict": "林夏今晚必须把藏在地板下的硬盘带走；门禁被远程锁死，赵叔说「查水电」",
     "hook": "门缝塞进一张新字条——写的是林夏的乳名，而她从未告诉过房东"
@@ -10,13 +11,13 @@
     {
       "id": "linxia",
       "name": "林夏",
-      "color": "#E6B85C",
+      "color": "#39C5BB",
       "anchor": "二十五岁东亚女性，齐肩黑发略乱，深色卫衣，神色紧绷，脸被冷白灯光和手机屏幕照着"
     },
     {
       "id": "zhaoshu",
       "name": "赵叔",
-      "color": "#4A5C4E",
+      "color": "#7B8CFF",
       "anchor": "五十多岁男性，声音低而略沙，本片几乎不露面，只见门缝外的轮廓和手影"
     }
   ],
@@ -45,7 +46,7 @@
           "motionId": "follow",
           "durationSec": 2,
           "cast": ["linxia"],
-          "line": "楼道里有人停住。",
+          "line": "门锁，远处。",
           "prop": "lock"
         }
       ]
@@ -66,8 +67,8 @@
           "id": "s2",
           "order": 2,
           "purpose": "欲望：硬盘是她要带走的东西",
-          "shotSize": "cu",
-          "motionId": "pan_right",
+          "shotSize": "ecu",
+          "motionId": "push_in",
           "durationSec": 3,
           "cast": ["linxia"],
           "line": "就三分钟。硬盘还在。",
@@ -119,7 +120,7 @@
           "motionId": "pan_left",
           "durationSec": 3,
           "cast": ["linxia"],
-          "line": "今晚查水电。",
+          "line": "查水电。",
           "prop": "note"
         }
       ]
@@ -140,7 +141,7 @@
           "id": "s5",
           "order": 5,
           "purpose": "信息：乳名暴露",
-          "shotSize": "cu",
+          "shotSize": "ecu",
           "motionId": "push_in",
           "durationSec": 4,
           "cast": ["linxia"],
@@ -170,7 +171,7 @@
           "motionId": "cut",
           "durationSec": 3,
           "cast": ["linxia"],
-          "line": "小满，我知道你在家。",
+          "line": "小满。开门。",
           "lineSpeaker": "zhaoshu",
           "prop": "door"
         }

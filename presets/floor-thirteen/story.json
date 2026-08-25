@@ -1,0 +1,183 @@
+{
+  "id": "floor-thirteen",
+  "title": "13层",
+  "input": {
+    "theme": "职场悬疑",
+    "character": "实习生何安；从不在工位的主管吴姐（只有工牌和电梯语音）",
+    "conflict": "何安要把藏在茶水间的合同带出大厦；门禁卡过不了13层",
+    "hook": "电梯到13层门开，里面挂着何安自己的工牌，背面写着她的乳名"
+  },
+  "characters": [
+    {
+      "id": "hean",
+      "name": "何安",
+      "color": "#FF7EB6",
+      "anchor": "二十二岁东亚女性，齐肩黑发，白衬衫微皱，工牌歪着，夜里加班的疲惫"
+    },
+    {
+      "id": "wujie",
+      "name": "吴姐",
+      "color": "#4A6FA5",
+      "anchor": "四十岁女性，声音职业而平，本片不露面，只有电梯提示音和工牌"
+    }
+  ],
+  "setting": {
+    "place": "写字楼电梯厅与13层，夜班走廊",
+    "time": "夜里加班",
+    "light": "电梯黄光，走廊冷白灯一盏坏了一盏亮"
+  },
+  "shots": [
+    {
+      "id": "s1",
+      "order": 1,
+      "purpose": "建立：她在赶最后十分钟",
+      "shotSize": "ms",
+      "motionId": "cut",
+      "durationSec": 2,
+      "cast": ["hean"],
+      "line": "最后十分钟。",
+      "lineSpeaker": "hean",
+      "prop": "none",
+      "alts": [
+        {
+          "id": "s1",
+          "order": 1,
+          "purpose": "建立：她在赶最后十分钟",
+          "shotSize": "ms",
+          "motionId": "follow",
+          "durationSec": 2,
+          "cast": ["hean"],
+          "line": "最后十分钟。",
+          "lineSpeaker": "hean",
+          "prop": "none"
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "order": 2,
+      "purpose": "欲望：合同必须今晚带走",
+      "shotSize": "ecu",
+      "motionId": "push_in",
+      "durationSec": 3,
+      "cast": ["hean"],
+      "line": "合同还在茶水间。",
+      "lineSpeaker": "hean",
+      "prop": "none",
+      "alts": [
+        {
+          "id": "s2",
+          "order": 2,
+          "purpose": "欲望：合同必须今晚带走",
+          "shotSize": "ecu",
+          "motionId": "push_in",
+          "durationSec": 3,
+          "cast": ["hean"],
+          "line": "这份不能留到明天。",
+          "lineSpeaker": "hean",
+          "prop": "none"
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "order": 3,
+      "purpose": "阻碍：门禁过不了13层",
+      "shotSize": "ws",
+      "motionId": "pull_out",
+      "durationSec": 3,
+      "cast": ["hean"],
+      "line": "",
+      "prop": "lock",
+      "alts": [
+        {
+          "id": "s3",
+          "order": 3,
+          "purpose": "阻碍：门禁过不了13层",
+          "shotSize": "ws",
+          "motionId": "cut",
+          "durationSec": 3,
+          "cast": ["hean"],
+          "line": "",
+          "prop": "lock"
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "order": 4,
+      "purpose": "升级：电梯自己停在13层",
+      "shotSize": "cu",
+      "motionId": "enter_stage",
+      "durationSec": 3,
+      "cast": ["hean"],
+      "line": "十三层。",
+      "prop": "door",
+      "alts": [
+        {
+          "id": "s4",
+          "order": 4,
+          "purpose": "升级：电梯自己停在13层",
+          "shotSize": "cu",
+          "motionId": "pan_right",
+          "durationSec": 3,
+          "cast": ["hean"],
+          "line": "十三层。",
+          "prop": "door"
+        }
+      ]
+    },
+    {
+      "id": "s5",
+      "order": 5,
+      "purpose": "信息：工牌背面是乳名",
+      "shotSize": "ecu",
+      "motionId": "push_in",
+      "durationSec": 4,
+      "cast": ["hean"],
+      "line": "这是我的工牌。",
+      "lineSpeaker": "hean",
+      "prop": "note",
+      "alts": [
+        {
+          "id": "s5",
+          "order": 5,
+          "purpose": "信息：工牌背面是乳名",
+          "shotSize": "ecu",
+          "motionId": "push_in",
+          "durationSec": 4,
+          "cast": ["hean"],
+          "line": "背面……小安？",
+          "lineSpeaker": "hean",
+          "prop": "note"
+        }
+      ]
+    },
+    {
+      "id": "s6",
+      "order": 6,
+      "purpose": "钩子：电梯用乳名叫她出来",
+      "shotSize": "ms",
+      "motionId": "follow",
+      "durationSec": 3,
+      "cast": ["hean"],
+      "line": "小安。出来。",
+      "lineSpeaker": "wujie",
+      "prop": "door",
+      "alts": [
+        {
+          "id": "s6",
+          "order": 6,
+          "purpose": "钩子：电梯用乳名叫她出来",
+          "shotSize": "ms",
+          "motionId": "cut",
+          "durationSec": 3,
+          "cast": ["hean"],
+          "line": "小安。出来。",
+          "lineSpeaker": "wujie",
+          "prop": "door"
+        }
+      ]
+    }
+  ]
+}

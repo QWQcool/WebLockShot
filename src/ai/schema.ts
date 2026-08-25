@@ -135,6 +135,8 @@ export function parseModelText<T>(
 
 function parseInput(raw: unknown): ParseResult<StoryInput> {
   if (!isRecord(raw)) return { ok: false, error: 'input 必须是对象' }
+  const theme = asNonEmpty(raw.theme, 'input.theme')
+  if (!theme.ok) return theme
   const character = asNonEmpty(raw.character, 'input.character')
   if (!character.ok) return character
   const conflict = asNonEmpty(raw.conflict, 'input.conflict')
@@ -144,6 +146,7 @@ function parseInput(raw: unknown): ParseResult<StoryInput> {
   return {
     ok: true,
     value: {
+      theme: theme.value,
       character: character.value,
       conflict: conflict.value,
       hook: hook.value,

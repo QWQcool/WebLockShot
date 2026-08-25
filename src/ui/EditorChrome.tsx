@@ -11,7 +11,7 @@ import {
 } from '../types'
 import { modeFooter, modeLabel } from '../modes'
 import { PRESETS } from '../presets/load'
-import type { PromptDialect } from '../export/buildPromptPack'
+import type { ShotHistoryItem } from '../shotHistory'
 
 type Props = {
   mode: EditorMode
@@ -28,21 +28,28 @@ type Props = {
   duration: number
   busy: boolean
   error: string | null
-  copied: PromptDialect | null
+  copied: boolean
   token: TokenConfig
   onToken: (token: TokenConfig) => void
   canGenerate: boolean
   generateHint: string
   canRedo: boolean
   redoHint: string
+  canRevise: boolean
+  supplement: string
+  onSupplement: (value: string) => void
+  durationDraft: string
+  onDurationDraft: (value: string) => void
+  history: ShotHistoryItem[]
+  onRestore: (item: ShotHistoryItem) => void
   onGenerate: () => void
   onLine: (line: string) => void
   onMotion: (motionId: MotionId) => void
   onRedo: () => void
+  onRevise: () => void
   onTogglePlay: () => void
   onSeekShot: (index: number) => void
-  onCopy: (dialect: PromptDialect) => void
-  previewPack: string
+  onCopy: () => void
   children: ReactNode
 }
 
@@ -69,19 +76,27 @@ export function EditorChrome(props: Props) {
     generateHint,
     canRedo,
     redoHint,
+    canRevise,
+    supplement,
+    onSupplement,
+    durationDraft,
+    onDurationDraft,
+    history,
+    onRestore,
     onGenerate,
     onLine,
     onMotion,
     onRedo,
+    onRevise,
     onTogglePlay,
     onSeekShot,
     onCopy,
-    previewPack,
     children,
   } = props
 
-  const readOnlyInput = mode === 'preset'
+  const presetLocked = mode === 'preset'
   const progress = duration > 0 ? Math.min(1, time / duration) : 0
+  const themeValue = presetLocked ? story.input.theme : draft.theme
 
   return (
     <div className="desk">
@@ -90,19 +105,24 @@ export function EditorChrome(props: Props) {
           <span className="mast-slate">WEB锁镜</span>
           <p className="mast-tag">出可灵之前，先锁这六镜</p>
         </div>
-        <div className="mode-switch" role="tablist" aria-label="工作模式">
-          {(['preset', 'token'] as const).map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={mode === id}
-              className={mode === id ? 'is-on' : ''}
-              onClick={() => onMode(id)}
-            >
-              {modeLabel(id)}
-            </button>
-          ))}
+        <div className="mast-actions">
+          <div className="mode-switch" role="tablist" aria-label="工作模式">
+            {(['preset', 'token'] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={mode === id}
+                className={mode === id ? 'is-on' : ''}
+                onClick={() => onMode(id)}
+              >
+                {modeLabel(id)}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="btn-export" onClick={onCopy}>
+            {copied ? '已复制提示词' : '导出提示词'}
+          </button>
         </div>
       </header>
 
@@ -112,39 +132,45 @@ export function EditorChrome(props: Props) {
             <h2 className="panel-h">这一分钟</h2>
             {mode === 'preset' ? (
               <label className="field">
-                <span>内置故事</span>
+                <span>内置故事（预设）</span>
                 <select
                   value={presetId}
                   onChange={(e) => onPresetId(e.target.value)}
                 >
                   {PRESETS.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.title}
+                      {p.title}（{p.theme}）
                     </option>
                   ))}
                 </select>
               </label>
             ) : (
               <p className="panel-note">
-                三个短框，不写长剧本。密钥只进 sessionStorage。
+                主题 + 三个短框，不写长剧本。密钥只进 sessionStorage。
               </p>
             )}
             <Field
+              label="主题"
+              value={themeValue}
+              readOnly={presetLocked}
+              onChange={(theme) => onDraft({ ...draft, theme })}
+            />
+            <Field
               label="人物"
-              value={readOnlyInput ? story.input.character : draft.character}
-              readOnly={readOnlyInput}
+              value={presetLocked ? story.input.character : draft.character}
+              readOnly={presetLocked}
               onChange={(character) => onDraft({ ...draft, character })}
             />
             <Field
               label="冲突"
-              value={readOnlyInput ? story.input.conflict : draft.conflict}
-              readOnly={readOnlyInput}
+              value={presetLocked ? story.input.conflict : draft.conflict}
+              readOnly={presetLocked}
               onChange={(conflict) => onDraft({ ...draft, conflict })}
             />
             <Field
               label="钩子"
-              value={readOnlyInput ? story.input.hook : draft.hook}
-              readOnly={readOnlyInput}
+              value={presetLocked ? story.input.hook : draft.hook}
+              readOnly={presetLocked}
               onChange={(hook) => onDraft({ ...draft, hook })}
               accent
             />
@@ -154,9 +180,12 @@ export function EditorChrome(props: Props) {
               disabled={!canGenerate || busy}
               onClick={onGenerate}
             >
-              {busy ? '拆镜中…' : '生成粗剪'}
+              {busy ? '拆镜中…' : mode === 'preset' ? '载入该预设' : '生成粗剪'}
             </button>
             {!canGenerate ? <p className="hint">{generateHint}</p> : null}
+            {presetLocked ? (
+              <p className="hint">预设模拟只供预览。台词和运动不能改，重做只会切到官方第二镜。 </p>
+            ) : null}
           </section>
 
           {mode === 'token' ? (
@@ -198,18 +227,20 @@ export function EditorChrome(props: Props) {
           <section className="panel">
             <h2 className="panel-h">锁这一镜</h2>
             <p className="shot-purpose">{shot.purpose}</p>
-            <label className="field">
+            <label className={presetLocked ? 'field is-locked' : 'field'}>
               <span>台词</span>
               <textarea
                 rows={3}
                 value={shot.line}
+                readOnly={presetLocked}
                 onChange={(e) => onLine(e.target.value)}
               />
             </label>
-            <label className="field">
+            <label className={presetLocked ? 'field is-locked' : 'field'}>
               <span>运动模板</span>
               <select
                 value={shot.motionId}
+                disabled={presetLocked}
                 onChange={(e) => onMotion(e.target.value as MotionId)}
               >
                 {MOTION_IDS.map((id) => (
@@ -228,24 +259,63 @@ export function EditorChrome(props: Props) {
               重做这一镜
             </button>
             <p className="hint">{redoHint}</p>
-          </section>
 
-          <section className="panel">
-            <h2 className="panel-h">导出提示词</h2>
-            <p className="panel-note">
-              请到可灵 / 即梦自行粘贴。本产品不代出视频。改过的台词和运动会写进当前包。
-            </p>
-            <div className="export-row">
-              <button type="button" className="btn-export" onClick={() => onCopy('kling')}>
-                {copied === 'kling' ? '已复制可灵包' : '复制可灵包'}
-              </button>
-              <button type="button" className="btn-export" onClick={() => onCopy('jimeng')}>
-                {copied === 'jimeng' ? '已复制即梦包' : '复制即梦包'}
-              </button>
-            </div>
-            <details className="pack-preview">
-              <summary>查看当前即梦包</summary>
-              <pre>{previewPack}</pre>
+            {mode === 'token' ? (
+              <div className="revise-block">
+                <label className="field">
+                  <span>补充要改变的内容</span>
+                  <textarea
+                    rows={3}
+                    value={supplement}
+                    onChange={(e) => onSupplement(e.target.value)}
+                    placeholder="例如：台词更狠一点，运动换成推近"
+                  />
+                </label>
+                <label className="field">
+                  <span>镜头时长（秒）</span>
+                  <input
+                    inputMode="decimal"
+                    value={durationDraft}
+                    onChange={(e) => onDurationDraft(e.target.value)}
+                    placeholder={`不填则沿用 ${shot.durationSec} 秒`}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={!canRevise || busy}
+                  onClick={onRevise}
+                >
+                  按补充改这一镜
+                </button>
+                <p className="hint">
+                  基于当前镜修改，不另起炉灶。时长留空则用上一版这一镜的秒数。
+                </p>
+              </div>
+            ) : null}
+
+            <details className="history">
+              <summary>观看历史镜头</summary>
+              {history.length === 0 ? (
+                <p className="hint">这一镜还没有历史。重做或按补充修改后会出现，方便还原。</p>
+              ) : (
+                <ul className="history-list">
+                  {history.map((item, i) => (
+                    <li key={item.key} className="history-item">
+                      <div>
+                        <b>版本 {history.length - i}</b>
+                        <span>
+                          {MOTION_LABEL[item.shot.motionId]} · {item.shot.durationSec}s
+                        </span>
+                        <p>{item.shot.line.trim() || '（无对白）'}</p>
+                      </div>
+                      <button type="button" onClick={() => onRestore(item)}>
+                        还原
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </details>
           </section>
 
@@ -261,7 +331,9 @@ export function EditorChrome(props: Props) {
             <div className="monitor-bezel">
               <div className="monitor-meta">
                 <span className={playing ? 'tally is-live' : 'tally'} />
-                <span>《{story.title}》</span>
+                <span>
+                  《{story.title}》 · {story.input.theme}
+                </span>
                 <span>{playing ? 'REC' : 'PAUSE'}</span>
               </div>
               <div className="monitor-glass">
@@ -320,7 +392,7 @@ function Field(props: {
   onChange: (value: string) => void
 }) {
   return (
-    <label className={props.accent ? 'field is-hook' : 'field'}>
+    <label className={props.accent ? 'field is-hook' : props.readOnly ? 'field is-locked' : 'field'}>
       <span>{props.label}</span>
       <textarea
         rows={2}

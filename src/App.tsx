@@ -4,11 +4,19 @@ import {
   generateUserPrompt,
   redoShotSystemPrompt,
   redoShotUserPrompt,
+  reviseShotUserPrompt,
   storySystemPrompt,
 } from './ai/prompts'
 import { parseModelText, parseShotJson, parseStoryJson } from './ai/schema'
-import { buildPromptPack, type PromptDialect } from './export/buildPromptPack'
+import { buildPromptPack } from './export/buildPromptPack'
 import { defaultPresetId, loadPreset } from './presets/load'
+import {
+  pushShotHistory,
+  resolveDuration,
+  shotKey,
+  withoutAlts,
+  type ShotHistory,
+} from './shotHistory'
 import { ShotStage } from './stage/ShotStage'
 import { useShotTimeline } from './stage/useShotTimeline'
 import type {
@@ -32,8 +40,11 @@ export default function App() {
   const [token, setToken] = useState<TokenConfig>(readToken)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState<PromptDialect | null>(null)
+  const [copied, setCopied] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(false)
+  const [history, setHistory] = useState<ShotHistory>({})
+  const [supplement, setSupplement] = useState('')
+  const [durationDraft, setDurationDraft] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
 
   const timelineKey = [
@@ -58,6 +69,11 @@ export default function App() {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(token))
   }, [token])
 
+  useEffect(() => {
+    setSupplement('')
+    setDurationDraft('')
+  }, [shot.id])
+
   const canGenerate =
     mode === 'preset' ||
     Boolean(token.apiKey.trim() && token.baseUrl.trim() && token.model.trim())
@@ -74,11 +90,12 @@ export default function App() {
   const redoHint =
     mode === 'preset'
       ? canRedo
-        ? '在这一镜的仓库备选里循环，不消耗 Token。'
+        ? '切到这一镜的官方第二版本（台词或运动只改一项）。不能手改内容。'
         : '这一镜没有备选，按钮不可用。'
       : canGenerate
-        ? '只让模型重写这一镜 JSON，其余五镜不动。'
+        ? '让模型重写这一镜。时长留空则沿用当前秒数。'
         : '填写密钥后才能让模型重做这一镜。'
+  const canRevise = mode === 'token' && canGenerate && Boolean(supplement.trim())
 
   const charIds = useMemo(
     () => new Set(story.characters.map((c) => c.id)),
@@ -90,7 +107,27 @@ export default function App() {
     setDraft(next.input)
   }
 
+  function replaceShot(nextShot: Shot, recordHistory: boolean) {
+    if (recordHistory) {
+      setHistory((hist) => pushShotHistory(hist, shot))
+    }
+    setStory((prev) => ({
+      ...prev,
+      shots: prev.shots.map((item) =>
+        item.id === shot.id
+          ? {
+              ...item,
+              ...nextShot,
+              id: item.id,
+              order: item.order,
+            }
+          : item,
+      ),
+    }))
+  }
+
   function patchShot(patch: Partial<Shot>) {
+    if (mode === 'preset') return
     setStory((prev) => ({
       ...prev,
       shots: prev.shots.map((item, i) =>
@@ -104,6 +141,7 @@ export default function App() {
     if (mode === 'preset') {
       const next = loadPreset(presetId)
       presetSource.current = next
+      setHistory({})
       applyStory(next)
       return
     }
@@ -120,6 +158,7 @@ export default function App() {
         setError(`模型返回不合格：${parsed.error}。上一版粗剪仍可播。`)
         return
       }
+      setHistory({})
       applyStory(parsed.value)
     } catch (err) {
       setError(asErrorMessage(err))
@@ -134,24 +173,27 @@ export default function App() {
       const source = presetSource.current.shots.find((s) => s.id === shot.id)
       if (!source) return
       const pool = [withoutAlts(source), ...(source.alts ?? [])]
-      const key = shotKey(shot)
-      const idx = pool.findIndex((item) => shotKey(item) === key)
+      const idx = pool.findIndex((item) => shotKey(item) === shotKey(withoutAlts(shot)))
       const nextShot = pool[(idx + 1) % pool.length]
-      patchShot({ ...nextShot, id: source.id, order: source.order, alts: source.alts })
+      replaceShot({ ...nextShot, alts: source.alts }, true)
       return
     }
+    const durationSec = resolveDuration(durationDraft, shot.durationSec)
     setBusy(true)
     try {
       const text = await chatCompletionsText(token, [
         { role: 'system', content: redoShotSystemPrompt() },
-        { role: 'user', content: redoShotUserPrompt(story, shot) },
+        { role: 'user', content: redoShotUserPrompt(story, shot, durationSec) },
       ])
       const parsed = parseModelText(text, (raw) => parseShotJson(raw, charIds))
       if (!parsed.ok) {
         setError(`单镜重写不合格：${parsed.error}。当前镜未改。`)
         return
       }
-      patchShot({ ...parsed.value, id: shot.id, order: shot.order, alts: undefined })
+      replaceShot(
+        { ...parsed.value, durationSec, id: shot.id, order: shot.order, alts: undefined },
+        true,
+      )
     } catch (err) {
       setError(asErrorMessage(err))
     } finally {
@@ -159,23 +201,60 @@ export default function App() {
     }
   }
 
-  async function onCopy(dialect: PromptDialect) {
-    const pack = buildPromptPack(story, dialect)
+  async function onRevise() {
+    setError(null)
+    if (mode !== 'token') return
+    const note = supplement.trim()
+    if (!note) {
+      setError('请先填写要改变的内容，再按补充改这一镜。')
+      return
+    }
+    const durationSec = resolveDuration(durationDraft, shot.durationSec)
+    setBusy(true)
+    try {
+      const text = await chatCompletionsText(token, [
+        { role: 'system', content: redoShotSystemPrompt() },
+        { role: 'user', content: reviseShotUserPrompt(story, shot, note, durationSec) },
+      ])
+      const parsed = parseModelText(text, (raw) => parseShotJson(raw, charIds))
+      if (!parsed.ok) {
+        setError(`按补充改镜不合格：${parsed.error}。当前镜未改。`)
+        return
+      }
+      replaceShot(
+        { ...parsed.value, durationSec, id: shot.id, order: shot.order, alts: undefined },
+        true,
+      )
+    } catch (err) {
+      setError(asErrorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onCopy() {
+    const pack = buildPromptPack(story)
     try {
       await navigator.clipboard.writeText(pack)
     } catch {
       window.prompt('复制失败，请手动全选复制：', pack)
     }
-    setCopied(dialect)
-    window.setTimeout(() => setCopied(null), 1800)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1800)
   }
 
   function onPresetId(id: string) {
     setPresetId(id)
     const next = loadPreset(id)
     presetSource.current = next
+    setHistory({})
     applyStory(next)
     setError(null)
+  }
+
+  function onRestore(item: { key: string; shot: Shot }) {
+    const source = presetSource.current.shots.find((s) => s.id === shot.id)
+    replaceShot({ ...item.shot, alts: mode === 'preset' ? source?.alts : undefined }, true)
   }
 
   return (
@@ -201,31 +280,29 @@ export default function App() {
       generateHint={generateHint}
       canRedo={canRedo}
       redoHint={redoHint}
+      canRevise={canRevise}
+      supplement={supplement}
+      onSupplement={setSupplement}
+      durationDraft={durationDraft}
+      onDurationDraft={setDurationDraft}
+      history={history[shot.id] ?? []}
+      onRestore={onRestore}
       onGenerate={() => void onGenerate()}
       onLine={(line) => patchShot({ line })}
       onMotion={(motionId: MotionId) => patchShot({ motionId })}
       onRedo={() => void onRedo()}
+      onRevise={() => void onRevise()}
       onTogglePlay={timeline.toggle}
       onSeekShot={timeline.seekToShot}
-      onCopy={(d) => void onCopy(d)}
-      previewPack={buildPromptPack(story, 'jimeng')}
+      onCopy={() => void onCopy()}
     >
       <div className="stage-stack" ref={rootRef}>
         {story.shots.map((item) => (
-          <ShotStage key={item.id} story={story} shot={item} />
+          <ShotStage key={`${story.id}-${item.id}`} story={story} shot={item} />
         ))}
       </div>
     </EditorChrome>
   )
-}
-
-function withoutAlts(shot: Shot): Shot {
-  const { alts: _alts, ...rest } = shot
-  return rest
-}
-
-function shotKey(shot: Shot): string {
-  return `${shot.motionId}|${shot.shotSize}|${shot.line}|${shot.prop ?? 'none'}`
 }
 
 function readToken(): TokenConfig {
