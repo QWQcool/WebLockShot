@@ -4,6 +4,8 @@
 
 粗糙是特性。这是 animatic，不是给观众看的成片。
 
+在线体验：https://qwqcool.github.io/WebLockShot/
+
 ## 本地运行
 
 ```bash

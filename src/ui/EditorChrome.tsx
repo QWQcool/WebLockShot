@@ -103,7 +103,7 @@ export function EditorChrome(props: Props) {
       <header className="mast">
         <div className="mast-brand">
           <span className="mast-slate">WEB锁镜</span>
-          <p className="mast-tag">出可灵之前，先锁这六镜</p>
+          <p className="mast-tag">AI出视频之前，先锁这六镜</p>
         </div>
         <div className="mast-actions">
           <div className="mode-switch" role="tablist" aria-label="工作模式">
@@ -174,18 +174,21 @@ export function EditorChrome(props: Props) {
               onChange={(hook) => onDraft({ ...draft, hook })}
               accent
             />
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={!canGenerate || busy}
-              onClick={onGenerate}
-            >
-              {busy ? '拆镜中…' : mode === 'preset' ? '载入该预设' : '生成粗剪'}
-            </button>
-            {!canGenerate ? <p className="hint">{generateHint}</p> : null}
-            {presetLocked ? (
-              <p className="hint">预设模拟只供预览。台词和运动不能改，重做只会切到官方第二镜。 </p>
-            ) : null}
+            {mode === 'token' ? (
+              <>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!canGenerate || busy}
+                  onClick={onGenerate}
+                >
+                  {busy ? '拆镜中…' : '生成粗剪'}
+                </button>
+                {!canGenerate ? <p className="hint">{generateHint}</p> : null}
+              </>
+            ) : (
+              <p className="hint">预设模拟只供预览。台词和运动不能改，重做只会切到官方第二镜。</p>
+            )}
           </section>
 
           {mode === 'token' ? (
