@@ -2,7 +2,8 @@
 
 给竖屏短剧创作者一台 **出可灵 / 即梦之前的免费粗剪台**。用主题、人物、冲突、钩子拆成可播放的 6 镜动态分镜（HTML + GSAP 模板，不是成片），锁镜头和台词之后，导出一份可粘贴到可灵或即梦的提示词。
 
-在线体验：https://qwqcool.github.io/WebLockShot/（推送 `main` 后由 GitHub Actions 自动部署）
+在线体验：https://qwqcool.github.io/WebLockShot/
+（推送 `main` 后由 GitHub Actions 自动部署）
 
 ## 本地运行
 
