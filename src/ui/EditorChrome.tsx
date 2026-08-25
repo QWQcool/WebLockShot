@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useRef, type ChangeEvent, type ReactNode } from 'react'
 import {
   MOTION_IDS,
   MOTION_LABEL,
@@ -29,6 +29,7 @@ type Props = {
   busy: boolean
   error: string | null
   copied: boolean
+  fileFlash: string | null
   token: TokenConfig
   onToken: (token: TokenConfig) => void
   canGenerate: boolean
@@ -50,6 +51,8 @@ type Props = {
   onTogglePlay: () => void
   onSeekShot: (index: number) => void
   onCopy: () => void
+  onExportStory: () => void
+  onImportStory: (file: File) => void
   children: ReactNode
 }
 
@@ -70,6 +73,7 @@ export function EditorChrome(props: Props) {
     busy,
     error,
     copied,
+    fileFlash,
     token,
     onToken,
     canGenerate,
@@ -91,9 +95,12 @@ export function EditorChrome(props: Props) {
     onTogglePlay,
     onSeekShot,
     onCopy,
+    onExportStory,
+    onImportStory,
     children,
   } = props
 
+  const fileRef = useRef<HTMLInputElement>(null)
   const presetLocked = mode === 'preset'
   const progress = duration > 0 ? Math.min(1, time / duration) : 0
   const themeValue = presetLocked ? story.input.theme : draft.theme
@@ -120,9 +127,38 @@ export function EditorChrome(props: Props) {
               </button>
             ))}
           </div>
-          <button type="button" className="btn-export" onClick={onCopy}>
-            {copied ? '已复制提示词' : '导出提示词'}
-          </button>
+          <div className="pack-actions">
+            <button type="button" className="btn-export" onClick={onCopy}>
+              {copied ? '已复制提示词' : '导出提示词'}
+            </button>
+            <button
+              type="button"
+              className="btn-export"
+              disabled={busy}
+              onClick={onExportStory}
+            >
+              {fileFlash === '已下载 JSON' ? '已下载 JSON' : '导出 JSON'}
+            </button>
+            <button
+              type="button"
+              className="btn-export"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              {fileFlash === '已导入 JSON' ? '已导入 JSON' : '导入 JSON'}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) onImportStory(file)
+              }}
+            />
+          </div>
         </div>
       </header>
 

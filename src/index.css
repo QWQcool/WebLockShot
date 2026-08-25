@@ -120,6 +120,13 @@ textarea:focus-visible {
   gap: 1.15rem;
 }
 
+.pack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
 .mode-switch {
   display: flex;
   border: 1px solid var(--miku);

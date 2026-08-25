@@ -9,7 +9,8 @@ import {
 } from './ai/prompts'
 import { parseModelText, parseShotJson, parseStoryJson } from './ai/schema'
 import { buildPromptPack } from './export/buildPromptPack'
-import { defaultPresetId, loadPreset } from './presets/load'
+import { defaultPresetId, loadPreset, PRESETS } from './presets/load'
+import { downloadStoryJson, parseStoryFile } from './storyFile'
 import {
   pushShotHistory,
   resolveDuration,
@@ -41,6 +42,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [fileFlash, setFileFlash] = useState<string | null>(null)
   const [reducedMotion, setReducedMotion] = useState(false)
   const [history, setHistory] = useState<ShotHistory>({})
   const [supplement, setSupplement] = useState('')
@@ -243,6 +245,39 @@ export default function App() {
     window.setTimeout(() => setCopied(false), 1800)
   }
 
+  function flashFile(message: string) {
+    setFileFlash(message)
+    window.setTimeout(() => setFileFlash(null), 1800)
+  }
+
+  function onExportStory() {
+    downloadStoryJson(story)
+    flashFile('已下载 JSON')
+  }
+
+  async function onImportStory(file: File) {
+    setError(null)
+    try {
+      const parsed = parseStoryFile(await file.text())
+      if (!parsed.ok) {
+        setError(`无法导入：${parsed.error}。当前粗剪未改。`)
+        return
+      }
+      const next = parsed.value
+      presetSource.current = next
+      setHistory({})
+      applyStory(next)
+      if (PRESETS.some((p) => p.id === next.id)) {
+        setPresetId(next.id)
+      } else {
+        setMode('token')
+      }
+      flashFile('已导入 JSON')
+    } catch {
+      setError('无法读取该文件。当前粗剪未改。')
+    }
+  }
+
   function onPresetId(id: string) {
     setPresetId(id)
     const next = loadPreset(id)
@@ -274,6 +309,7 @@ export default function App() {
       busy={busy}
       error={error}
       copied={copied}
+      fileFlash={fileFlash}
       token={token}
       onToken={setToken}
       canGenerate={canGenerate}
@@ -295,6 +331,8 @@ export default function App() {
       onTogglePlay={timeline.toggle}
       onSeekShot={timeline.seekToShot}
       onCopy={() => void onCopy()}
+      onExportStory={onExportStory}
+      onImportStory={(file) => void onImportStory(file)}
     >
       <div className="stage-stack" ref={rootRef}>
         {story.shots.map((item) => (
