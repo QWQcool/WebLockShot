@@ -14,8 +14,9 @@ dist-ssr
 .env
 .env.*
 
-# Local-only prompt notes (keep on disk, never commit)
+# Local-only notes (keep on disk, never commit)
 提示词存储.md
+体验说明.md
 
 # Editor directories and files
 .vscode/*
