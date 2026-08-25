@@ -4,7 +4,7 @@
 
 粗糙是特性。这是 animatic，不是给观众看的成片。
 
-在线体验：https://qwqcool.github.io/WebLockShot/
+在线体验：https://qwqcool.github.io/WebLockShot/（推送 `main` 后由 GitHub Actions 自动部署）
 
 ## 本地运行
 
