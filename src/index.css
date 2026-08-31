@@ -331,6 +331,37 @@ textarea:focus-visible {
   border-radius: 8px;
 }
 
+.err .fallback-tag {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--miku);
+  color: #fff;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.resume-banner {
+  margin-top: 0.7rem;
+  padding: 0.7rem;
+  border-radius: 12px;
+  border: 1px dashed var(--miku);
+  background: #f3fffe;
+}
+
+.resume-banner p {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .bay {
   display: grid;
   place-items: center;

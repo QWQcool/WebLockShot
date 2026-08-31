@@ -9,6 +9,7 @@ import {
   type Shot,
   type ShotSize,
   type Story,
+  type StoryEnvelope,
   type StoryInput,
 } from '../types'
 
@@ -41,10 +42,10 @@ function asNonEmpty(v: unknown, label: string): ParseResult<string> {
   return s
 }
 
-export function parseStoryJson(
+export function parseStoryEnvelope(
   raw: unknown,
-  opts: { allowAlts: boolean },
-): ParseResult<Story> {
+  opts?: { minCharacters?: number },
+): ParseResult<StoryEnvelope> {
   if (!isRecord(raw)) return { ok: false, error: '根对象必须是 JSON 对象' }
 
   const id = asNonEmpty(raw.id, 'id')
@@ -55,8 +56,9 @@ export function parseStoryJson(
   const input = parseInput(raw.input)
   if (!input.ok) return input
 
-  if (!Array.isArray(raw.characters) || raw.characters.length < 1) {
-    return { ok: false, error: 'characters 至少需要 1 人' }
+  const minCharacters = opts?.minCharacters ?? 1
+  if (!Array.isArray(raw.characters) || raw.characters.length < minCharacters) {
+    return { ok: false, error: `characters 至少需要 ${minCharacters} 人` }
   }
   const characters: Character[] = []
   const charIds = new Set<string>()
@@ -73,12 +75,33 @@ export function parseStoryJson(
   const setting = parseSetting(raw.setting)
   if (!setting.ok) return setting
 
+  return {
+    ok: true,
+    value: {
+      id: id.value,
+      title: title.value,
+      input: input.value,
+      characters,
+      setting: setting.value,
+    },
+  }
+}
+
+export function parseStoryJson(
+  raw: unknown,
+  opts: { allowAlts: boolean },
+): ParseResult<Story> {
+  const envelope = parseStoryEnvelope(raw)
+  if (!envelope.ok) return envelope
+  if (!isRecord(raw)) return { ok: false, error: '根对象必须是 JSON 对象' }
+
   if (!Array.isArray(raw.shots) || raw.shots.length !== 6) {
     return { ok: false, error: 'shots 必须恰好 6 镜' }
   }
 
   const shots: Shot[] = []
   const seenOrder = new Set<number>()
+  const charIds = new Set(envelope.value.characters.map((c) => c.id))
   for (let i = 0; i < raw.shots.length; i++) {
     const shot = parseShot(raw.shots[i], `shots[${i}]`, {
       allowAlts: opts.allowAlts,
@@ -102,11 +125,7 @@ export function parseStoryJson(
   return {
     ok: true,
     value: {
-      id: id.value,
-      title: title.value,
-      input: input.value,
-      characters,
-      setting: setting.value,
+      ...envelope.value,
       shots,
     },
   }

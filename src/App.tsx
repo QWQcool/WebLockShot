@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { chatCompletionsText, TokenClientError } from './ai/client'
+import { runSequentialGenerate } from './ai/generate'
 import {
-  generateUserPrompt,
   redoShotSystemPrompt,
   redoShotUserPrompt,
   reviseShotUserPrompt,
-  storySystemPrompt,
 } from './ai/prompts'
-import { parseModelText, parseShotJson, parseStoryJson } from './ai/schema'
+import { parseModelText, parseShotJson } from './ai/schema'
 import { buildPromptPack } from './export/buildPromptPack'
 import { defaultPresetId, loadPreset, PRESETS } from './presets/load'
 import { downloadStoryJson, parseStoryFile } from './storyFile'
@@ -29,6 +28,17 @@ import type {
 } from './types'
 import { TOKEN_STORAGE_KEY } from './types'
 import { EditorChrome } from './ui/EditorChrome'
+import {
+  clearGenerateSession,
+  createGenerateSession,
+  isIncompleteSession,
+  readGenerateSession,
+  readLastGoodStory,
+  sessionProgress,
+  writeGenerateSession,
+  writeLastGoodStory,
+  type GenerateSession,
+} from './persist'
 
 const EMPTY_TOKEN: TokenConfig = { baseUrl: '', apiKey: '', model: '' }
 
@@ -47,7 +57,17 @@ export default function App() {
   const [history, setHistory] = useState<ShotHistory>({})
   const [supplement, setSupplement] = useState('')
   const [durationDraft, setDurationDraft] = useState('')
+  const [busyLabel, setBusyLabel] = useState<string | null>(null)
+  const [resumeSession, setResumeSession] = useState<GenerateSession | null>(
+    () => {
+      const existing = readGenerateSession()
+      return existing && isIncompleteSession(existing) ? existing : null
+    },
+  )
+  const [fallbackNote, setFallbackNote] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const restoredTokenStory = useRef(false)
 
   const timelineKey = [
     story.id,
@@ -109,6 +129,32 @@ export default function App() {
     setDraft(next.input)
   }
 
+  function beginAbortSignal(): AbortSignal {
+    abortRef.current?.abort()
+    const ac = new AbortController()
+    abortRef.current = ac
+    return ac.signal
+  }
+
+  function rememberSuccess(next: Story) {
+    writeLastGoodStory(next)
+    applyStory(next)
+  }
+
+  function failGenerate(err: unknown) {
+    const last = readLastGoodStory()
+    const detail = asErrorMessage(err)
+    if (last) {
+      setFallbackNote('上次可用版本')
+      setError(`${detail}。上次可用版本仍可播放。`)
+    } else {
+      setFallbackNote(null)
+      setError(`${detail}。这是首次生成失败，没有可降级的上一版。`)
+    }
+    const leftover = readGenerateSession()
+    setResumeSession(leftover && isIncompleteSession(leftover) ? leftover : null)
+  }
+
   function replaceShot(nextShot: Shot, recordHistory: boolean) {
     if (recordHistory) {
       setHistory((hist) => pushShotHistory(hist, shot))
@@ -138,6 +184,37 @@ export default function App() {
     }))
   }
 
+  async function generateFromSession(session: GenerateSession) {
+    setBusy(true)
+    setBusyLabel('拆镜中…')
+    setError(null)
+    setFallbackNote(null)
+    try {
+      const next = await runSequentialGenerate({
+        token,
+        session,
+        signal: beginAbortSignal(),
+        onSession: setResumeSession,
+        onProgress: setBusyLabel,
+      })
+      setHistory({})
+      rememberSuccess(next)
+      setResumeSession(null)
+      setBusyLabel(null)
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('生成已取消。未完成会话仍保留，刷新后可继续。')
+        const leftover = readGenerateSession()
+        setResumeSession(leftover && isIncompleteSession(leftover) ? leftover : null)
+        return
+      }
+      failGenerate(err)
+    } finally {
+      setBusy(false)
+      setBusyLabel(null)
+    }
+  }
+
   async function onGenerate() {
     setError(null)
     if (mode === 'preset') {
@@ -147,26 +224,30 @@ export default function App() {
       applyStory(next)
       return
     }
-    setBusy(true)
-    try {
-      const text = await chatCompletionsText(token, [
-        { role: 'system', content: storySystemPrompt() },
-        { role: 'user', content: generateUserPrompt(draft) },
-      ])
-      const parsed = parseModelText(text, (raw) =>
-        parseStoryJson(raw, { allowAlts: false }),
-      )
-      if (!parsed.ok) {
-        setError(`模型返回不合格：${parsed.error}。上一版粗剪仍可播。`)
-        return
-      }
-      setHistory({})
-      applyStory(parsed.value)
-    } catch (err) {
-      setError(asErrorMessage(err))
-    } finally {
-      setBusy(false)
+    const session = createGenerateSession(draft, token.model)
+    writeGenerateSession(session)
+    setResumeSession(session)
+    await generateFromSession(session)
+  }
+
+  async function onResumeGenerate() {
+    const session = readGenerateSession()
+    if (!session || !isIncompleteSession(session)) {
+      setResumeSession(null)
+      return
     }
+    if (!canGenerate) {
+      setError('先填写密钥再继续未完成的生成。')
+      return
+    }
+    await generateFromSession(session)
+  }
+
+  function onDiscardGenerate() {
+    abortRef.current?.abort()
+    clearGenerateSession()
+    setResumeSession(null)
+    setError(null)
   }
 
   async function onRedo() {
@@ -182,24 +263,38 @@ export default function App() {
     }
     const durationSec = resolveDuration(durationDraft, shot.durationSec)
     setBusy(true)
+    setBusyLabel('重写这一镜…')
     try {
-      const text = await chatCompletionsText(token, [
-        { role: 'system', content: redoShotSystemPrompt() },
-        { role: 'user', content: redoShotUserPrompt(story, shot, durationSec) },
-      ])
+      const text = await chatCompletionsText(
+        token,
+        [
+          { role: 'system', content: redoShotSystemPrompt() },
+          { role: 'user', content: redoShotUserPrompt(story, shot, durationSec) },
+        ],
+        beginAbortSignal(),
+      )
       const parsed = parseModelText(text, (raw) => parseShotJson(raw, charIds))
       if (!parsed.ok) {
         setError(`单镜重写不合格：${parsed.error}。当前镜未改。`)
         return
       }
-      replaceShot(
-        { ...parsed.value, durationSec, id: shot.id, order: shot.order, alts: undefined },
-        true,
-      )
+      const nextShot = {
+        ...parsed.value,
+        durationSec,
+        id: shot.id,
+        order: shot.order,
+        alts: undefined,
+      }
+      replaceShot(nextShot, true)
+      writeLastGoodStory({
+        ...story,
+        shots: story.shots.map((item) => (item.id === shot.id ? { ...item, ...nextShot } : item)),
+      })
     } catch (err) {
       setError(asErrorMessage(err))
     } finally {
       setBusy(false)
+      setBusyLabel(null)
     }
   }
 
@@ -213,24 +308,38 @@ export default function App() {
     }
     const durationSec = resolveDuration(durationDraft, shot.durationSec)
     setBusy(true)
+    setBusyLabel('按补充改这一镜…')
     try {
-      const text = await chatCompletionsText(token, [
-        { role: 'system', content: redoShotSystemPrompt() },
-        { role: 'user', content: reviseShotUserPrompt(story, shot, note, durationSec) },
-      ])
+      const text = await chatCompletionsText(
+        token,
+        [
+          { role: 'system', content: redoShotSystemPrompt() },
+          { role: 'user', content: reviseShotUserPrompt(story, shot, note, durationSec) },
+        ],
+        beginAbortSignal(),
+      )
       const parsed = parseModelText(text, (raw) => parseShotJson(raw, charIds))
       if (!parsed.ok) {
         setError(`按补充改镜不合格：${parsed.error}。当前镜未改。`)
         return
       }
-      replaceShot(
-        { ...parsed.value, durationSec, id: shot.id, order: shot.order, alts: undefined },
-        true,
-      )
+      const nextShot = {
+        ...parsed.value,
+        durationSec,
+        id: shot.id,
+        order: shot.order,
+        alts: undefined,
+      }
+      replaceShot(nextShot, true)
+      writeLastGoodStory({
+        ...story,
+        shots: story.shots.map((item) => (item.id === shot.id ? { ...item, ...nextShot } : item)),
+      })
     } catch (err) {
       setError(asErrorMessage(err))
     } finally {
       setBusy(false)
+      setBusyLabel(null)
     }
   }
 
@@ -267,6 +376,7 @@ export default function App() {
       presetSource.current = next
       setHistory({})
       applyStory(next)
+      writeLastGoodStory(next)
       if (PRESETS.some((p) => p.id === next.id)) {
         setPresetId(next.id)
       } else {
@@ -295,7 +405,13 @@ export default function App() {
   return (
     <EditorChrome
       mode={mode}
-      onMode={setMode}
+      onMode={(next) => {
+        setMode(next)
+        if (next !== 'token' || restoredTokenStory.current) return
+        restoredTokenStory.current = true
+        const last = readLastGoodStory()
+        if (last) applyStory(last)
+      }}
       presetId={presetId}
       onPresetId={onPresetId}
       draft={draft}
@@ -307,7 +423,16 @@ export default function App() {
       time={timeline.time}
       duration={timeline.duration}
       busy={busy}
+      busyLabel={busyLabel}
       error={error}
+      fallbackNote={fallbackNote}
+      resumeOffer={
+        resumeSession && isIncompleteSession(resumeSession) && !busy
+          ? sessionProgress(resumeSession)
+          : null
+      }
+      onResumeGenerate={() => void onResumeGenerate()}
+      onDiscardGenerate={onDiscardGenerate}
       copied={copied}
       fileFlash={fileFlash}
       token={token}
@@ -361,7 +486,8 @@ function readToken(): TokenConfig {
 }
 
 function asErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.name === 'AbortError') return '请求已取消'
   if (err instanceof TokenClientError) return err.message
   if (err instanceof Error) return err.message
-  return '生成失败，上一版粗剪仍可播。'
+  return '生成失败。'
 }

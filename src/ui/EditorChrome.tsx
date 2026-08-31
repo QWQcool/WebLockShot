@@ -27,7 +27,12 @@ type Props = {
   time: number
   duration: number
   busy: boolean
+  busyLabel: string | null
   error: string | null
+  fallbackNote: string | null
+  resumeOffer: { done: number; total: number } | null
+  onResumeGenerate: () => void
+  onDiscardGenerate: () => void
   copied: boolean
   fileFlash: string | null
   token: TokenConfig
@@ -71,7 +76,12 @@ export function EditorChrome(props: Props) {
     time,
     duration,
     busy,
+    busyLabel,
     error,
+    fallbackNote,
+    resumeOffer,
+    onResumeGenerate,
+    onDiscardGenerate,
     copied,
     fileFlash,
     token,
@@ -218,9 +228,30 @@ export function EditorChrome(props: Props) {
                   disabled={!canGenerate || busy}
                   onClick={onGenerate}
                 >
-                  {busy ? '拆镜中…' : '生成粗剪'}
+                  {busy ? busyLabel ?? '拆镜中…' : '生成粗剪'}
                 </button>
                 {!canGenerate ? <p className="hint">{generateHint}</p> : null}
+                {resumeOffer ? (
+                  <div className="resume-banner" role="status">
+                    <p>
+                      发现未完成的生成，是否继续？已保存 {resumeOffer.done}/
+                      {resumeOffer.total} 镜，已完成的镜不会再消耗 Token。
+                    </p>
+                    <div className="resume-actions">
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={!canGenerate}
+                        onClick={onResumeGenerate}
+                      >
+                        继续
+                      </button>
+                      <button type="button" className="btn-ghost" onClick={onDiscardGenerate}>
+                        放弃
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </>
             ) : (
               <p className="hint">预设模拟只供预览。台词和运动不能改，重做只会切到官方第二镜。</p>
@@ -361,6 +392,9 @@ export function EditorChrome(props: Props) {
           {error ? (
             <p className="err" role="alert">
               {error}
+              {fallbackNote ? (
+                <span className="fallback-tag">{fallbackNote}</span>
+              ) : null}
             </p>
           ) : null}
         </aside>
@@ -376,7 +410,9 @@ export function EditorChrome(props: Props) {
                 <span>{playing ? 'REC' : 'PAUSE'}</span>
               </div>
               <div className="monitor-glass">
-                {busy ? <div className="busy">拆镜中…</div> : null}
+                {busy ? (
+                  <div className="busy">{busyLabel ?? '拆镜中…'}</div>
+                ) : null}
                 {children}
               </div>
             </div>

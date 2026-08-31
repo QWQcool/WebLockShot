@@ -1,12 +1,30 @@
 import type { TokenConfig } from '../types'
+import {
+  abortError,
+  classifyTokenError,
+  decorateRetryExhausted,
+  isAbortError,
+  withRetry,
+  type RetryClassify,
+} from './retry'
 
 export class TokenClientError extends Error {
   readonly kind: 'config' | 'network' | 'http' | 'empty'
+  readonly status?: number
+  readonly retryAfter?: string | null
+  readonly retries?: number
 
-  constructor(kind: TokenClientError['kind'], message: string) {
+  constructor(
+    kind: TokenClientError['kind'],
+    message: string,
+    extra?: { status?: number; retryAfter?: string | null; retries?: number },
+  ) {
     super(message)
     this.kind = kind
     this.name = 'TokenClientError'
+    this.status = extra?.status
+    this.retryAfter = extra?.retryAfter
+    this.retries = extra?.retries
   }
 }
 
@@ -22,11 +40,19 @@ export function assertTokenConfig(config: TokenConfig): void {
     throw new TokenClientError('config', '还没有填写 API Base URL')
   }
   if (!config.apiKey.trim()) {
-    throw new TokenClientError('config', '还没有填写 API Key。密钥只存在本标签页，不会写入仓库')
+    throw new TokenClientError(
+      'config',
+      '还没有填写 API Key。密钥只存在本标签页，不会写入仓库',
+    )
   }
   if (!config.model.trim()) {
     throw new TokenClientError('config', '还没有填写模型名')
   }
+}
+
+export function classifyChatError(err: unknown): RetryClassify {
+  if (!(err instanceof TokenClientError)) return { retry: false }
+  return classifyTokenError(err)
 }
 
 type ChatMessage = { role: 'system' | 'user'; content: string }
@@ -39,6 +65,36 @@ export async function chatCompletionsText(
   assertTokenConfig(config)
   const url = completionsUrl(config.baseUrl)
 
+  return withRetry(() => requestOnce(url, config, messages, signal), {
+    signal,
+    classify: classifyChatError,
+    decorateExhausted: (err) => {
+      if (!(err instanceof TokenClientError)) return err
+      return new TokenClientError(err.kind, decorateRetryExhausted(err.message), {
+        status: err.status,
+        retryAfter: err.retryAfter,
+        retries: 3,
+      })
+    },
+    onRetry: ({ retry, delayMs, error }) => {
+      const status = error instanceof TokenClientError ? error.status : undefined
+      const kind = error instanceof TokenClientError ? error.kind : 'unknown'
+      console.info('[weblockshot.retry]', {
+        retry,
+        delayMs,
+        kind,
+        status,
+      })
+    },
+  })
+}
+
+async function requestOnce(
+  url: string,
+  config: TokenConfig,
+  messages: ChatMessage[],
+  signal?: AbortSignal,
+): Promise<string> {
   let response: Response
   try {
     response = await fetch(url, {
@@ -54,7 +110,8 @@ export async function chatCompletionsText(
       }),
       signal,
     })
-  } catch {
+  } catch (err) {
+    if (signal?.aborted || isAbortError(err)) throw abortError()
     throw new TokenClientError(
       'network',
       '无法连到该 API。若在浏览器里跨域失败，请换 OpenRouter 或硅基流动等允许 CORS 的端点',
@@ -67,6 +124,10 @@ export async function chatCompletionsText(
     throw new TokenClientError(
       'http',
       `接口返回 ${response.status}${hint ? `：${hint}` : ''}`,
+      {
+        status: response.status,
+        retryAfter: response.headers.get('Retry-After'),
+      },
     )
   }
 

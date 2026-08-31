@@ -72,12 +72,15 @@ export type Shot = {
   alts?: Shot[]
 }
 
-export type Story = {
+export type StoryEnvelope = {
   id: string
   title: string
   input: StoryInput
   characters: Character[]
   setting: Setting
+}
+
+export type Story = StoryEnvelope & {
   shots: Shot[]
 }
 
