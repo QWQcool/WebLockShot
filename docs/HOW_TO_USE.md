@@ -80,16 +80,20 @@ npm run dev
 
 ## （二）电商全链路六步爆款工作流
 
-![电商全链路六步爆款工作流界面](./screenshots/01_workbench_pipeline.png)
-
-点击顶部导航的 **「🛒 电商全链路工作流」**，即可按科学工业化步骤执行生成。
+点击顶部导航的 **「🛒 电商全链路工作流」**，即可按科学工业化步骤执行生成。每一个环节均经过百万级推流数据检验与严格 Schema 约束。
 
 ### Step 0：商品信息多模态导入
+
+![Step 0 商品信息多模态导入与卖点归纳](./screenshots/01_step0_product_import.png)
+
 - **链接导入**：输入电商主图链接，系统如实归档并引导填写核心差异化卖点；
 - **图片导入**：支持上传高清商品白底图或透底图，内置 9 款 3C、美妆、服饰大厂级 Mock 预设图一键选用；
 - **参考视频导入**：支持上传本地爆款对标视频片段，内置 Canvas 自动抽帧引擎。
 
 ### Step 1：5 大爆款结构与黄金 3 秒钩子选择
+
+![Step 1 5大爆款结构套路与黄金3秒钩子库](./screenshots/02_step1_template_hook.png)
+
 针对短视频平台推流算法，内置经百万播放验证的 5 套 6 镜带货套路：
 1. **痛点开场型 (Pain-Solution)**：反常识开场 → 痛点共鸣放大 → 产品破局 → 核心功能微距 → 信任凭证背书 → 强引导限时下单；
 2. **效果反差型 (Contrast-Shock)**：震撼对比 → 揭秘关键机理 → 深度实测 → 体验升级 → 资质打消顾虑 → 行动号召；
@@ -98,23 +102,38 @@ npm run dev
 5. **价格锚点型 (Price-Anchor)**：大牌天价对比 → 打破暴利黑幕 → 极致做工对标 → 溯源源头成本 → 超值特惠释放 → 锁单催促。
 
 ### Step 2：双 Agent 剧本编导与对立面评审
+
+![Step 2 双 Agent 剧本编导与对立面评审雷达打分](./screenshots/03_step2_script_critic.png)
+
 - **编导智体 (ScriptWriter)**：结合商品卖点与所选爆款套路，自动创作符合竖屏短视频传播节奏的 6 镜分镜台词与画面描述。
-- **质检智体 (ScriptCritic)**：化身挑剔的平台质检员，从「3 秒停留率、卖点可视化、完播节奏、合规风险」4 个维度严苛打分（0~100 分），并提出具体的剧本修改诊断建议。
+- **质检智体 (ScriptCritic)**：化身挑剔的平台质检员，从「3 秒停留率、卖点可视化、完播节奏、合规风险」4 个维度严苛打分（0~100 分），并给出详尽的诊断雷达图与具体修改建议。
 
 ### Step 3：9:16 GSAP 动态分镜视觉预演
+
+![Step 3 9:16 GSAP 动态分镜视觉预演舞台](./screenshots/04_step3_gsap_storyboard.png)
+
 - 在向昂贵算力派发任务前，WebLockShot 的 `sell-stage` 动态舞台会基于 GSAP 动画引擎进行 9:16 全真视觉模拟；
 - 能够直观预览每个镜头的景别（特写、中景、远景）、推拉摇移运镜动势、卖点文字弹幕浮现节奏。
 
 ### Step 4：视觉提示词工程编译
+
+![Step 4 视觉提示词方案工程编译与参数微调](./screenshots/05_step4_visual_compiler.png)
+
 - 系统自动将分镜剧本编译为高精度中英文双语视觉提示词（Positive Prompt & Negative Prompt）；
 - 自动规范画幅（9:16）、镜头秒数（3~6 秒）、渲染参数（8K、光影质感、运镜轨迹与物理防畸变约束）。
 
 ### Step 5：串行任务队列与神经渲染调度
+
+![Step 5 串行任务调度队列与进度实时监控](./screenshots/06_step5_render_queue.png)
+
 - 单机串行任务调度引擎自动调度各镜头任务；
 - 支持快手可灵、字节即梦、**ComfyUI 私有集群** 或 Mock 本地录制出片；
 - 具备实时任务排队进度监控、单镜头独立失败重试与错误精准上报。
 
 ### Step 6：连续审片、TTS 口播与剪映草稿对齐导出
+
+![Step 6 连续审片播放器、自适应 TTS 口播与剪映草稿导出](./screenshots/07_step6_deliver_player.png)
+
 - 6 镜视频无缝连播审片播放器，支持全屏预览与单镜头逐一审阅；
 - **智能 TTS 配音**：内置语速自适应算法，自动根据镜头秒数缩放台词语速，确保台词在镜头结束前精准收尾；
 - **剪映草稿工程直出**：一键导出对齐好的 `draft_content.json`。
@@ -127,7 +146,7 @@ npm run dev
 
 ### 模式 A：单 Agent 极速直出模式
 
-![单 Agent 极速直出工作室](./screenshots/02_single_agent_studio.png)
+![模式 A 单 Agent 极速直出工作室](./screenshots/08_single_agent_studio.png)
 
 适合单镜头快速实验与电商图生视频（Image-to-Video）：
 - **精选灵感库**：内置 3C 数码金属光泽、美妆水润精华露微距、潮流穿搭光影等高转化提示词预设；
@@ -139,7 +158,7 @@ npm run dev
 
 ### 模式 B：多 Agent 协同编导研讨室
 
-![多 Agent 协同编导研讨室](./screenshots/03_multi_agent_studio.png)
+![模式 B 多 Agent 协同编导研讨室](./screenshots/09_multi_agent_studio.png)
 
 适合高定短片与复杂多镜头影视级创作：
 - **4 Agent 协同共创推演**：
@@ -153,7 +172,7 @@ npm run dev
 
 ## （四）视频供应商配置与 ComfyUI 自建私有算力指南
 
-![API 配置与 ComfyUI 私有算力 GPU 探测](./screenshots/04_token_settings_comfyui.png)
+![API 配置与 ComfyUI 私有算力 GPU 探测](./screenshots/10_token_settings_comfyui.png)
 
 点击右上角 **「⚙️ API 设置」** 即可完成各生成渠道的配置。
 
@@ -226,7 +245,7 @@ WebLockShot 导出的 `draft_content.json` 是标准的 CapCut/剪映工程格�
 
 ### 3. 虚拟钱包两阶段提交事务 (Two-Phase Commit Wallet)
 
-![工业级虚拟钱包两阶段结算与审计流水中心](./screenshots/05_virtual_wallet.png)
+![工业级虚拟钱包两阶段结算与审计流水中心](./screenshots/11_virtual_wallet.png)
 
 - 顶部导航常驻 **「💰 虚拟钱包」**；
 - **阶段 1：预冻结 (Freeze)**：点击生成时，若余额充足，将预估费用移入「任务冻结中」，锁定资金防并发超支；

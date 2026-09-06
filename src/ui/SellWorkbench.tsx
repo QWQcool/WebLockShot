@@ -31,6 +31,13 @@ import { DeliverPlayer } from './steps/DeliverPlayer.tsx'
 import { SingleAgentStudio } from './studios/SingleAgentStudio.tsx'
 import { MultiAgentStudio } from './studios/MultiAgentStudio.tsx'
 import { hairDryerImg } from '../assets/presets/index.ts'
+import {
+  DEMO_SCRIPT,
+  DEMO_CRITIC,
+  DEMO_STORY,
+  DEMO_VISUAL_PLANS,
+  DEMO_JOBS,
+} from '../assets/presets/demoPipelineData.ts'
 
 const DEFAULT_PRODUCT_INPUT: ProductInput = {
   source: 'link',
@@ -72,11 +79,19 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
     initialSession?.selectedTemplateId || STRUCTURE_TEMPLATES[0].id
   )
-  const [script, setScript] = useState<Script | null>(initialSession?.script || null)
-  const [criticResult, setCriticResult] = useState<CriticReviewResult | null>(null)
-  const [sellStory, setSellStory] = useState<Story | null>(initialSession?.story || null)
-  const [visualPlans, setVisualPlans] = useState<VisualPlan[]>(initialSession?.visualPlans || [])
-  const [jobs, setJobs] = useState<ShotJob[]>(initialSession?.jobs || [])
+  const [script, setScript] = useState<Script | null>(initialSession?.script || DEMO_SCRIPT)
+  const [criticResult, setCriticResult] = useState<CriticReviewResult | null>(DEMO_CRITIC)
+  const [sellStory, setSellStory] = useState<Story | null>(initialSession?.story || DEMO_STORY)
+  const [visualPlans, setVisualPlans] = useState<VisualPlan[]>(
+    initialSession?.visualPlans && initialSession.visualPlans.length > 0
+      ? initialSession.visualPlans
+      : DEMO_VISUAL_PLANS
+  )
+  const [jobs, setJobs] = useState<ShotJob[]>(
+    initialSession?.jobs && initialSession.jobs.length > 0
+      ? initialSession.jobs
+      : DEMO_JOBS
+  )
   const [isExpanding, setIsExpanding] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(urlParams?.get('settings') === 'open')
   const [isWalletOpen, setIsWalletOpen] = useState(urlParams?.get('wallet') === 'open')
