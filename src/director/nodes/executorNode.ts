@@ -142,10 +142,12 @@ export class ExecutorEngine {
             clientTaskId: job.taskKey,
             prompt: plan.positive,
             negative: plan.negative,
+            imageBase64: plan.referenceImage,
             durationSec: plan.durationSec,
             ratio: plan.ratio,
             shotId: plan.shotId,
             caption: plan.caption,
+            title: plan.shotId,
           })
 
           job.providerTaskId = taskId

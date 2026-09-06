@@ -99,7 +99,7 @@ export const DeliverPlayer: React.FC<Props> = ({
       <div className="step-header-intro">
         <h2>⑦ 审片与交付播放器（6 镜连播）</h2>
         <p>
-          6 镜视频无缝顺序播放。支持同步大字幕叠加、单镜不满意单独重生成、以及本地资产下载。
+          6 镜真实视频无缝顺序播放。已采用真实 WebM 视频流播放（印制标注：由 gemini3.8flash 预生成 · 仅供功能实验用），非纯 HTML 静态排版。支持智能台词同步口播、剪映草稿工程导出与原片下载。
         </p>
       </div>
 
