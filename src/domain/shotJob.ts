@@ -14,7 +14,7 @@ export type MediaAsset = z.infer<typeof MediaAssetSchema>
 export const JobStatusSchema = z.enum(['queued', 'running', 'succeeded', 'failed'])
 export type JobStatus = z.infer<typeof JobStatusSchema>
 
-export const VideoProviderIdSchema = z.enum(['mock', 'kling', 'jimeng'])
+export const VideoProviderIdSchema = z.enum(['mock', 'kling', 'jimeng', 'comfyui'])
 export type VideoProviderId = z.infer<typeof VideoProviderIdSchema>
 
 export const ShotJobSchema = z.object({

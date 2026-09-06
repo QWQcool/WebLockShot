@@ -4,6 +4,7 @@ import type { VideoProvider } from '../../media/types.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
 import { klingVideoProvider } from '../../media/providers/kling.ts'
 import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
+import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 
 export type JobUpdateListener = (jobs: ShotJob[]) => void
 
@@ -13,6 +14,9 @@ export function resolveVideoProvider(providerId: VideoProviderId): VideoProvider
   }
   if (providerId === 'jimeng') {
     return jimengVideoProvider
+  }
+  if (providerId === 'comfyui') {
+    return comfyUIVideoProvider
   }
   return mockVideoProvider
 }

@@ -31,7 +31,7 @@ export const GenerateBoard: React.FC<Props> = ({
       <div className="step-header-intro">
         <h2>⑥ 媒体渲染生成台（浏览器串行队列）</h2>
         <p>
-          单机串行队列调度中。支持快手可灵 (Kling) 官方模型 API 真实出片，或 MediaRecorder 对 9:16 动态舞台进行真实录制。
+          单机串行队列调度中。支持快手可灵 (Kling) / 字节即梦 / ComfyUI 私有 GPU 集群官方真实出片，或 Mock 对 9:16 动态舞台进行极速录制。
         </p>
       </div>
 

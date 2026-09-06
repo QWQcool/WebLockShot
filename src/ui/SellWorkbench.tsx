@@ -164,6 +164,8 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
     try {
       const p = sessionStorage.getItem('weblockshot.video_provider')
       if (p === 'kling') return 'kling'
+      if (p === 'jimeng') return 'jimeng'
+      if (p === 'comfyui') return 'comfyui'
       return 'mock'
     } catch {
       return 'mock'

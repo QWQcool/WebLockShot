@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import type { TokenConfig } from '../../types.ts'
 import { TOKEN_STORAGE_KEY } from '../../types.ts'
+import {
+  comfyUIVideoProvider,
+  COMFY_URL_STORAGE_KEY,
+  COMFY_PRESET_STORAGE_KEY,
+} from '../../media/providers/comfyui.ts'
 
 type Props = {
   isOpen: boolean
@@ -41,9 +46,16 @@ export const TokenSettingsModal: React.FC<Props> = ({
     apiKey: '',
     model: 'deepseek-ai/DeepSeek-V3',
   })
-  const [videoProvider, setVideoProvider] = useState<'mock' | 'kling' | 'jimeng'>('mock')
+  const [videoProvider, setVideoProvider] = useState<'mock' | 'kling' | 'jimeng' | 'comfyui'>('mock')
   const [klingKey, setKlingKey] = useState('')
   const [jimengKey, setJimengKey] = useState('')
+  const [comfyUrl, setComfyUrl] = useState('http://127.0.0.1:8188')
+  const [comfyPreset, setComfyPreset] = useState<string>('wan2.1-i2v')
+  const [comfyTestStatus, setComfyTestStatus] = useState<{
+    testing: boolean
+    ok?: boolean
+    msg?: string
+  }>({ testing: false })
   const [saveSuccess, setSaveSuccess] = useState(false)
 
   useEffect(() => {
@@ -58,13 +70,17 @@ export const TokenSettingsModal: React.FC<Props> = ({
         })
       }
       const savedProvider = sessionStorage.getItem('weblockshot.video_provider')
-      if (savedProvider === 'kling' || savedProvider === 'jimeng') {
-        setVideoProvider(savedProvider)
+      if (savedProvider === 'kling' || savedProvider === 'jimeng' || savedProvider === 'comfyui') {
+        setVideoProvider(savedProvider as any)
       }
       const savedKling = sessionStorage.getItem('weblockshot.kling_key')
       if (savedKling) setKlingKey(savedKling)
       const savedJimeng = sessionStorage.getItem('weblockshot.jimeng_key')
       if (savedJimeng) setJimengKey(savedJimeng)
+      const savedComfyUrl = sessionStorage.getItem(COMFY_URL_STORAGE_KEY)
+      if (savedComfyUrl) setComfyUrl(savedComfyUrl)
+      const savedComfyPreset = sessionStorage.getItem(COMFY_PRESET_STORAGE_KEY)
+      if (savedComfyPreset) setComfyPreset(savedComfyPreset)
     } catch {}
   }, [isOpen])
 
@@ -87,6 +103,8 @@ export const TokenSettingsModal: React.FC<Props> = ({
     if (jimengKey) {
       sessionStorage.setItem('weblockshot.jimeng_key', jimengKey)
     }
+    sessionStorage.setItem(COMFY_URL_STORAGE_KEY, comfyUrl)
+    sessionStorage.setItem(COMFY_PRESET_STORAGE_KEY, comfyPreset)
     setSaveSuccess(true)
     setTimeout(() => {
       setSaveSuccess(false)
@@ -100,6 +118,8 @@ export const TokenSettingsModal: React.FC<Props> = ({
     sessionStorage.removeItem('weblockshot.video_provider')
     sessionStorage.removeItem('weblockshot.kling_key')
     sessionStorage.removeItem('weblockshot.jimeng_key')
+    sessionStorage.removeItem(COMFY_URL_STORAGE_KEY)
+    sessionStorage.removeItem(COMFY_PRESET_STORAGE_KEY)
     setTokenConfig({
       baseUrl: 'https://api.siliconflow.cn/v1',
       apiKey: '',
@@ -107,8 +127,28 @@ export const TokenSettingsModal: React.FC<Props> = ({
     })
     setKlingKey('')
     setJimengKey('')
+    setComfyUrl('http://127.0.0.1:8188')
+    setComfyPreset('wan2.1-i2v')
     setVideoProvider('mock')
     onSaved?.()
+  }
+
+  const handleTestComfy = async () => {
+    setComfyTestStatus({ testing: true })
+    const res = await comfyUIVideoProvider.testConnection(comfyUrl)
+    if (res.ok) {
+      setComfyTestStatus({
+        testing: false,
+        ok: true,
+        msg: `✓ 成功连接 ComfyUI！显卡设备: ${res.gpuName || 'GPU'} (可用显存: ${res.vramFreeGb ?? '动态'} GB)`,
+      })
+    } else {
+      setComfyTestStatus({
+        testing: false,
+        ok: false,
+        msg: `⚠️ 连接失败: ${res.error}`,
+      })
+    }
   }
 
   return (
@@ -211,8 +251,8 @@ export const TokenSettingsModal: React.FC<Props> = ({
                   onChange={() => setVideoProvider('mock')}
                 />
                 <div>
-                  <strong>Mock 真实录制（推荐）</strong>
-                  <p>MediaRecorder 本地真录制，0 门槛免费出 WebM</p>
+                  <strong>Mock 真实录制（免费）</strong>
+                  <p>MediaRecorder 本地真录制，0 门槛秒级出片</p>
                 </div>
               </label>
 
@@ -245,6 +285,22 @@ export const TokenSettingsModal: React.FC<Props> = ({
                 <div>
                   <strong>字节即梦 AI (Jimeng)</strong>
                   <p>真实直调字节即梦视频 API（需开发者凭据）</p>
+                </div>
+              </label>
+
+              <label
+                className={`provider-card-option ${videoProvider === 'comfyui' ? 'selected' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="video_provider"
+                  value="comfyui"
+                  checked={videoProvider === 'comfyui'}
+                  onChange={() => setVideoProvider('comfyui')}
+                />
+                <div>
+                  <strong>🔥 ComfyUI 私有 GPU 算力集群</strong>
+                  <p>0 接口费直调本地/云端 GPU，支持阿里 Wan 2.1 / CogVideoX</p>
                 </div>
               </label>
             </div>
@@ -280,8 +336,59 @@ export const TokenSettingsModal: React.FC<Props> = ({
                 </small>
               </div>
             )}
+
+            {videoProvider === 'comfyui' && (
+              <div className="form-item mt-3">
+                <div className="section-title-bar">
+                  <label>ComfyUI 实例 Base URL：</label>
+                  <button
+                    type="button"
+                    className="btn-test-comfy"
+                    onClick={handleTestComfy}
+                    disabled={comfyTestStatus.testing}
+                  >
+                    {comfyTestStatus.testing ? '正在握手 Ping...' : '🔍 测试连接 (Ping GPU)'}
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  className="text-input"
+                  placeholder="http://127.0.0.1:8188 或远程公网 IP"
+                  value={comfyUrl}
+                  onChange={(e) => setComfyUrl(e.target.value)}
+                />
+
+                {comfyTestStatus.msg && (
+                  <div
+                    className={`comfy-ping-banner ${
+                      comfyTestStatus.ok ? 'success' : 'error'
+                    }`}
+                  >
+                    {comfyTestStatus.msg}
+                  </div>
+                )}
+
+                <div className="form-item mt-2">
+                  <label>预设生视频工作流底模：</label>
+                  <select
+                    value={comfyPreset}
+                    onChange={(e) => setComfyPreset(e.target.value)}
+                    className="text-input"
+                  >
+                    <option value="wan2.1-i2v">阿里 Wan 2.1 (万象开源生视频 14B / 1.3B I2V)</option>
+                    <option value="cogvideox-5b">智谱 CogVideoX-5B 图生视频</option>
+                    <option value="svd-xt">SVD-XT (Stable Video Diffusion 电商微动)</option>
+                    <option value="custom">自定义工作流 API (通过 /prompt 节点图注入)</option>
+                  </select>
+                </div>
+                <small className="hint-text">
+                  默认通过 Vite 代理连接 <code>http://127.0.0.1:8188</code>。若部署在远程 GPU 服务器，请输入完整公网 IP:端口。
+                </small>
+              </div>
+            )}
           </div>
         </div>
+
 
         <div className="modal-footer">
           <button type="button" className="btn-secondary" onClick={handleClear}>

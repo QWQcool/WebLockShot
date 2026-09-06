@@ -3950,3 +3950,57 @@ textarea:focus-visible {
   }
 }
 
+/* =========================================================
+   ComfyUI 集成专属样式
+   ========================================================= */
+.btn-test-comfy {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.btn-test-comfy:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.28);
+  border-color: #fbbf24;
+  transform: translateY(-1px);
+}
+
+.btn-test-comfy:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.comfy-ping-banner {
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.comfy-ping-banner.success {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.comfy-ping-banner.error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+.pill-btn.comfyui-btn.active {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+  border-color: #f59e0b !important;
+}
+

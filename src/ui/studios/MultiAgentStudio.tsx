@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { klingVideoProvider } from '../../media/providers/kling.ts'
 import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
+import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
 import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
 import {
@@ -60,7 +61,7 @@ type Props = {
 
 export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [themeInput, setThemeInput] = useState('未来钛合金机械手表，微距齿轮精密咬合与赛博夜景流光')
-  const [providerId, setProviderId] = useState<'mock' | 'kling' | 'jimeng'>('mock')
+  const [providerId, setProviderId] = useState<'mock' | 'kling' | 'jimeng' | 'comfyui'>('mock')
   const [durationSec, setDurationSec] = useState<number>(5)
   const [isCustomDuration, setIsCustomDuration] = useState<boolean>(false)
 
@@ -191,6 +192,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       let provider: VideoProvider = mockVideoProvider
       if (providerId === 'kling') provider = klingVideoProvider
       if (providerId === 'jimeng') provider = jimengVideoProvider
+      if (providerId === 'comfyui') provider = comfyUIVideoProvider
       const req: VideoGenRequest = {
         clientTaskId: `swarm-task-${Date.now()}`,
         shotId: `swarm-${Date.now()}`,
@@ -205,7 +207,11 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       }
 
       setRenderProgress(30)
-      setRenderStatus(`已连接 ${providerId.toUpperCase()} 集群，多 Agent 联合神经渲染中...`)
+      setRenderStatus(
+        providerId === 'comfyui'
+          ? '已连接 ComfyUI 本地/私有 GPU 集群 (Wan2.1)，多 Agent 联合神经渲染中...'
+          : `已连接 ${providerId.toUpperCase()} 集群，多 Agent 联合神经渲染中...`
+      )
 
       const { taskId } = await provider.submit(req)
 
@@ -284,6 +290,13 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
               onClick={() => setProviderId('jimeng')}
             >
               字节即梦 (Jimeng)
+            </button>
+            <button
+              type="button"
+              className={`pill-btn comfyui-btn ${providerId === 'comfyui' ? 'active' : ''}`}
+              onClick={() => setProviderId('comfyui')}
+            >
+              🔥 ComfyUI 私有算力
             </button>
           </div>
 

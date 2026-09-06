@@ -6,6 +6,7 @@ import {
 } from '../../ai/agents/promptPolisher.ts'
 import { klingVideoProvider } from '../../media/providers/kling.ts'
 import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
+import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
 import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
 import { TOKEN_STORAGE_KEY, type TokenConfig } from '../../types.ts'
@@ -101,7 +102,7 @@ type Props = {
 
 export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   // 基础参数
-  const [providerId, setProviderId] = useState<'mock' | 'kling' | 'jimeng'>('mock')
+  const [providerId, setProviderId] = useState<'mock' | 'kling' | 'jimeng' | 'comfyui'>('mock')
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9' | '1:1'>('9:16')
   const [durationSec, setDurationSec] = useState<number>(5)
   const [isCustomDuration, setIsCustomDuration] = useState<boolean>(false)
@@ -200,6 +201,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       let provider: VideoProvider = mockVideoProvider
       if (providerId === 'kling') provider = klingVideoProvider
       if (providerId === 'jimeng') provider = jimengVideoProvider
+      if (providerId === 'comfyui') provider = comfyUIVideoProvider
       const req: VideoGenRequest = {
         clientTaskId: `single-task-${Date.now()}`,
         shotId: `single-${Date.now()}`,
@@ -220,6 +222,8 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             ? '快手可灵 Kling'
             : providerId === 'jimeng'
             ? '字节即梦 Jimeng'
+            : providerId === 'comfyui'
+            ? 'ComfyUI 本地/私有 GPU 集群 (Wan2.1)'
             : 'Mock 本地录制'
         }，任务调度中...`
       )
@@ -302,6 +306,13 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
               onClick={() => setProviderId('jimeng')}
             >
               字节即梦 (Jimeng)
+            </button>
+            <button
+              type="button"
+              className={`pill-btn comfyui-btn ${providerId === 'comfyui' ? 'active' : ''}`}
+              onClick={() => setProviderId('comfyui')}
+            >
+              🔥 ComfyUI 私有算力
             </button>
           </div>
 

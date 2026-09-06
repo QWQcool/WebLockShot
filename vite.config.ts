@@ -11,6 +11,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/kling/, ''),
       },
+      '/api/comfyui': {
+        target: 'http://127.0.0.1:8188',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/comfyui/, ''),
+      },
     },
   },
 })
