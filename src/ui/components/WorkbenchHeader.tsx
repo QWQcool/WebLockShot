@@ -18,6 +18,8 @@ type Props = {
   currentStep: WorkbenchStep
   onStepChange: (step: WorkbenchStep) => void
   maxReachedStep: WorkbenchStep
+  onOpenSettings?: () => void
+  hasToken?: boolean
 }
 
 export const WorkbenchHeader: React.FC<Props> = ({
@@ -26,6 +28,8 @@ export const WorkbenchHeader: React.FC<Props> = ({
   currentStep,
   onStepChange,
   maxReachedStep,
+  onOpenSettings,
+  hasToken,
 }) => {
   return (
     <header className="workbench-header">
@@ -38,22 +42,40 @@ export const WorkbenchHeader: React.FC<Props> = ({
           <span className="brand-tagline">多 Agent 电商带货视频工作台</span>
         </div>
 
-        {/* 模式切换 */}
-        <div className="mode-toggle">
-          <button
-            type="button"
-            className={`mode-btn ${mode === 'sell' ? 'active' : ''}`}
-            onClick={() => onModeChange('sell')}
-          >
-            🎯 带货工作台（仿爆款）
-          </button>
-          <button
-            type="button"
-            className={`mode-btn ${mode === 'drama' ? 'active' : ''}`}
-            onClick={() => onModeChange('drama')}
-          >
-            🎭 剧情短剧（粗剪台）
-          </button>
+        {/* 模式切换与 API 设置 */}
+        <div className="header-controls-group">
+          <div className="mode-toggle">
+            <button
+              type="button"
+              className={`mode-btn ${mode === 'sell' ? 'active' : ''}`}
+              onClick={() => onModeChange('sell')}
+            >
+              🎯 带货工作台（仿爆款）
+            </button>
+            <button
+              type="button"
+              className={`mode-btn ${mode === 'drama' ? 'active' : ''}`}
+              onClick={() => onModeChange('drama')}
+            >
+              🎭 剧情短剧（粗剪台）
+            </button>
+          </div>
+
+          {onOpenSettings && (
+            <button
+              type="button"
+              className="btn-settings-trigger"
+              onClick={onOpenSettings}
+              title="配置大模型与视频生成 API 密钥"
+            >
+              ⚙️ API 设置
+              {hasToken ? (
+                <span className="token-dot active" title="已配置专属 API Key" />
+              ) : (
+                <span className="token-dot empty" title="当前为 0 Key 免费模式" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 

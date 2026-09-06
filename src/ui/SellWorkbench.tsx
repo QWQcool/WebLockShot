@@ -18,6 +18,7 @@ import {
 } from '../persistV2.ts'
 
 import { WorkbenchHeader, type WorkbenchStep } from './components/WorkbenchHeader.tsx'
+import { TokenSettingsModal } from './components/TokenSettingsModal.tsx'
 import { ProductStep } from './steps/ProductStep.tsx'
 import { TemplateStep } from './steps/TemplateStep.tsx'
 import { ScriptStep } from './steps/ScriptStep.tsx'
@@ -62,6 +63,15 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
   const [visualPlans, setVisualPlans] = useState<VisualPlan[]>(initialSession?.visualPlans || [])
   const [jobs, setJobs] = useState<ShotJob[]>(initialSession?.jobs || [])
   const [isExpanding, setIsExpanding] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [hasToken, setHasToken] = useState<boolean>(() => {
+    try {
+      const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)
+      return Boolean(raw && (JSON.parse(raw) as TokenConfig).apiKey?.trim())
+    } catch {
+      return false
+    }
+  })
 
   // 监听任务调度器更新
   useEffect(() => {
@@ -179,6 +189,21 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
         currentStep={currentStep}
         onStepChange={(s) => setCurrentStep(s)}
         maxReachedStep={maxReachedStep}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        hasToken={hasToken}
+      />
+
+      <TokenSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSaved={() => {
+          try {
+            const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)
+            setHasToken(Boolean(raw && (JSON.parse(raw) as TokenConfig).apiKey?.trim()))
+          } catch {
+            setHasToken(false)
+          }
+        }}
       />
 
       <main className="workbench-main-content">
