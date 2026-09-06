@@ -147,7 +147,7 @@ export class ExecutorEngine {
             ratio: plan.ratio,
             shotId: plan.shotId,
             caption: plan.caption,
-            title: plan.shotId,
+            title: plan.caption || plan.positive || plan.shotId,
           })
 
           job.providerTaskId = taskId

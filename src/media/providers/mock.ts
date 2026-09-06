@@ -1,6 +1,6 @@
 import type { MediaAsset } from '../../domain/shotJob.ts'
 import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
-import { getPresetImageByKeyword } from '../../assets/presets/index.ts'
+import { getPresetImageByKeyword, resolveAsset } from '../../assets/presets/index.ts'
 
 type MockTaskState = {
   req: VideoGenRequest
@@ -13,8 +13,16 @@ type MockTaskState = {
 const mockTasks = new Map<string, MockTaskState>()
 
 function inferPresetImage(imageSrc?: string, title?: string): string {
-  if (imageSrc && (imageSrc.startsWith('data:') || imageSrc.startsWith('http') || imageSrc.startsWith('/') || imageSrc.includes('assets/'))) {
-    return imageSrc
+  if (imageSrc && imageSrc.trim()) {
+    const s = imageSrc.trim()
+    if (s.startsWith('data:') || s.startsWith('blob:') || s.startsWith('http://') || s.startsWith('https://')) {
+      return s
+    }
+    if (s.includes('presets/')) {
+      const filename = s.split('presets/').pop()?.split('?')[0] || 'hair_dryer.jpg'
+      return resolveAsset(filename)
+    }
+    return s
   }
   return getPresetImageByKeyword(title)
 }
@@ -53,16 +61,27 @@ async function recordCanvasWebm(
 
   if (typeof Image !== 'undefined') {
     imgObj = new Image()
-    imgObj.crossOrigin = 'anonymous'
+    // 同源或相对路径绝对不能加 crossOrigin，否则在 GitHub Pages 等静态服务器上会触发 CORS 阻断
+    if (resolvedSrc.startsWith('http') && !resolvedSrc.includes(window.location.hostname)) {
+      imgObj.crossOrigin = 'anonymous'
+    }
+
     imgObj.src = resolvedSrc
 
-    await Promise.race([
-      new Promise((resolve) => {
-        imgObj!.onload = () => resolve(true)
-        imgObj!.onerror = () => resolve(false)
-      }),
-      new Promise((resolve) => setTimeout(resolve, 1200)), // 1.2s 超时防阻断
-    ])
+    if (imgObj.complete && imgObj.naturalWidth > 0) {
+      // 已经缓存就绪，直接继续
+    } else {
+      await Promise.race([
+        new Promise((resolve) => {
+          imgObj!.onload = () => resolve(true)
+          imgObj!.onerror = (e) => {
+            console.warn('[WebLockShot Mock] 商业主图加载失败，回退底图:', resolvedSrc, e)
+            resolve(false)
+          }
+        }),
+        new Promise((resolve) => setTimeout(resolve, 6000)), // 6s 宽裕超时保障跨网加载
+      ])
+    }
   }
 
   const stream = canvas.captureStream(30)
