@@ -3997,6 +3997,30 @@ textarea:focus-visible {
   color: #f87171;
 }
 
+.comfy-ping-banner.testing {
+  background: rgba(57, 197, 187, 0.10);
+  border: 1px solid rgba(57, 197, 187, 0.30);
+  color: #5eead4;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.comfy-ping-banner.testing::before {
+  content: "";
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .pill-btn.comfyui-btn.active {
   background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
   color: #fff !important;

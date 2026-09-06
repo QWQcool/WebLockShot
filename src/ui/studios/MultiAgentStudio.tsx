@@ -86,6 +86,39 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // ComfyUI 选中后的自动握手结果（与 kling/jimeng 的「未配置即报错」对齐）
+  type ComfyPingState = {
+    status: 'idle' | 'testing' | 'ok' | 'error'
+    msg?: string
+    gpuName?: string
+    vramFreeGb?: number
+  }
+  const [comfyPing, setComfyPing] = useState<ComfyPingState>({ status: 'idle' })
+
+  const runComfyPing = async (): Promise<boolean> => {
+    setComfyPing({ status: 'testing' })
+    const res = await comfyUIVideoProvider.testConnection()
+    if (res.ok) {
+      const vram = res.vramFreeGb != null ? `，可用显存 ${res.vramFreeGb} GB` : ''
+      setComfyPing({
+        status: 'ok',
+        msg: `✓ 已连接 ComfyUI${res.gpuName ? ` · 显卡 ${res.gpuName}` : ''}${vram}`,
+        gpuName: res.gpuName,
+        vramFreeGb: res.vramFreeGb,
+      })
+      setErrorMsg(null)
+      return true
+    }
+    setComfyPing({
+      status: 'error',
+      msg: res.error || '未检测到本地 ComfyUI 实例',
+    })
+    setErrorMsg(
+      `当前选用了 ComfyUI 私有算力，但 ${res.error || '未检测到本地 ComfyUI 服务'}。请确认 ComfyUI 已启动（默认 http://127.0.0.1:8188）后点击上方「⚙️ 前往配置 API Key」核对地址，或切换为 Mock 模式。`
+    )
+    return false
+  }
+
   const handleSelectProvider = (id: 'mock' | 'kling' | 'jimeng' | 'comfyui') => {
     setProviderId(id)
     if (id === 'kling') {
@@ -93,6 +126,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         const key = sessionStorage.getItem('weblockshot.kling_key')
         if (!key?.trim()) {
           setErrorMsg('未检测到快手可灵 API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式。')
+          setComfyPing({ status: 'idle' })
           return
         }
       } catch {}
@@ -102,10 +136,17 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         const key = sessionStorage.getItem('weblockshot.jimeng_key')
         if (!key?.trim()) {
           setErrorMsg('未检测到字节即梦 (Jimeng) API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式。')
+          setComfyPing({ status: 'idle' })
           return
         }
       } catch {}
     }
+    if (id === 'comfyui') {
+      // 选中 ComfyUI 时异步探测，结果回写到 banner + errorMsg
+      void runComfyPing()
+      return
+    }
+    setComfyPing({ status: 'idle' })
     setErrorMsg(null)
   }
 
@@ -134,6 +175,14 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
           return
         }
       } catch {}
+    }
+
+    if (providerId === 'comfyui') {
+      // 与 kling/jimeng 一致：生成前若上次 ping 失败或未 ping，重新探测
+      if (comfyPing.status !== 'ok') {
+        const ok = await runComfyPing()
+        if (!ok) return
+      }
     }
 
     setIsDeliberating(true)
@@ -471,6 +520,27 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
           </button>
         </div>
       </div>
+
+      {/* ComfyUI 选中后的 Ping 状态条：与 kling/jimeng 的「未配置即报错」行为对齐 */}
+      {providerId === 'comfyui' && comfyPing.status !== 'idle' && (
+        <div
+          className={`comfy-ping-banner ${comfyPing.status === 'ok' ? 'success' : comfyPing.status === 'error' ? 'error' : 'testing'}`}
+        >
+          {comfyPing.status === 'testing' && '🔄 正在向本地 ComfyUI 发起 /system_stats 握手…'}
+          {comfyPing.status === 'ok' && (comfyPing.msg || '✓ 已连接 ComfyUI')}
+          {comfyPing.status === 'error' && `⚠️ ${comfyPing.msg || '未检测到本地 ComfyUI 服务'}`}
+          {comfyPing.status === 'error' && (
+            <button
+              type="button"
+              className="btn-alert-action"
+              style={{ marginLeft: '0.6rem' }}
+              onClick={() => void runComfyPing()}
+            >
+              🔄 重新探测
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 全局醒目错误与 API 配置引导条 */}
       {errorMsg && (

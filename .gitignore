@@ -18,6 +18,9 @@ dist-ssr
 提示词存储.md
 体验说明.md
 
+# AI 助手工作目录：含本机路径与临时预览图，公开仓库不提交
+.workbuddy/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

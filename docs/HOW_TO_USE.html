@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>WebLockShot 完整使用指南</title><style>
+@page { size: A4; margin: 15mm 13mm 15mm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+html { font-size: 10.5pt; }
+body {
+  margin: 0;
+  font-family: "PingFang SC", "Microsoft YaHei", "Source Han Sans SC",
+               "Noto Sans CJK SC", system-ui, sans-serif;
+  color: #1f2430;
+  line-height: 1.75;
+  background: #fff;
+}
+
+/* ---------- 封面标题块 ---------- */
+.cover {
+  border-bottom: 2.2pt solid #4f46e5;
+  padding-bottom: 4mm;
+  margin-bottom: 6mm;
+}
+.cover .kicker {
+  font-size: 9pt; letter-spacing: 2px; color: #4f46e5;
+  font-weight: 600; text-transform: uppercase; margin-bottom: 1.5mm;
+}
+.cover h1 { all: unset; }
+
+/* ---------- 标题 ---------- */
+h1 {
+  font-size: 21pt; line-height: 1.35; font-weight: 700;
+  color: #1a1f36; margin: 0 0 3mm; letter-spacing: .5px;
+  break-after: avoid;
+}
+h2 {
+  font-size: 15pt; font-weight: 700; color: #fff;
+  background: linear-gradient(100deg, #4f46e5, #7c3aed);
+  padding: 2.6mm 4mm; margin: 0 0 4mm; border-radius: 1.5mm;
+  break-before: page; break-after: avoid;
+}
+h2:first-of-type { break-before: auto; } /* 目录不上分页 */
+h3 {
+  font-size: 12.5pt; font-weight: 700; color: #3730a3;
+  margin: 6mm 0 2.5mm; padding-left: 2.6mm;
+  border-left: 2.4pt solid #6366f1; line-height: 1.5;
+  break-after: avoid;
+}
+h4 {
+  font-size: 11pt; font-weight: 700; color: #312e81;
+  margin: 4.5mm 0 2mm; padding-left: 2.2mm;
+  border-left: 1.8pt solid #a5b4fc;
+  break-after: avoid;
+}
+p { margin: 0 0 2.4mm; text-align: justify; }
+
+/* ---------- 目录 ---------- */
+nav.toc { padding: 2mm 0 1mm; }
+nav.toc ul { list-style: none; margin: 0; padding-left: 0; }
+nav.toc > ul > li { margin-bottom: 1.4mm; }
+nav.toc ul ul { padding-left: 5mm; margin-top: .8mm; }
+nav.toc li { line-height: 1.6; }
+nav.toc a { color: #3730a3; text-decoration: none; font-weight: 600; }
+nav.toc ul ul a { color: #4b5563; font-weight: 400; }
+
+/* ---------- 列表 ---------- */
+ul, ol { margin: 0 0 2.6mm; padding-left: 5.5mm; }
+li { margin-bottom: 1.2mm; }
+li > ul, li > ol { margin: 1.2mm 0; }
+ul { list-style: none; }
+ul > li { position: relative; }
+ul > li::before {
+  content: ""; position: absolute; left: -4mm; top: 3.2mm;
+  width: 1.6mm; height: 1.6mm; border-radius: 50%; background: #818cf8;
+}
+nav.toc ul > li::before { display: none; }
+ol { list-style: decimal; }
+ol > li::marker { color: #4f46e5; font-weight: 700; }
+
+/* ---------- 强调 / 代码 ---------- */
+strong { color: #312e81; font-weight: 700; }
+em { color: #6b7280; }
+code {
+  font-family: Consolas, "Cascadia Mono", Menlo, monospace;
+  font-size: 9pt; background: #eef2ff; color: #3730a3;
+  padding: .3mm 1.2mm; border-radius: .8mm; border: .4pt solid #dbe1ff;
+}
+pre {
+  background: #0f172a; color: #e2e8f0; border-radius: 1.5mm;
+  padding: 3mm 3.5mm; margin: 3mm 0 3.5mm;
+  font-size: 9pt; line-height: 1.65; overflow: hidden;
+  break-inside: avoid;
+}
+pre code {
+  background: none; color: inherit; padding: 0; border: none; font-size: 9pt;
+}
+blockquote {
+  margin: 3mm 0 4mm; padding: 2.6mm 4mm;
+  background: #f5f3ff; border-left: 2.4pt solid #8b5cf6;
+  color: #4c4a63; border-radius: 0 1.5mm 1.5mm 0;
+  break-inside: avoid;
+}
+blockquote p { margin: 0; }
+hr { border: none; border-top: .6pt solid #e5e7eb; margin: 5mm 0; }
+
+/* ---------- 表格 ---------- */
+table {
+  width: 100%; border-collapse: collapse; margin: 3mm 0 4mm;
+  font-size: 9pt; break-inside: avoid;
+}
+th {
+  background: #4f46e5; color: #fff; font-weight: 700;
+  padding: 1.8mm 2.2mm; text-align: left; line-height: 1.5;
+}
+td { padding: 1.6mm 2.2mm; border-bottom: .4pt solid #e5e7eb; line-height: 1.6; }
+tbody tr:nth-child(even) { background: #f8f8ff; }
+
+/* ---------- 图片 ---------- */
+figure { margin: 3mm 0 4mm; text-align: center; break-inside: avoid; }
+figure img {
+  max-width: 100%; max-height: 85mm; width: auto; height: auto;
+  border: .5pt solid #dcdfe6; border-radius: 1.5mm;
+  box-shadow: 0 1mm 3mm rgba(31,36,48,.13);
+}
+figcaption {
+  margin-top: 1.8mm; font-size: 8.5pt; color: #6b7280; line-height: 1.5;
+}
+
+a { color: #4f46e5; }
+</style></head>
+<body>
+<h1 id="weblockshot">WebLockShot 完整使用指南与工业化实战手册</h1>
+<blockquote>
+<p>本指南旨在帮助电商卖家、带货主播、编导创作者及 AI 视频开发人员，快速掌握 WebLockShot 的核心链路、双工作室工作流、私有化 ComfyUI 算力集成，以及剪映 / CapCut 自动化草稿对齐出片。</p>
+</blockquote>
+<hr />
+<h2 id="_1">目录</h2><nav class="toc">
+<ul>
+<li><a href="#序介绍与定位">（序）介绍与定位</a></li>
+<li><a href="#一快速上手免安装在线版-vs-团队私有部署">（一）快速上手：免安装在线版 vs 团队私有部署</a></li>
+<li><a href="#二电商全链路六步爆款工作流">（二）电商全链路六步爆款工作流</a></li>
+<li><a href="#step-0商品信息多模态导入">Step 0：商品信息多模态导入</a></li>
+<li><a href="#step-15-大爆款结构与黄金-3-秒钩子选择">Step 1：5 大爆款结构与黄金 3 秒钩子选择</a></li>
+<li><a href="#step-2双-agent-剧本编导与对立面评审">Step 2：双 Agent 剧本编导与对立面评审</a></li>
+<li><a href="#step-3916-gsap-动态分镜视觉预演">Step 3：9:16 GSAP 动态分镜视觉预演</a></li>
+<li><a href="#step-4视觉提示词工程编译">Step 4：视觉提示词工程编译</a></li>
+<li><a href="#step-5串行任务队列与神经渲染调度">Step 5：串行任务队列与神经渲染调度</a></li>
+<li><a href="#step-6连续审片tts-口播与剪映草稿对齐导出">Step 6：连续审片、TTS 口播与剪映草稿对齐导出</a></li>
+<li><a href="#三双独立工作室模式">（三）双独立工作室模式</a></li>
+<li><a href="#模式-a单-agent-极速直出模式">模式 A：单 Agent 极速直出模式</a></li>
+<li><a href="#模式-b多-agent-协同编导研讨室">模式 B：多 Agent 协同编导研讨室</a></li>
+<li><a href="#四视频供应商配置与-comfyui-自建私有算力指南">（四）视频供应商配置与 ComfyUI 自建私有算力指南</a></li>
+<li><a href="#1-快手可灵-kling-api-直连">1. 快手可灵 (Kling) API 直连</a></li>
+<li><a href="#2-字节即梦-jimeng-api-直连">2. 字节即梦 (Jimeng) API 直连</a></li>
+<li><a href="#3-comfyui-本地局域网私有-gpu-算力集群wan-21--cogvideox">3. ComfyUI 本地/局域网私有 GPU 算力集群（Wan 2.1 / CogVideoX）</a></li>
+<li><a href="#五剪映--capcut-电脑版草稿工程导入与声画自动对齐实操">（五）剪映 / CapCut 电脑版草稿工程导入与声画自动对齐实操</a></li>
+<li><a href="#六工业级可靠性体系幂等防抖状态机与两阶段钱包闭环">（六）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</a></li>
+<li><a href="#七常见问题与避坑指南faq">（七）常见问题与避坑指南（FAQ）</a></li>
+</ul>
+</nav>
+<h2 id="_2">（序）介绍与定位</h2>
+<p><strong>WebLockShot</strong> 是一款面向带货短视频与电商视觉创作者的 <strong>多 Agent 闭环短视频生成平台</strong>。</p>
+<p>过去创作一条符合平台推流机制的电商爆款短视频，通常面临如下痛点：
+1. <strong>创意开销大</strong>：依赖人工编写脚本，不懂前 3 秒黄金完播率套路；
+2. <strong>多工具断层</strong>：找商品图、打磨 Midjourney/Sora 提示词、可灵网页生片、下载再拖入剪映手动拼接剪辑，全流程分散低效；
+3. <strong>接口资费昂贵且无防重保障</strong>：云端视频 API 动辄几毛到几块钱一次，网络重试或连击经常造成重复扣费；
+4. <strong>声画割裂</strong>：生成的视频片段长度固定，与配音解说字幕时长不匹配，人工拉伸音频费时费力。</p>
+<p>WebLockShot 实现了全链路整合突破：<strong>从商品卖点输入、爆款结构套用、双 Agent 剧本研讨、9:16 动态预演、自建 ComfyUI / 商业 API 渲染生成，到剪映草稿工程声画字三轨微秒自动对齐，全流程浏览器内闭环！</strong></p>
+<h3 id="vs-weblockshot">传统工作流 vs WebLockShot 核心特性对比</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">环节 / 能力</th>
+<th style="text-align: left;">传统人工制作模式</th>
+<th style="text-align: left;">一般套壳 AI 工具</th>
+<th style="text-align: left;">WebLockShot 工作台</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>爆款规律把控</strong></td>
+<td style="text-align: left;">编导凭个人感觉拼凑</td>
+<td style="text-align: left;">单一文本粗糙扩写</td>
+<td style="text-align: left;"><strong>内置 5 大爆款结构套路库 + 黄金 3 秒强对抗钩子库</strong>（Zod 强约束）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>脚本编导质量</strong></td>
+<td style="text-align: left;">单人盲写，缺乏审校</td>
+<td style="text-align: left;">直接输出一段长文本</td>
+<td style="text-align: left;"><strong>ScriptWriter + ScriptCritic 双智体剧本推演与严苛批判打分</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>生片前可控预演</strong></td>
+<td style="text-align: left;">脑内想象或黑屏等待</td>
+<td style="text-align: left;">无法预演，直接开盲盒</td>
+<td style="text-align: left;"><strong>9:16 GSAP 动态分镜舞台，毫秒级模拟镜头运镜与转场节奏</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>渲染算力支持</strong></td>
+<td style="text-align: left;">仅能在特定官方网页手动点</td>
+<td style="text-align: left;">仅对接 1 家闭源云端 API</td>
+<td style="text-align: left;"><strong>四擎并行</strong>：快手可灵、字节即梦、<strong>ComfyUI 私有显卡 (Wan 2.1)</strong>、Mock 实验画布</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>出片成本</strong></td>
+<td style="text-align: left;">商业 API 接口费昂贵</td>
+<td style="text-align: left;">充值代币高溢价抽成</td>
+<td style="text-align: left;"><strong>0 接口费自由</strong>：直连本地 RTX 4090 / A100 ComfyUI，边际成本趋向于 0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>防重与资金安全</strong></td>
+<td style="text-align: left;">连击重复扣费，失败不管</td>
+<td style="text-align: left;">失败扣点不予返还</td>
+<td style="text-align: left;"><strong>工业级两阶段事务钱包</strong>（预冻结 → 成功核销 / 失败回滚）+ SHA-256 幂等防抖</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>剪辑工程交付</strong></td>
+<td style="text-align: left;">人工逐轨拖拽、切片对齐</td>
+<td style="text-align: left;">仅提供独立 MP4 下载</td>
+<td style="text-align: left;"><strong>剪映 / CapCut 草稿工程直出</strong>：视频轨 + 旁白轨 + 花字字幕轨微秒级自动化对齐</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="vs">（一）快速上手：免安装在线版 vs 团队私有部署</h2>
+<h3 id="1">1. 纯前端零配置开箱体验</h3>
+<ul>
+<li>在线访问：https://qwqcool.github.io/WebLockShot/</li>
+<li><strong>零服务端依赖、免注册登录</strong>：所有密钥安全保存在浏览器本地 <code>sessionStorage</code>，绝不上传任何第三方服务器，保护企业数据隐私。</li>
+<li><strong>免 Key 畅玩</strong>：内置 Mock 实时画布录制引擎与 0-Key AI 规则模板引擎，无需充值即可体验完整生产链路。</li>
+</ul>
+<h3 id="2">2. 本地自建与二次开发</h3>
+<p>适合拥有本地高配 GPU（RTX 3090/4090/A100）或需内网部署的团队：</p>
+<pre><code class="language-bash"># 克隆仓库
+git clone https://github.com/QWQcool/WebLockShot.git
+cd WebLockShot
+
+# 安装依赖
+npm install
+
+# 启动本地开发服务 (支持 ComfyUI 自动反向代理)
+npm run dev
+</code></pre>
+<p>启动后在浏览器打开 <code>http://localhost:5173</code> 即可进入工作台。</p>
+<hr />
+<h2 id="_3">（二）电商全链路六步爆款工作流</h2>
+<p>点击顶部导航的 <strong>「🛒 电商全链路工作流」</strong>，即可按科学工业化步骤执行生成。每一个环节均经过百万级推流数据检验与严格 Schema 约束。</p>
+<h3 id="step-0">Step 0：商品信息多模态导入</h3>
+<figure><img alt="Step 0 商品信息多模态导入与卖点归纳" src="./screenshots/01_step0_product_import.png" /><figcaption>Step 0 商品信息多模态导入与卖点归纳</figcaption></figure>
+<ul>
+<li><strong>链接导入</strong>：输入电商主图链接，系统如实归档并引导填写核心差异化卖点；</li>
+<li><strong>图片导入</strong>：支持上传高清商品白底图或透底图，内置 9 款 3C、美妆、服饰大厂级 Mock 预设图一键选用；</li>
+<li><strong>参考视频导入</strong>：支持上传本地爆款对标视频片段，内置 Canvas 自动抽帧引擎。</li>
+</ul>
+<h3 id="step-15-3">Step 1：5 大爆款结构与黄金 3 秒钩子选择</h3>
+<figure><img alt="Step 1 5大爆款结构套路与黄金3秒钩子库" src="./screenshots/02_step1_template_hook.png" /><figcaption>Step 1 5大爆款结构套路与黄金3秒钩子库</figcaption></figure>
+<p>针对短视频平台推流算法，内置经百万播放验证的 5 套 6 镜带货套路：
+1. <strong>痛点开场型 (Pain-Solution)</strong>：反常识开场 → 痛点共鸣放大 → 产品破局 → 核心功能微距 → 信任凭证背书 → 强引导限时下单；
+2. <strong>效果反差型 (Contrast-Shock)</strong>：震撼对比 → 揭秘关键机理 → 深度实测 → 体验升级 → 资质打消顾虑 → 行动号召；
+3. <strong>沉浸开箱型 (Sensory-Unboxing)</strong>：视听微距开箱 → 材质触感细节 → 交互仪式感 → 场景融入 → 性价比锚点 → 福利促单；
+4. <strong>短剧场景植入型 (Drama-Insert)</strong>：人物生活矛盾冲突 → 戏剧化窘境 → 救场神器亮相 → 危机化解 → 情感共鸣 → 购买指引；
+5. <strong>价格锚点型 (Price-Anchor)</strong>：大牌天价对比 → 打破暴利黑幕 → 极致做工对标 → 溯源源头成本 → 超值特惠释放 → 锁单催促。</p>
+<h3 id="step-2-agent">Step 2：双 Agent 剧本编导与对立面评审</h3>
+<figure><img alt="Step 2 双 Agent 剧本编导与对立面评审雷达打分" src="./screenshots/03_step2_script_critic.png" /><figcaption>Step 2 双 Agent 剧本编导与对立面评审雷达打分</figcaption></figure>
+<ul>
+<li><strong>编导智体 (ScriptWriter)</strong>：结合商品卖点与所选爆款套路，自动创作符合竖屏短视频传播节奏的 6 镜分镜台词与画面描述。</li>
+<li><strong>质检智体 (ScriptCritic)</strong>：化身挑剔的平台质检员，从「3 秒停留率、卖点可视化、完播节奏、合规风险」4 个维度严苛打分（0~100 分），并给出详尽的诊断雷达图与具体修改建议。</li>
+</ul>
+<h3 id="step-3916-gsap">Step 3：9:16 GSAP 动态分镜视觉预演</h3>
+<figure><img alt="Step 3 9:16 GSAP 动态分镜视觉预演舞台" src="./screenshots/04_step3_gsap_storyboard.png" /><figcaption>Step 3 9:16 GSAP 动态分镜视觉预演舞台</figcaption></figure>
+<ul>
+<li>在向昂贵算力派发任务前，WebLockShot 的 <code>sell-stage</code> 动态舞台会基于 GSAP 动画引擎进行 9:16 全真视觉模拟；</li>
+<li>能够直观预览每个镜头的景别（特写、中景、远景）、推拉摇移运镜动势、卖点文字弹幕浮现节奏。</li>
+</ul>
+<h3 id="step-4">Step 4：视觉提示词工程编译</h3>
+<figure><img alt="Step 4 视觉提示词方案工程编译与参数微调" src="./screenshots/05_step4_visual_compiler.png" /><figcaption>Step 4 视觉提示词方案工程编译与参数微调</figcaption></figure>
+<ul>
+<li>系统自动将分镜剧本编译为高精度中英文双语视觉提示词（Positive Prompt &amp; Negative Prompt）；</li>
+<li>自动规范画幅（9:16）、镜头秒数（3~6 秒）、渲染参数（8K、光影质感、运镜轨迹与物理防畸变约束）。</li>
+</ul>
+<h3 id="step-5">Step 5：串行任务队列与神经渲染调度</h3>
+<figure><img alt="Step 5 串行任务调度队列与进度实时监控" src="./screenshots/06_step5_render_queue.png" /><figcaption>Step 5 串行任务调度队列与进度实时监控</figcaption></figure>
+<ul>
+<li>单机串行任务调度引擎自动调度各镜头任务；</li>
+<li>支持快手可灵、字节即梦、<strong>ComfyUI 私有集群</strong> 或 Mock 本地录制出片；</li>
+<li>具备实时任务排队进度监控、单镜头独立失败重试与错误精准上报。</li>
+</ul>
+<h3 id="step-6tts">Step 6：连续审片、TTS 口播与剪映草稿对齐导出</h3>
+<figure><img alt="Step 6 连续审片播放器、自适应 TTS 口播与剪映草稿导出" src="./screenshots/07_step6_deliver_player.png" /><figcaption>Step 6 连续审片播放器、自适应 TTS 口播与剪映草稿导出</figcaption></figure>
+<ul>
+<li>6 镜视频无缝连播审片播放器，支持全屏预览与单镜头逐一审阅；</li>
+<li><strong>智能 TTS 配音</strong>：内置语速自适应算法，自动根据镜头秒数缩放台词语速，确保台词在镜头结束前精准收尾；</li>
+<li><strong>剪映草稿工程直出</strong>：一键导出对齐好的 <code>draft_content.json</code>。</li>
+</ul>
+<hr />
+<h2 id="_4">（三）双独立工作室模式</h2>
+<p>除了标准的六步全链路外，顶部工具栏还提供针对快速单挑和复杂编导的双工作室：</p>
+<h3 id="a-agent">模式 A：单 Agent 极速直出模式</h3>
+<figure><img alt="模式 A 单 Agent 极速直出工作室" src="./screenshots/08_single_agent_studio.png" /><figcaption>模式 A 单 Agent 极速直出工作室</figcaption></figure>
+<p>适合单镜头快速实验与电商图生视频（Image-to-Video）：
+- <strong>精选灵感库</strong>：内置 3C 数码金属光泽、美妆水润精华露微距、潮流穿搭光影等高转化提示词预设；
+- <strong>AI 智能运镜润色</strong>：输入简略构思（如“吹风机快速吹干水滴”），AI 自动扩写为运镜、布光、景深齐全的电影级 Prompt；
+- <strong>多模态参考素材面板</strong>：
+  - <strong>参考图片</strong>：支持拖拽上传本地图，支持点击九宫格快速载入高清 Mock 图，支持<strong>双击灯箱无损放大预览</strong>；
+  - <strong>参考视频</strong>：支持上传本地运镜视频片段，提取动作参考（Motion Mimic）。
+- <strong>时长自由调节</strong>：支持 5s、10s、15s 预设切换，或在微调框中键入 1~60 秒自定义时长。</p>
+<h3 id="b-agent">模式 B：多 Agent 协同编导研讨室</h3>
+<figure><img alt="模式 B 多 Agent 协同编导研讨室" src="./screenshots/09_multi_agent_studio.png" /><figcaption>模式 B 多 Agent 协同编导研讨室</figcaption></figure>
+<p>适合高定短片与复杂多镜头影视级创作：
+- <strong>4 Agent 协同共创推演</strong>：
+  1. 🎬 <strong>导演 Agent (Director)</strong>：负责整体视觉调性、节奏节奏把控与场景构建；
+  2. 🎥 <strong>运镜 Agent (Cinematographer)</strong>：设计精妙机位走位、焦段切换（85mm/100mm微距）与动态打光；
+  3. ⚖️ <strong>质检 Agent (Critic)</strong>：严查画质连贯性、商品特征变形与过饱和瑕疵；
+  4. ⚡ <strong>调度 Agent (Dispatcher)</strong>：综合 3 方评审意见，合成终极提示词并派发至渲染引擎。
+- 动态推演过程全可视，支持多轮协商打磨。</p>
+<hr />
+<h2 id="comfyui">（四）视频供应商配置与 ComfyUI 自建私有算力指南</h2>
+<figure><img alt="API 配置与 ComfyUI 私有算力 GPU 探测" src="./screenshots/10_token_settings_comfyui.png" /><figcaption>API 配置与 ComfyUI 私有算力 GPU 探测</figcaption></figure>
+<p>点击右上角 <strong>「⚙️ API 设置」</strong> 即可完成各生成渠道的配置。</p>
+<h3 id="1-kling-api">1. 快手可灵 (Kling) API 直连</h3>
+<ul>
+<li>申请快手可灵官方开发者平台 API 密钥（Access Key ID 与 Secret Key）；</li>
+<li>填入对应输入框并选择首选生片时长；</li>
+<li>生成计费：在虚拟钱包中约 10 灵感币/镜头。</li>
+</ul>
+<h3 id="2-jimeng-api">2. 字节即梦 (Jimeng) API 直连</h3>
+<ul>
+<li>填入即梦开放平台 API Key 与端点地址；</li>
+<li>生成计费：在虚拟钱包中约 8 灵感币/镜头。</li>
+</ul>
+<h3 id="3-comfyui-gpu-wan-21-cogvideox">3. ComfyUI 本地/局域网私有 GPU 算力集群（Wan 2.1 / CogVideoX）</h3>
+<p>这是 WebLockShot 最强力的工业化亮点——<strong>连接您自己的显卡算力，享有 0 API 费用无限畅做短视频！</strong></p>
+<h4 id="1-comfyui">步骤 1：本地启动 ComfyUI</h4>
+<p>确保您的 ComfyUI 支持外部或局域网访问，启动命令行必须加上 <code>--listen</code> 参数：</p>
+<pre><code class="language-bash">python main.py --listen 127.0.0.1 --port 8188
+</code></pre>
+<p><em>(如部署在局域网 GPU 服务器，可使用 <code>--listen 0.0.0.0</code>)</em></p>
+<h4 id="2_1">步骤 2：推荐模型依赖</h4>
+<ul>
+<li><strong>阿里 Wan 2.1 (WanVideo I2V)</strong>：当前开源图生视频领域极度出色的模型，支持 14B / 1.3B 参数；</li>
+<li><strong>智谱 CogVideoX-5B</strong>：擅长大幅度动作动力学与电影感光影；</li>
+<li><strong>Stability SVD-XT</strong>：轻量化微距商品展示。</li>
+</ul>
+<h4 id="3-weblockshot">步骤 3：在 WebLockShot 中绑定并一键探测</h4>
+<ol>
+<li>打开右上角 <strong>「⚙️ API 设置」</strong>；</li>
+<li>视频提供商选择 <strong>「ComfyUI 自建/私有算力 (0接口费)」</strong>；</li>
+<li>输入实例地址（本地通常保持默认 <code>http://127.0.0.1:8188</code> 即可，Vite 会自动通过 <code>/api/comfyui</code> 反代穿透跨域）；</li>
+<li>点击 <strong>「🔍 测试连接 (Ping GPU)」</strong> 按钮；</li>
+<li>系统将调用 <code>/system_stats</code> 接口，瞬间返回显卡型号（例如 <code>NVIDIA GeForce RTX 4090</code>）以及当前剩余可用显存（VRAM），确认连通即可畅享无成本生片！</li>
+</ol>
+<hr />
+<h2 id="capcut">（五）剪映 / CapCut 电脑版草稿工程导入与声画自动对齐实操</h2>
+<p>在全链路最后一步 <strong>「✨ 审片交付」</strong>，点击 <strong>「📥 导出剪映电脑版草稿工程 (draft_content.json)」</strong>：</p>
+<h3 id="_5">剪映草稿对齐原理</h3>
+<p>WebLockShot 导出的 <code>draft_content.json</code> 是标准的 CapCut/剪映工程格式：
+1. <strong>三轨微秒对齐 (1s = 1,000,000us)</strong>：
+   - <code>track_video</code> (视频主轨)：6 镜视频无缝顺排；
+   - <code>track_audio</code> (旁白配音轨)：每个镜头的配音与视频起始点、终止点微秒严密吻合；
+   - <code>track_text</code> (花字字幕轨)：带货爆款花字，第 1 镜黄金钩子预设黄色高亮与更大字号。
+2. <strong>自适应防黑帧</strong>：精确计算 <code>source_timerange</code> 与 <code>target_timerange</code>，杜绝任何黑帧或音频爆音重叠。</p>
+<h3 id="_6">如何导入剪映电脑版：</h3>
+<ol>
+<li>打开您电脑上的剪映 / CapCut 电脑版，新建一个空白草稿并起名（例如 <code>吹风机带货</code>）；</li>
+<li>找到剪映本地草稿保存目录：
+   - <strong>Windows</strong>：<code>C:\Users\&lt;用户名&gt;\AppData\Local\JianyingPro\User Data\Projects\com.lveditor.draft\</code>
+   - <strong>macOS</strong>：<code>~/Movies/JianyingPro/User Data/Projects/com.lveditor.draft/</code></li>
+<li>进入对应工程名字的文件夹，将 WebLockShot 下载的 <code>draft_content.json</code> 替换原有文件；</li>
+<li>重新在剪映中打开该项目，所有分镜视频、配音解说与爆款字幕已在时间线上精确对齐就绪，直接导出高清成片！</li>
+</ol>
+<hr />
+<h2 id="_7">（六）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</h2>
+<p>为了支撑商业生产环境的稳定性，WebLockShot 构筑了三重安全防护网：</p>
+<h3 id="1-idempotency-debounce">1. 任务幂等性与防连击锁 (Idempotency &amp; Debounce)</h3>
+<ul>
+<li><strong>SHA-256 结构化意图签名</strong>：根据 <code>(intent, provider, prompt, duration, shotId)</code> 计算唯一幂等指纹；</li>
+<li><strong>In-flight 互斥锁</strong>：任务在后台处理期间，拦截一切重复连击，并在界面给出倒计时提示，防止并发风暴。</li>
+</ul>
+<h3 id="2-fsm-circuit-breaker">2. 状态机流转与边界容错 (FSM &amp; Circuit Breaker)</h3>
+<ul>
+<li><strong>状态转移守卫</strong>：任务严格按照 <code>IDLE</code> → <code>VALIDATING</code> → <code>FROZEN</code> → <code>SUBMITTING</code> → <code>RUNNING</code> → <code>SUCCEEDED / FAILED / REFUNDED</code> 流转，阻断非法状态篡改；</li>
+<li><strong>自动熔断器 (Circuit Breaker)</strong>：若某一云端 API 连续出现 3 次 5xx 或网络异常，熔断器自动跳闸保护，暂时阻断同渠道任务并建议切换至 ComfyUI / Mock 模式，30 秒后自动半开探测。</li>
+</ul>
+<h3 id="3-two-phase-commit-wallet">3. 虚拟钱包两阶段提交事务 (Two-Phase Commit Wallet)</h3>
+<figure><img alt="工业级虚拟钱包两阶段结算与审计流水中心" src="./screenshots/11_virtual_wallet.png" /><figcaption>工业级虚拟钱包两阶段结算与审计流水中心</figcaption></figure>
+<ul>
+<li>顶部导航常驻 <strong>「💰 虚拟钱包」</strong>；</li>
+<li><strong>阶段 1：预冻结 (Freeze)</strong>：点击生成时，若余额充足，将预估费用移入「任务冻结中」，锁定资金防并发超支；</li>
+<li><strong>阶段 2A：成功核销 (Settle)</strong>：出片成功后正式划扣冻结款项；</li>
+<li><strong>阶段 2B：失败回滚 (Refund)</strong>：一旦发生网络中断、接口超时、生成异常或用户取消，<strong>冻结款项 100% 毫秒级全额退回可用余额</strong>；</li>
+<li>具备完整的资金交易收支流水审计明细，支持一键模拟充值与重置体验金。</li>
+</ul>
+<hr />
+<h2 id="faq">（七）常见问题与避坑指南（FAQ）</h2>
+<h4 id="q1-comfyui">Q1：调用本地 ComfyUI 时提示网络错误或连接超时？</h4>
+<ul>
+<li><strong>排查 A</strong>：请确认启动 ComfyUI 时是否添加了 <code>--listen</code> 参数（必须为 <code>python main.py --listen 127.0.0.1 --port 8188</code>）；</li>
+<li><strong>排查 B</strong>：WebLockShot 在开发环境下通过 Vite 内置反向代理 <code>/api/comfyui</code> 穿透跨域，请确认通过 <code>http://localhost:5173</code> 访问工作台，而不是直接双击打开本地 HTML 文件。</li>
+</ul>
+<h4 id="q2">Q2：为什么点击生成按钮提示“钱包可用余额不足”？</h4>
+<ul>
+<li>WebLockShot 引入了工业级资金防透支机制。点击顶部导航栏的 <strong>「💰 虚拟钱包」</strong>，点击 <strong>「+ 1,000 币」</strong> 模拟充值或 <strong>「重置 2,000 体验金」</strong>，即可立即恢复生成。若使用 ComfyUI 或 Mock 模式，资费为 0，永不扣费。</li>
+</ul>
+<h4 id="q3">Q3：如果某个镜头生成的画面不满意怎么办？</h4>
+<ul>
+<li>在第 6 步「审片交付」阶段，无需全部重跑！针对不满意的单个镜头，点击右侧的 <strong>「🔄 局部重生成」</strong>，系统将仅对该单镜重新调度生成，其余满意的镜头保持不变，极大节约算力与时间。</li>
+</ul>
+<h4 id="q4">Q4：导出的剪映草稿打开后素材显示离线？</h4>
+<ul>
+<li>剪映草稿中记录了各视频素材的本地路径或网络 URL。若为本地录制的 Blob URL，请将下载的视频素材文件保存在剪映草稿同级目录下，剪映将自动完成重链接。</li>
+</ul>
+<hr />
+<p><em>WebLockShot 致力于为每一位电商创作者打造顺滑、可信、低成本的 AI 短视频工业化流水线。</em></p>
+</body></html>
