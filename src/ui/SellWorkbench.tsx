@@ -12,6 +12,7 @@ import { scriptToStory } from '../director/nodes/storyboardNode.ts'
 import { compileVisualPlans } from '../director/nodes/visualizerNode.ts'
 import { executorEngine } from '../director/nodes/executorNode.ts'
 import {
+  clearPipelineSession,
   loadPipelineSession,
   savePipelineSession,
   type PipelineSessionV2,
@@ -181,14 +182,25 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
     setCurrentStep(5)
   }
 
-  // 新建下一条带货视频
+  // 新建下一条带货视频（彻底重置全链路状态）
   const handleRestartPipeline = () => {
     setScript(null)
     setCriticResult(null)
     setSellStory(null)
     setVisualPlans([])
     setJobs([])
-    advanceToStep(0)
+    executorEngine.loadJobs([])
+    setCurrentStep(0)
+    setMaxReachedStep(0)
+    clearPipelineSession()
+    savePipelineSession({
+      version: 2,
+      id: `pipeline-${Date.now()}`,
+      activeStep: 0,
+      productInput,
+      selectedTemplateId,
+      updatedAt: Date.now(),
+    })
   }
 
   return (
