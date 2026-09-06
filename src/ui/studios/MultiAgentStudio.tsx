@@ -7,6 +7,7 @@ import {
   resolveAsset,
   ALL_PRESET_ASSETS,
 } from '../../assets/presets/index.ts'
+import { ImageLightboxModal } from '../components/ImageLightboxModal.tsx'
 
 export type AgentRole = 'director' | 'camera' | 'critic' | 'dispatcher'
 
@@ -68,6 +69,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [referenceVideo, setReferenceVideo] = useState<string | null>(null)
   const [referenceVideoName, setReferenceVideoName] = useState<string>('')
   const [motionPrompt, setMotionPrompt] = useState<string>('')
+  const [isImageLightboxOpen, setIsImageLightboxOpen] = useState(false)
 
   const [isDeliberating, setIsDeliberating] = useState(false)
   const [messages, setMessages] = useState<AgentMessage[]>([])
@@ -410,9 +412,21 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
                 </div>
 
                 {referenceImage ? (
-                  <div className="ref-preview-box">
+                  <div
+                    className="ref-preview-box"
+                    onDoubleClick={() => setIsImageLightboxOpen(true)}
+                    title="双击全屏放大查看高清首帧"
+                  >
                     <img src={referenceImage} alt="参考商品图" className="ref-thumb-img" />
-                    <div className="ref-badge-tag">✓ 已装载首帧图 (多 Agent 将以此图为视觉基准)</div>
+                    <button
+                      type="button"
+                      className="btn-zoom-corner"
+                      onClick={() => setIsImageLightboxOpen(true)}
+                      title="点击放大查看"
+                    >
+                      🔍 双击放大
+                    </button>
+                    <div className="ref-badge-tag">✓ 已装载首帧图 (多 Agent 将以此图为视觉基准 · 双击放大)</div>
                   </div>
                 ) : (
                   <label className="ref-dropzone">
@@ -681,6 +695,14 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
           </div>
         </div>
       </div>
+
+      {/* 首帧图双击放大模态弹窗 */}
+      <ImageLightboxModal
+        isOpen={isImageLightboxOpen}
+        imageUrl={referenceImage}
+        title={themeInput.slice(0, 30) || '首帧参考图'}
+        onClose={() => setIsImageLightboxOpen(false)}
+      />
     </div>
   )
 }
