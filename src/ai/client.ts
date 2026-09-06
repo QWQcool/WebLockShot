@@ -1,4 +1,4 @@
-import type { TokenConfig } from '../types'
+import type { TokenConfig } from '../types.ts'
 import {
   abortError,
   classifyTokenError,
@@ -6,7 +6,7 @@ import {
   isAbortError,
   withRetry,
   type RetryClassify,
-} from './retry'
+} from './retry.ts'
 
 export class TokenClientError extends Error {
   readonly kind: 'config' | 'network' | 'http' | 'empty'

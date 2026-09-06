@@ -3,12 +3,16 @@ import type { VisualPlan } from '../../domain/sellVisual.ts'
 import type { VideoProvider } from '../../media/types.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
 import { klingVideoProvider } from '../../media/providers/kling.ts'
+import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 
 export type JobUpdateListener = (jobs: ShotJob[]) => void
 
 export function resolveVideoProvider(providerId: VideoProviderId): VideoProvider {
   if (providerId === 'kling') {
     return klingVideoProvider
+  }
+  if (providerId === 'jimeng') {
+    return jimengVideoProvider
   }
   return mockVideoProvider
 }

@@ -43,6 +43,7 @@ export const TokenSettingsModal: React.FC<Props> = ({
   })
   const [videoProvider, setVideoProvider] = useState<'mock' | 'kling' | 'jimeng'>('mock')
   const [klingKey, setKlingKey] = useState('')
+  const [jimengKey, setJimengKey] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
 
   useEffect(() => {
@@ -62,6 +63,8 @@ export const TokenSettingsModal: React.FC<Props> = ({
       }
       const savedKling = sessionStorage.getItem('weblockshot.kling_key')
       if (savedKling) setKlingKey(savedKling)
+      const savedJimeng = sessionStorage.getItem('weblockshot.jimeng_key')
+      if (savedJimeng) setJimengKey(savedJimeng)
     } catch {}
   }, [isOpen])
 
@@ -81,6 +84,9 @@ export const TokenSettingsModal: React.FC<Props> = ({
     if (klingKey) {
       sessionStorage.setItem('weblockshot.kling_key', klingKey)
     }
+    if (jimengKey) {
+      sessionStorage.setItem('weblockshot.jimeng_key', jimengKey)
+    }
     setSaveSuccess(true)
     setTimeout(() => {
       setSaveSuccess(false)
@@ -93,12 +99,14 @@ export const TokenSettingsModal: React.FC<Props> = ({
     sessionStorage.removeItem(TOKEN_STORAGE_KEY)
     sessionStorage.removeItem('weblockshot.video_provider')
     sessionStorage.removeItem('weblockshot.kling_key')
+    sessionStorage.removeItem('weblockshot.jimeng_key')
     setTokenConfig({
       baseUrl: 'https://api.siliconflow.cn/v1',
       apiKey: '',
       model: 'deepseek-ai/DeepSeek-V3',
     })
     setKlingKey('')
+    setJimengKey('')
     setVideoProvider('mock')
     onSaved?.()
   }
@@ -223,6 +231,22 @@ export const TokenSettingsModal: React.FC<Props> = ({
                   <p>真实直调快手可灵视频 API（需开发者凭据）</p>
                 </div>
               </label>
+
+              <label
+                className={`provider-card-option ${videoProvider === 'jimeng' ? 'selected' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="video_provider"
+                  value="jimeng"
+                  checked={videoProvider === 'jimeng'}
+                  onChange={() => setVideoProvider('jimeng')}
+                />
+                <div>
+                  <strong>字节即梦 AI (Jimeng)</strong>
+                  <p>真实直调字节即梦视频 API（需开发者凭据）</p>
+                </div>
+              </label>
             </div>
 
             {videoProvider === 'kling' && (
@@ -236,7 +260,23 @@ export const TokenSettingsModal: React.FC<Props> = ({
                   onChange={(e) => setKlingKey(e.target.value)}
                 />
                 <small className="hint-text">
-                  请前往可灵开放平台获取开发者密钥。浏览器端直连可能需要配合 Vite 代理（P1 阶段）。
+                  请前往快手可灵开放平台获取开发者密钥。
+                </small>
+              </div>
+            )}
+
+            {videoProvider === 'jimeng' && (
+              <div className="form-item mt-3">
+                <label>即梦 API Key / Access Token：</label>
+                <input
+                  type="password"
+                  className="text-input"
+                  placeholder="Bearer Token 或 API_KEY"
+                  value={jimengKey}
+                  onChange={(e) => setJimengKey(e.target.value)}
+                />
+                <small className="hint-text">
+                  请前往字节跳动即梦/火山方舟获取 API 密钥。
                 </small>
               </div>
             )}

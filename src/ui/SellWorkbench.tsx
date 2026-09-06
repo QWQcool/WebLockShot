@@ -18,7 +18,11 @@ import {
   type PipelineSessionV2,
 } from '../persistV2.ts'
 
-import { WorkbenchHeader, type WorkbenchStep } from './components/WorkbenchHeader.tsx'
+import {
+  WorkbenchHeader,
+  type WorkbenchStep,
+  type StudioMode,
+} from './components/WorkbenchHeader.tsx'
 import { TokenSettingsModal } from './components/TokenSettingsModal.tsx'
 import { ProductStep } from './steps/ProductStep.tsx'
 import { TemplateStep } from './steps/TemplateStep.tsx'
@@ -27,6 +31,8 @@ import { StoryboardStep } from './steps/StoryboardStep.tsx'
 import { VisualStep } from './steps/VisualStep.tsx'
 import { GenerateBoard } from './steps/GenerateBoard.tsx'
 import { DeliverPlayer } from './steps/DeliverPlayer.tsx'
+import { SingleAgentStudio } from './studios/SingleAgentStudio.tsx'
+import { MultiAgentStudio } from './studios/MultiAgentStudio.tsx'
 import { hairDryerImg } from '../assets/presets/index.ts'
 
 const DEFAULT_PRODUCT_INPUT: ProductInput = {
@@ -54,6 +60,7 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
   const [maxReachedStep, setMaxReachedStep] = useState<WorkbenchStep>(
     (initialSession?.activeStep as WorkbenchStep) || 0
   )
+  const [studioMode, setStudioMode] = useState<StudioMode>('pipeline')
   const [productInput, setProductInput] = useState<ProductInput>(
     initialSession?.productInput || DEFAULT_PRODUCT_INPUT
   )
@@ -214,6 +221,8 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
         currentStep={currentStep}
         onStepChange={(s) => setCurrentStep(s)}
         maxReachedStep={maxReachedStep}
+        studioMode={studioMode}
+        onStudioModeChange={setStudioMode}
         onOpenSettings={() => setIsSettingsOpen(true)}
         hasToken={hasToken}
       />
@@ -232,69 +241,81 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
       />
 
       <main className="workbench-main-content">
-        {currentStep === 0 && (
-          <ProductStep
-            productInput={productInput}
-            onChange={setProductInput}
-            onNext={() => advanceToStep(1)}
-          />
+        {studioMode === 'single-agent' && (
+          <SingleAgentStudio onOpenSettings={() => setIsSettingsOpen(true)} />
         )}
 
-        {currentStep === 1 && (
-          <TemplateStep
-            selectedTemplateId={selectedTemplateId}
-            onSelectTemplate={setSelectedTemplateId}
-            onNext={handleGenerateScript}
-            isLoading={isExpanding}
-          />
+        {studioMode === 'multi-agent' && (
+          <MultiAgentStudio onOpenSettings={() => setIsSettingsOpen(true)} />
         )}
 
-        {currentStep === 2 && script && (
-          <ScriptStep
-            script={script}
-            criticResult={criticResult}
-            onChange={setScript}
-            onNext={handleScriptToStoryboard}
-            onReCritique={async () => {
-              const token = readToken()
-              const res = await critiqueScript(script, token?.apiKey ? token : null)
-              setCriticResult(res)
-            }}
-          />
-        )}
+        {studioMode === 'pipeline' && (
+          <>
+            {currentStep === 0 && (
+              <ProductStep
+                productInput={productInput}
+                onChange={setProductInput}
+                onNext={() => advanceToStep(1)}
+              />
+            )}
 
-        {currentStep === 3 && sellStory && (
-          <StoryboardStep
-            story={sellStory}
-            onStoryChange={setSellStory}
-            onNext={handleStoryboardToVisual}
-          />
-        )}
+            {currentStep === 1 && (
+              <TemplateStep
+                selectedTemplateId={selectedTemplateId}
+                onSelectTemplate={setSelectedTemplateId}
+                onNext={handleGenerateScript}
+                isLoading={isExpanding}
+              />
+            )}
 
-        {currentStep === 4 && (
-          <VisualStep
-            visualPlans={visualPlans}
-            onChange={setVisualPlans}
-            onNext={handleStartGeneration}
-          />
-        )}
+            {currentStep === 2 && script && (
+              <ScriptStep
+                script={script}
+                criticResult={criticResult}
+                onChange={setScript}
+                onNext={handleScriptToStoryboard}
+                onReCritique={async () => {
+                  const token = readToken()
+                  const res = await critiqueScript(script, token?.apiKey ? token : null)
+                  setCriticResult(res)
+                }}
+              />
+            )}
 
-        {currentStep === 5 && (
-          <GenerateBoard
-            jobs={jobs}
-            onRetryShot={handleRetryJob}
-            onNext={() => advanceToStep(6)}
-          />
-        )}
+            {currentStep === 3 && sellStory && (
+              <StoryboardStep
+                story={sellStory}
+                onStoryChange={setSellStory}
+                onNext={handleStoryboardToVisual}
+              />
+            )}
 
-        {currentStep === 6 && sellStory && (
-          <DeliverPlayer
-            jobs={jobs}
-            story={sellStory}
-            visualPlans={visualPlans}
-            onRegenerateSingleShot={handleRegenerateSingleShot}
-            onRestartPipeline={handleRestartPipeline}
-          />
+            {currentStep === 4 && (
+              <VisualStep
+                visualPlans={visualPlans}
+                onChange={setVisualPlans}
+                onNext={handleStartGeneration}
+              />
+            )}
+
+            {currentStep === 5 && (
+              <GenerateBoard
+                jobs={jobs}
+                onRetryShot={handleRetryJob}
+                onNext={() => advanceToStep(6)}
+              />
+            )}
+
+            {currentStep === 6 && sellStory && (
+              <DeliverPlayer
+                jobs={jobs}
+                story={sellStory}
+                visualPlans={visualPlans}
+                onRegenerateSingleShot={handleRegenerateSingleShot}
+                onRestartPipeline={handleRestartPipeline}
+              />
+            )}
+          </>
         )}
       </main>
     </div>

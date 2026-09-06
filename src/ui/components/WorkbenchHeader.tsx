@@ -12,12 +12,16 @@ export const STEP_NAMES: { step: WorkbenchStep; label: string; icon: string }[] 
   { step: 6, label: '审片交付', icon: '✨' },
 ]
 
+export type StudioMode = 'pipeline' | 'single-agent' | 'multi-agent'
+
 type Props = {
   mode: 'sell' | 'drama'
   onModeChange: (mode: 'sell' | 'drama') => void
   currentStep: WorkbenchStep
   onStepChange: (step: WorkbenchStep) => void
   maxReachedStep: WorkbenchStep
+  studioMode?: StudioMode
+  onStudioModeChange?: (mode: StudioMode) => void
   onOpenSettings?: () => void
   hasToken?: boolean
 }
@@ -28,6 +32,8 @@ export const WorkbenchHeader: React.FC<Props> = ({
   currentStep,
   onStepChange,
   maxReachedStep,
+  studioMode = 'pipeline',
+  onStudioModeChange,
   onOpenSettings,
   hasToken,
 }) => {
@@ -80,29 +86,89 @@ export const WorkbenchHeader: React.FC<Props> = ({
       </div>
 
       {mode === 'sell' && (
-        <nav className="header-steps" aria-label="生成步骤">
-          {STEP_NAMES.map(({ step, label, icon }) => {
-            const isActive = currentStep === step
-            const isCompleted = maxReachedStep > step
-            const canClick = step <= maxReachedStep
+        <div className="workbench-three-zones-bar">
+          {/* 左侧红框：电商全链路工作流 */}
+          <div
+            className={`workflow-zone-card zone-pipeline ${
+              studioMode === 'pipeline' ? 'active' : ''
+            }`}
+          >
+            <div
+              className="zone-header-trigger"
+              onClick={() => onStudioModeChange?.('pipeline')}
+              role="button"
+              tabIndex={0}
+            >
+              <span className="zone-tag">🛒 电商全链路工作流</span>
+            </div>
 
-            return (
-              <button
-                key={step}
-                type="button"
-                className={`step-nav-item ${isActive ? 'active' : ''} ${
-                  isCompleted ? 'completed' : ''
-                }`}
-                disabled={!canClick}
-                onClick={() => onStepChange(step)}
-              >
-                <span className="step-icon">{isCompleted ? '✓' : icon}</span>
-                <span className="step-label">{label}</span>
-                {step < 6 && <span className="step-divider" />}
-              </button>
-            )
-          })}
-        </nav>
+            <nav className="header-steps" aria-label="生成步骤">
+              {STEP_NAMES.map(({ step, label, icon }) => {
+                const isActive = studioMode === 'pipeline' && currentStep === step
+                const isCompleted = maxReachedStep > step
+                const canClick = step <= maxReachedStep
+
+                return (
+                  <button
+                    key={step}
+                    type="button"
+                    className={`step-nav-item ${isActive ? 'active' : ''} ${
+                      isCompleted ? 'completed' : ''
+                    }`}
+                    disabled={!canClick}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onStudioModeChange?.('pipeline')
+                      onStepChange(step)
+                    }}
+                  >
+                    <span className="step-icon">{isCompleted ? '✓' : icon}</span>
+                    <span className="step-label">{label}</span>
+                    {step < 6 && <span className="step-divider" />}
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+
+          {/* 中间红框：单 Agent 极速直出 */}
+          <div
+            className={`workflow-zone-card zone-single ${
+              studioMode === 'single-agent' ? 'active' : ''
+            }`}
+            onClick={() => onStudioModeChange?.('single-agent')}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="zone-meta-wrap">
+              <div className="zone-title-row">
+                <span className="zone-icon">⚡</span>
+                <span className="zone-title">单 Agent 极速直出</span>
+                <span className="zone-pill">Prompt 直调 API</span>
+              </div>
+              <div className="zone-desc">提示词模板 · AI 润色扩写 · 直调可灵/即梦</div>
+            </div>
+          </div>
+
+          {/* 右侧红框：多 Agent 协同导演室 */}
+          <div
+            className={`workflow-zone-card zone-multi ${
+              studioMode === 'multi-agent' ? 'active' : ''
+            }`}
+            onClick={() => onStudioModeChange?.('multi-agent')}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="zone-meta-wrap">
+              <div className="zone-title-row">
+                <span className="zone-icon">🤖</span>
+                <span className="zone-title">多 Agent 协同导演室</span>
+                <span className="zone-pill multi-pill">4 Agent 协同</span>
+              </div>
+              <div className="zone-desc">编导+运镜+质检+调度四智体共创 · 动态推演</div>
+            </div>
+          </div>
+        </div>
       )}
     </header>
   )
