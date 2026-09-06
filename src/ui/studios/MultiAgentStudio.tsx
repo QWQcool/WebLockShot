@@ -4,6 +4,9 @@ import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
 import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
+import { walletManager } from '../../domain/wallet.ts'
+import { circuitBreaker } from '../../domain/fsm.ts'
+import { idempotencyManager } from '../../domain/idempotency.ts'
 import {
   resolveAsset,
   ALL_PRESET_ASSETS,
@@ -183,6 +186,43 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   // 启动多 Agent 联合视频渲染
   const handleRenderSwarmVideo = async () => {
     if (!swarmSpec) return
+
+    // 0. 熔断与幂等排查
+    const breakerCheck = circuitBreaker.isAvailable(providerId)
+    if (!breakerCheck.allowed) {
+      setErrorMsg(breakerCheck.reason || '当前服务处于熔断保护状态')
+      return
+    }
+
+    const taskKey = idempotencyManager.generateKey({
+      intent: 'multi-swarm-render',
+      providerId,
+      prompt: swarmSpec.synthesizedPrompt,
+      durationSec,
+      extra: themeInput,
+    })
+
+    const lockResult = idempotencyManager.acquireLock(taskKey)
+    if (!lockResult.success) {
+      setErrorMsg(lockResult.reason || '多 Agent 任务正在渲染中，请勿重复提交')
+      return
+    }
+
+    // 1. 钱包预扣款冻结
+    const cost = walletManager.getCost(providerId, 1)
+    const freezeSuccess = walletManager.freeze(
+      cost,
+      taskKey,
+      providerId,
+      `多 Agent 协同渲染 (${providerId === 'kling' ? '可灵' : providerId === 'jimeng' ? '即梦' : '自建/Mock'})`
+    )
+
+    if (!freezeSuccess) {
+      idempotencyManager.releaseLock(taskKey)
+      setErrorMsg(`钱包可用余额不足 (需 ${cost} 灵感币)，请在顶部虚拟钱包中模拟充值。`)
+      return
+    }
+
     setIsRendering(true)
     setRenderProgress(15)
     setRenderStatus('正在通过调度 Agent 派发视频渲染请求...')
@@ -194,7 +234,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       if (providerId === 'jimeng') provider = jimengVideoProvider
       if (providerId === 'comfyui') provider = comfyUIVideoProvider
       const req: VideoGenRequest = {
-        clientTaskId: `swarm-task-${Date.now()}`,
+        clientTaskId: taskKey,
         shotId: `swarm-${Date.now()}`,
         prompt: swarmSpec.synthesizedPrompt,
         negative: swarmSpec.negativePrompt,
@@ -231,29 +271,48 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             setRenderStatus('多 Agent 协同成片渲染完成！')
             setRenderedVideoUrl(asset.url)
             setIsRendering(false)
+
+            walletManager.settle(taskKey, cost, providerId, '多 Agent 协同渲染成功核销')
+            circuitBreaker.recordSuccess(providerId)
+            idempotencyManager.releaseLock(taskKey)
           } else if (pollRes.status === 'failed') {
             clearInterval(pollTimer)
             setIsRendering(false)
             setErrorMsg(`渲染失败: ${pollRes.error || '远端生成异常'}`)
+
+            walletManager.refund(taskKey, cost, providerId, `渲染失败全额退款: ${pollRes.error || '异常'}`)
+            circuitBreaker.recordFailure(providerId)
+            idempotencyManager.releaseLock(taskKey)
           } else if (attempts >= maxAttempts) {
             clearInterval(pollTimer)
             setIsRendering(false)
             const asset = await provider.getAsset(taskId)
             if (asset) {
               setRenderedVideoUrl(asset.url)
+              walletManager.settle(taskKey, cost, providerId, '多 Agent 协同渲染完成核销')
+              circuitBreaker.recordSuccess(providerId)
             } else {
               setErrorMsg('生成超时，请检查网络或 API 密钥配置。')
+              walletManager.refund(taskKey, cost, providerId, '渲染超时全额退款')
+              circuitBreaker.recordFailure(providerId)
             }
+            idempotencyManager.releaseLock(taskKey)
           }
         } catch (err: any) {
           clearInterval(pollTimer)
           setIsRendering(false)
           setErrorMsg(err.message || '查询任务状态出错')
+          walletManager.refund(taskKey, cost, providerId, `状态查询异常退款: ${err.message}`)
+          circuitBreaker.recordFailure(providerId)
+          idempotencyManager.releaseLock(taskKey)
         }
       }, 1500)
     } catch (err: any) {
       setIsRendering(false)
       setErrorMsg(err.message || '派发请求失败')
+      walletManager.refund(taskKey, cost, providerId, `派发请求失败退款: ${err.message}`)
+      circuitBreaker.recordFailure(providerId)
+      idempotencyManager.releaseLock(taskKey)
     }
   }
 

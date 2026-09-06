@@ -4004,3 +4004,262 @@ textarea:focus-visible {
   border-color: #f59e0b !important;
 }
 
+/* =========================================================
+   虚拟钱包与资金结算中心样式
+   ========================================================= */
+.btn-wallet-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-wallet-trigger:hover {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: #fbbf24;
+  transform: translateY(-1px);
+}
+
+.wallet-balance-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin: 1.2rem 0;
+}
+
+.balance-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.balance-label {
+  font-size: 0.75rem;
+  color: var(--wls-text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.balance-val {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+  font-family: monospace;
+}
+
+.balance-val small {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--wls-text-muted);
+}
+
+.balance-val.main-balance {
+  color: #34d399;
+}
+
+.balance-val.frozen-balance {
+  color: #fbbf24;
+}
+
+.balance-sub {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 0.25rem;
+}
+
+.wallet-action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.recharge-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.action-label {
+  font-size: 0.78rem;
+  color: var(--wls-text-muted);
+}
+
+.btn-recharge {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-recharge:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+}
+
+.btn-recharge.primary {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.btn-recharge.primary:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.btn-recharge-reset {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--wls-text-muted);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-recharge-reset:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.costs-guide {
+  font-size: 0.72rem;
+  color: var(--wls-text-muted);
+  display: flex;
+  gap: 0.65rem;
+}
+
+.free-tag {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.wallet-tx-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 1rem;
+}
+
+.tx-section-header h4 {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  margin: 0 0 0.75rem 0;
+}
+
+.tx-list-container {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-right: 0.3rem;
+}
+
+.empty-tx-tip {
+  font-size: 0.78rem;
+  color: var(--wls-text-muted);
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+.tx-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.76rem;
+}
+
+.tx-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.tx-type-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.tx-type-tag.type-freeze {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.tx-type-tag.type-settle {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.tx-type-tag.type-refund {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.tx-type-tag.type-recharge,
+.tx-type-tag.type-initial {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.tx-desc {
+  color: var(--wls-text);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tx-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tx-amount {
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.tx-amount.plus {
+  color: #34d399;
+}
+
+.tx-amount.minus {
+  color: #f87171;
+}
+
+.tx-amount.zero {
+  color: var(--wls-text-muted);
+}
+
+.tx-time {
+  color: var(--wls-text-muted);
+  font-size: 0.7rem;
+}
+

@@ -1,11 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildJianyingDraft } from '../jianyingDraft.ts'
+import { buildJianyingDraft, buildJianyingDraftMetaInfo } from '../jianyingDraft.ts'
 import type { Story } from '../../types.ts'
 import type { VisualPlan } from '../../domain/sellVisual.ts'
 import type { ShotJob } from '../../domain/shotJob.ts'
 
-test('剪映草稿工程导出：生成符合 9:16 规格的 draft_content.json', () => {
+test('剪映草稿工程导出：生成符合 9:16 规格且音视字三轨微秒级对齐的 draft_content.json', () => {
   const mockStory: Story = {
     id: 'story-mock',
     title: '高速负离子静音吹风机',
@@ -93,32 +93,48 @@ test('剪映草稿工程导出：生成符合 9:16 规格的 draft_content.json'
   // 2. 总时长微秒验证：3s + 4s = 7s -> 7,000,000 us
   assert.equal(draft.duration, 7_000_000)
 
-  // 3. 素材验证：2 个视频素材，2 个文本素材
+  // 3. 物料素材验证：2 个视频素材，2 个音频素材，2 个文本素材
   assert.equal(draft.materials.videos.length, 2)
+  assert.equal(draft.materials.audios.length, 2)
   assert.equal(draft.materials.texts.length, 2)
   assert.equal(draft.materials.videos[0].path, 'blob:http://localhost/s1.webm')
   assert.equal(draft.materials.videos[1].path, 'blob:http://localhost/s2.webm')
 
-  // 4. 轨道与片段验证
-  assert.equal(draft.tracks.length, 2)
+  // 4. 轨道与片段三轨微秒严密对齐验证 (视频主轨、音频配音轨、花字字幕轨)
+  assert.equal(draft.tracks.length, 3)
   const videoTrack = draft.tracks.find((t) => t.type === 'video')
+  const audioTrack = draft.tracks.find((t) => t.type === 'audio')
   const textTrack = draft.tracks.find((t) => t.type === 'text')
 
   assert.ok(videoTrack, '必须包含视频主轨道')
-  assert.ok(textTrack, '必须包含字幕轨道')
+  assert.ok(audioTrack, '必须包含旁白配音音频轨道')
+  assert.ok(textTrack, '必须包含花字字幕轨道')
 
   assert.equal(videoTrack?.segments.length, 2)
+  assert.equal(audioTrack?.segments.length, 2)
   assert.equal(textTrack?.segments.length, 2)
 
-  // 镜 1 时间戳对齐：0 ~ 3s
+  // 镜头 1 三轨时间戳微秒对齐：0 ~ 3,000,000 us
   assert.equal(videoTrack?.segments[0].target_timerange.start, 0)
   assert.equal(videoTrack?.segments[0].target_timerange.duration, 3_000_000)
+  assert.equal(audioTrack?.segments[0].target_timerange.start, 0)
+  assert.equal(audioTrack?.segments[0].target_timerange.duration, 3_000_000)
   assert.equal(textTrack?.segments[0].target_timerange.start, 0)
   assert.equal(textTrack?.segments[0].target_timerange.duration, 3_000_000)
 
-  // 镜 2 时间戳对齐：3s ~ 7s
+  // 镜头 2 三轨时间戳微秒对齐：3,000,000 ~ 7,000,000 us
   assert.equal(videoTrack?.segments[1].target_timerange.start, 3_000_000)
   assert.equal(videoTrack?.segments[1].target_timerange.duration, 4_000_000)
+  assert.equal(audioTrack?.segments[1].target_timerange.start, 3_000_000)
+  assert.equal(audioTrack?.segments[1].target_timerange.duration, 4_000_000)
   assert.equal(textTrack?.segments[1].target_timerange.start, 3_000_000)
   assert.equal(textTrack?.segments[1].target_timerange.duration, 4_000_000)
+
+  // 5. 元数据 draft_meta_info.json 导出测试
+  const meta = buildJianyingDraftMetaInfo({
+    story: mockStory,
+    projectTitle: '负离子吹风机_带货工程',
+  })
+  assert.equal(meta.draft_name, '负离子吹风机_带货工程')
+  assert.equal(meta.tm_duration, 7_000_000)
 })

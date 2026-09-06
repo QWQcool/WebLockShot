@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --experimental-strip-types --test src/ai/retry.test.ts src/director/__tests__/executor.test.ts src/prompts/library/__tests__/structures.test.ts src/media/__tests__/audio.test.ts src/media/__tests__/kling.test.ts src/media/__tests__/jimeng.test.ts src/media/__tests__/comfyui.test.ts src/ai/agents/__tests__/promptPolisher.test.ts src/export/__tests__/jianyingDraft.test.ts src/director/__tests__/fullPipeline.test.ts",
+    "test": "node --experimental-strip-types --test src/ai/retry.test.ts src/director/__tests__/executor.test.ts src/prompts/library/__tests__/structures.test.ts src/media/__tests__/audio.test.ts src/media/__tests__/kling.test.ts src/media/__tests__/jimeng.test.ts src/media/__tests__/comfyui.test.ts src/ai/agents/__tests__/promptPolisher.test.ts src/export/__tests__/jianyingDraft.test.ts src/domain/__tests__/wallet.test.ts src/domain/__tests__/fsm.test.ts src/director/__tests__/fullPipeline.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

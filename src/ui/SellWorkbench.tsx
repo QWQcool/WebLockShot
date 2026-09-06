@@ -18,12 +18,9 @@ import {
   type PipelineSessionV2,
 } from '../persistV2.ts'
 
-import {
-  WorkbenchHeader,
-  type WorkbenchStep,
-  type StudioMode,
-} from './components/WorkbenchHeader.tsx'
+import { WorkbenchHeader, type WorkbenchStep, type StudioMode } from './components/WorkbenchHeader.tsx'
 import { TokenSettingsModal } from './components/TokenSettingsModal.tsx'
+import { WalletModal } from './components/WalletModal.tsx'
 import { ProductStep } from './steps/ProductStep.tsx'
 import { TemplateStep } from './steps/TemplateStep.tsx'
 import { ScriptStep } from './steps/ScriptStep.tsx'
@@ -74,6 +71,7 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
   const [jobs, setJobs] = useState<ShotJob[]>(initialSession?.jobs || [])
   const [isExpanding, setIsExpanding] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isWalletOpen, setIsWalletOpen] = useState(false)
   const [hasToken, setHasToken] = useState<boolean>(() => {
     try {
       const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)
@@ -226,6 +224,7 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
         studioMode={studioMode}
         onStudioModeChange={setStudioMode}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenWallet={() => setIsWalletOpen(true)}
         hasToken={hasToken}
       />
 
@@ -240,6 +239,11 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
             setHasToken(false)
           }
         }}
+      />
+
+      <WalletModal
+        isOpen={isWalletOpen}
+        onClose={() => setIsWalletOpen(false)}
       />
 
       <main className="workbench-main-content">

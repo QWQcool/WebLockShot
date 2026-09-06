@@ -9,6 +9,9 @@ import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
 import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
+import { walletManager } from '../../domain/wallet.ts'
+import { circuitBreaker } from '../../domain/fsm.ts'
+import { idempotencyManager } from '../../domain/idempotency.ts'
 import { TOKEN_STORAGE_KEY, type TokenConfig } from '../../types.ts'
 import {
   resolveAsset,
@@ -192,6 +195,42 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       return
     }
 
+    // 0. 熔断与幂等检查
+    const breakerCheck = circuitBreaker.isAvailable(providerId)
+    if (!breakerCheck.allowed) {
+      setErrorMsg(breakerCheck.reason || '当前服务暂时熔断保护中')
+      return
+    }
+
+    const taskKey = idempotencyManager.generateKey({
+      intent: 'single-studio-generate',
+      providerId,
+      prompt,
+      durationSec,
+      ratio: aspectRatio,
+    })
+
+    const lockResult = idempotencyManager.acquireLock(taskKey)
+    if (!lockResult.success) {
+      setErrorMsg(lockResult.reason || '任务正在执行中，请勿连击')
+      return
+    }
+
+    // 1. 钱包预冻结
+    const cost = walletManager.getCost(providerId, 1)
+    const freezeSuccess = walletManager.freeze(
+      cost,
+      taskKey,
+      providerId,
+      `单 Agent 直出 (${providerId === 'kling' ? '可灵' : providerId === 'jimeng' ? '即梦' : '自建/Mock'})`
+    )
+
+    if (!freezeSuccess) {
+      idempotencyManager.releaseLock(taskKey)
+      setErrorMsg(`钱包可用余额不足 (需 ${cost} 灵感币)，请在顶部虚拟钱包中模拟充值。`)
+      return
+    }
+
     setIsGenerating(true)
     setGenerationProgress(10)
     setGenerationStatus('正在向视频生成服务提交请求...')
@@ -203,7 +242,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       if (providerId === 'jimeng') provider = jimengVideoProvider
       if (providerId === 'comfyui') provider = comfyUIVideoProvider
       const req: VideoGenRequest = {
-        clientTaskId: `single-task-${Date.now()}`,
+        clientTaskId: taskKey,
         shotId: `single-${Date.now()}`,
         prompt,
         negative: negativePrompt,
@@ -247,10 +286,20 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             setGenerationStatus('视频生成完成！')
             setGeneratedVideoUrl(asset.url)
             setIsGenerating(false)
+
+            // 资金与熔断结算
+            walletManager.settle(taskKey, cost, providerId, '单 Agent 视频生成成功核销')
+            circuitBreaker.recordSuccess(providerId)
+            idempotencyManager.releaseLock(taskKey)
           } else if (pollRes.status === 'failed') {
             clearInterval(pollTimer)
             setIsGenerating(false)
             setErrorMsg(`生成失败: ${pollRes.error || '远端生成异常'}`)
+
+            // 失败全额退款
+            walletManager.refund(taskKey, cost, providerId, `生成异常退还: ${pollRes.error || '远端生成异常'}`)
+            circuitBreaker.recordFailure(providerId)
+            idempotencyManager.releaseLock(taskKey)
           } else if (attempts >= maxAttempts) {
             clearInterval(pollTimer)
             setIsGenerating(false)
@@ -258,19 +307,30 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             const asset = await provider.getAsset(taskId)
             if (asset) {
               setGeneratedVideoUrl(asset.url)
+              walletManager.settle(taskKey, cost, providerId, '单 Agent 视频完成核销')
+              circuitBreaker.recordSuccess(providerId)
             } else {
               setErrorMsg('生成超时，请检查网络或 API 余额。')
+              walletManager.refund(taskKey, cost, providerId, '生成超时全额退款')
+              circuitBreaker.recordFailure(providerId)
             }
+            idempotencyManager.releaseLock(taskKey)
           }
         } catch (err: any) {
           clearInterval(pollTimer)
           setIsGenerating(false)
           setErrorMsg(err.message || '查询任务状态出错')
+          walletManager.refund(taskKey, cost, providerId, `查询异常退款: ${err.message}`)
+          circuitBreaker.recordFailure(providerId)
+          idempotencyManager.releaseLock(taskKey)
         }
       }, 1500)
     } catch (err: any) {
       setIsGenerating(false)
       setErrorMsg(err.message || '提交生片请求失败')
+      walletManager.refund(taskKey, cost, providerId, `提交异常退款: ${err.message}`)
+      circuitBreaker.recordFailure(providerId)
+      idempotencyManager.releaseLock(taskKey)
     }
   }
 

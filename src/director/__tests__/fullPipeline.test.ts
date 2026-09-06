@@ -102,10 +102,12 @@ test('全量电商链路端到端自动化测试：从商品导入、AI剧本、
   assert.equal(jianyingDraft.canvas_config.height, 1920)
   assert.equal(jianyingDraft.canvas_config.ratio, '9:16')
   assert.equal(jianyingDraft.materials.videos.length, 6, '必须打包 6 个视频素材')
+  assert.equal(jianyingDraft.materials.audios.length, 6, '必须打包 6 个音频旁白素材')
   assert.equal(jianyingDraft.materials.texts.length, 6, '必须打包 6 个字幕素材')
-  assert.equal(jianyingDraft.tracks.length, 2, '包含视频主轨道和字幕轨道')
+  assert.equal(jianyingDraft.tracks.length, 3, '包含视频主轨道、旁白配音轨道和花字字幕轨道')
   assert.equal(jianyingDraft.tracks[0].segments.length, 6)
   assert.equal(jianyingDraft.tracks[1].segments.length, 6)
+  assert.equal(jianyingDraft.tracks[2].segments.length, 6)
 
   // 7. 新建下一条带货视频（重置全链路状态）
   engine.loadJobs([])

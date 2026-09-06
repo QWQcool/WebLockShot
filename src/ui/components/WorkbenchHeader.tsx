@@ -23,6 +23,7 @@ type Props = {
   studioMode?: StudioMode
   onStudioModeChange?: (mode: StudioMode) => void
   onOpenSettings?: () => void
+  onOpenWallet?: () => void
   hasToken?: boolean
 }
 
@@ -35,6 +36,7 @@ export const WorkbenchHeader: React.FC<Props> = ({
   studioMode = 'pipeline',
   onStudioModeChange,
   onOpenSettings,
+  onOpenWallet,
   hasToken,
 }) => {
   return (
@@ -48,7 +50,7 @@ export const WorkbenchHeader: React.FC<Props> = ({
           <span className="brand-tagline">多 Agent 电商带货视频工作台</span>
         </div>
 
-        {/* 模式切换与 API 设置 */}
+        {/* 模式切换、钱包与 API 设置 */}
         <div className="header-controls-group">
           <div className="mode-toggle">
             <button
@@ -66,6 +68,17 @@ export const WorkbenchHeader: React.FC<Props> = ({
               🎭 剧情短剧（粗剪台）
             </button>
           </div>
+
+          {onOpenWallet && (
+            <button
+              type="button"
+              className="btn-wallet-trigger"
+              onClick={onOpenWallet}
+              title="打开虚拟钱包与资金明细"
+            >
+              💰 虚拟钱包
+            </button>
+          )}
 
           {onOpenSettings && (
             <button

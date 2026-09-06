@@ -5,6 +5,9 @@ import { mockVideoProvider } from '../../media/providers/mock.ts'
 import { klingVideoProvider } from '../../media/providers/kling.ts'
 import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
+import { walletManager } from '../../domain/wallet.ts'
+import { circuitBreaker } from '../../domain/fsm.ts'
+import { idempotencyManager } from '../../domain/idempotency.ts'
 
 export type JobUpdateListener = (jobs: ShotJob[]) => void
 
@@ -138,6 +141,40 @@ export class ExecutorEngine {
         const plan = visualPlans.find((p) => p.shotId === shotId)
         if (!plan) continue
 
+        // 0. 熔断检查与防连击幂等锁
+        const breakerCheck = circuitBreaker.isAvailable(job.provider)
+        if (!breakerCheck.allowed) {
+          job.status = 'failed'
+          job.error = breakerCheck.reason
+          this.notify()
+          continue
+        }
+
+        const lockResult = idempotencyManager.acquireLock(job.taskKey)
+        if (!lockResult.success) {
+          job.status = 'failed'
+          job.error = lockResult.reason
+          this.notify()
+          continue
+        }
+
+        // 1. 资金两阶段事务：阶段 1 (预冻结)
+        const cost = walletManager.getCost(job.provider, 1)
+        const freezeSuccess = walletManager.freeze(
+          cost,
+          job.shotId,
+          job.provider,
+          `第 ${plan.order || shotId} 镜生片 (${job.provider})`
+        )
+
+        if (!freezeSuccess) {
+          idempotencyManager.releaseLock(job.taskKey)
+          job.status = 'failed'
+          job.error = `钱包可用余额不足 (需 ${cost} 灵感币)，请在顶部虚拟钱包中模拟充值。`
+          this.notify()
+          continue
+        }
+
         job.status = 'running'
         job.progress = 10
         this.notify()
@@ -145,7 +182,7 @@ export class ExecutorEngine {
         const provider = this.resolveProvider(job.provider)
 
         try {
-          // 1. 提交至 provider
+          // 2. 提交至 provider
           const { taskId } = await provider.submit({
             clientTaskId: job.taskKey,
             prompt: plan.positive,
@@ -161,7 +198,7 @@ export class ExecutorEngine {
           job.providerTaskId = taskId
           this.notify()
 
-          // 2. 轮询状态直到终态
+          // 3. 轮询状态直到终态
           let finished = false
           let pollAttempts = 0
           while (!finished && pollAttempts < 60) {
@@ -176,11 +213,21 @@ export class ExecutorEngine {
               job.status = 'succeeded'
               job.progress = 100
               job.asset = await provider.getAsset(taskId)
+              
+              // 资金两阶段事务：阶段 2A (成功核销结算)
+              walletManager.settle(job.shotId, cost, job.provider, `第 ${plan.order || shotId} 镜出片成功核销`)
+              circuitBreaker.recordSuccess(job.provider)
+              idempotencyManager.releaseLock(job.taskKey)
               this.notify()
             } else if (result.status === 'failed') {
               finished = true
               job.status = 'failed'
               job.error = result.error || '生成失败'
+
+              // 资金两阶段事务：阶段 2B (失败全额回滚退还)
+              walletManager.refund(job.shotId, cost, job.provider, `第 ${plan.order || shotId} 镜生成异常自动退还`)
+              circuitBreaker.recordFailure(job.provider)
+              idempotencyManager.releaseLock(job.taskKey)
               this.notify()
             } else {
               job.status = 'running'
@@ -191,11 +238,17 @@ export class ExecutorEngine {
           if (!finished) {
             job.status = 'failed'
             job.error = '轮询超时'
+            walletManager.refund(job.shotId, cost, job.provider, `第 ${plan.order || shotId} 镜生成超时自动退款`)
+            circuitBreaker.recordFailure(job.provider)
+            idempotencyManager.releaseLock(job.taskKey)
             this.notify()
           }
         } catch (err) {
           job.status = 'failed'
           job.error = err instanceof Error ? err.message : String(err)
+          walletManager.refund(job.shotId, cost, job.provider, `第 ${plan.order || shotId} 镜提交异常自动退款`)
+          circuitBreaker.recordFailure(job.provider)
+          idempotencyManager.releaseLock(job.taskKey)
           this.notify()
         }
       }
