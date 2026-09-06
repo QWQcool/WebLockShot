@@ -1,5 +1,6 @@
 import type { MediaAsset } from '../../domain/shotJob.ts'
 import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
+import { getPresetImageByKeyword } from '../../assets/presets/index.ts'
 
 type MockTaskState = {
   req: VideoGenRequest
@@ -12,14 +13,10 @@ type MockTaskState = {
 const mockTasks = new Map<string, MockTaskState>()
 
 function inferPresetImage(imageSrc?: string, title?: string): string {
-  if (imageSrc && (imageSrc.startsWith('data:') || imageSrc.startsWith('http') || imageSrc.startsWith('/'))) {
+  if (imageSrc && (imageSrc.startsWith('data:') || imageSrc.startsWith('http') || imageSrc.startsWith('/') || imageSrc.includes('assets/'))) {
     return imageSrc
   }
-  const t = (title || '').toLowerCase()
-  if (t.includes('吹风') || t.includes('发') || t.includes('dryer')) return '/presets/hair_dryer.jpg'
-  if (t.includes('面膜') || t.includes('泥') || t.includes('mask')) return '/presets/clay_mask.jpg'
-  if (t.includes('包') || t.includes('收纳') || t.includes('bag')) return '/presets/tech_bag.jpg'
-  return '/presets/hair_dryer.jpg'
+  return getPresetImageByKeyword(title)
 }
 
 /**
@@ -180,36 +177,36 @@ async function recordCanvasWebm(
       ctx.fillRect(0, 480, 360, 160)
 
       // 4. 用户要求的明确标注与水印（gemini3.8flash 实验标注）
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'
-      ctx.strokeStyle = 'rgba(230, 57, 70, 0.45)'
+      ctx.fillStyle = 'rgba(11, 20, 25, 0.88)'
+      ctx.strokeStyle = 'rgba(57, 197, 187, 0.55)'
       ctx.lineWidth = 1
       ctx.beginPath()
       ctx.roundRect(14, 56, 332, 26, 13)
       ctx.fill()
       ctx.stroke()
 
-      ctx.fillStyle = '#fca5a5'
+      ctx.fillStyle = '#7ec8e3'
       ctx.font = 'bold 10px sans-serif'
       ctx.textAlign = 'center'
       ctx.fillText('✨ 由 gemini3.8flash 预生成 · 仅供功能实验 · 体验请配可灵等模型', 180, 73)
 
       // 5. 顶部镜号指示
-      ctx.fillStyle = '#e63946'
+      ctx.fillStyle = '#39c5bb'
       ctx.fillRect(16, 20, 64, 24)
-      ctx.fillStyle = '#ffffff'
+      ctx.fillStyle = '#0b1419'
       ctx.font = 'bold 12px sans-serif'
       ctx.textAlign = 'center'
       ctx.fillText(shotId.toUpperCase(), 48, 36)
 
-      ctx.fillStyle = '#94a3b8'
+      ctx.fillStyle = '#85a9b5'
       ctx.font = '11px sans-serif'
       ctx.textAlign = 'right'
       ctx.fillText(`9:16 商业分镜 · ${durationSec}s`, 344, 36)
 
       // 6. 底部字幕条（爆款高转化视觉标语）
       if (caption) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+        ctx.fillStyle = 'rgba(11, 20, 25, 0.88)'
+        ctx.strokeStyle = 'rgba(57, 197, 187, 0.3)'
         ctx.lineWidth = 1
         ctx.beginPath()
         ctx.roundRect(14, 535, 332, 50, 10)
@@ -223,7 +220,7 @@ async function recordCanvasWebm(
       }
 
       // 7. 底部视频进度线
-      ctx.fillStyle = '#e63946'
+      ctx.fillStyle = '#39c5bb'
       ctx.fillRect(0, 636, 360 * progress, 4)
 
       if (frame < totalFrames) {

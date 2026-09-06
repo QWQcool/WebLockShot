@@ -747,24 +747,27 @@ textarea:focus-visible {
    ========================================================================== */
 
 :root {
-  --wls-bg: #0b0f19;
-  --wls-card: #131b2e;
-  --wls-card-hover: #1c2742;
-  --wls-border: rgba(255, 255, 255, 0.08);
-  --wls-border-highlight: rgba(230, 57, 70, 0.4);
-  --wls-primary: #e63946;
-  --wls-primary-hover: #d62839;
-  --wls-accent: #38bdf8;
-  --wls-success: #10b981;
-  --wls-warning: #f59e0b;
-  --wls-text: #f8fafc;
-  --wls-text-muted: #94a3b8;
-  --wls-text-subtle: #64748b;
+  --wls-bg: #0b1419;
+  --wls-card: #112229;
+  --wls-card-hover: #182d36;
+  --wls-border: rgba(57, 197, 187, 0.16);
+  --wls-border-highlight: rgba(57, 197, 187, 0.55);
+  --wls-primary: #39c5bb;
+  --wls-primary-hover: #2aa8a0;
+  --wls-accent: #ff7eb6;
+  --wls-success: #38ef7d;
+  --wls-warning: #ffd166;
+  --wls-text: #f4feff;
+  --wls-text-muted: #85a9b5;
+  --wls-text-subtle: #527582;
 }
 
 .workbench-app {
   min-height: 100vh;
   background-color: var(--wls-bg);
+  background-image: 
+    radial-gradient(1200px 600px at 15% -10%, rgba(57, 197, 187, 0.12) 0%, transparent 60%),
+    radial-gradient(800px 450px at 85% 5%, rgba(255, 126, 182, 0.08) 0%, transparent 55%);
   color: var(--wls-text);
   display: flex;
   flex-direction: column;
@@ -772,9 +775,10 @@ textarea:focus-visible {
 
 /* 顶部导航 Header */
 .workbench-header {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
+  background: rgba(12, 24, 29, 0.88);
+  backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--wls-border);
+  box-shadow: 0 4px 20px rgba(57, 197, 187, 0.06);
   padding: 0.75rem 1.5rem;
   position: sticky;
   top: 0;
@@ -796,13 +800,14 @@ textarea:focus-visible {
 }
 
 .logo-badge {
-  background: linear-gradient(135deg, #e63946, #f97316);
-  color: #fff;
+  background: linear-gradient(135deg, #39c5bb, #2aa8a0);
+  color: #0b1419;
   font-weight: 900;
   font-size: 0.85rem;
   padding: 0.25rem 0.5rem;
   border-radius: 6px;
   letter-spacing: 0.05em;
+  box-shadow: 0 2px 10px rgba(57, 197, 187, 0.35);
 }
 
 .brand-text h1 {
@@ -822,7 +827,7 @@ textarea:focus-visible {
 
 .mode-toggle {
   display: flex;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   padding: 3px;
   border-radius: 8px;
   border: 1px solid var(--wls-border);
@@ -840,9 +845,10 @@ textarea:focus-visible {
 }
 
 .mode-btn.active {
-  background: #1e293b;
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  background: rgba(57, 197, 187, 0.18);
+  color: #39c5bb;
+  border: 1px solid rgba(57, 197, 187, 0.4);
+  box-shadow: 0 2px 8px rgba(57, 197, 187, 0.2);
 }
 
 /* 步骤导航 */
@@ -876,9 +882,11 @@ textarea:focus-visible {
 }
 
 .step-nav-item.active {
-  color: #ffffff;
-  background: rgba(230, 57, 70, 0.18);
-  border: 1px solid rgba(230, 57, 70, 0.4);
+  color: #0b1419;
+  background: var(--wls-primary);
+  border: 1px solid var(--wls-primary);
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(57, 197, 187, 0.35);
 }
 
 .step-nav-item.completed {
@@ -942,7 +950,7 @@ textarea:focus-visible {
 
 .text-input,
 .script-textarea {
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(11, 20, 25, 0.7);
   border: 1px solid var(--wls-border);
   color: #ffffff;
   border-radius: 8px;
@@ -955,24 +963,25 @@ textarea:focus-visible {
 .script-textarea:focus {
   outline: none;
   border-color: var(--wls-primary);
-  box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.2);
+  box-shadow: 0 0 0 2px rgba(57, 197, 187, 0.3);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #e63946, #d90429);
-  color: #ffffff;
+  background: linear-gradient(135deg, #39c5bb 0%, #2aa8a0 100%);
+  color: #0b1419;
   border: none;
   padding: 0.7rem 1.4rem;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: 8px;
   transition: transform 0.15s, opacity 0.15s;
-  box-shadow: 0 4px 14px rgba(230, 57, 70, 0.35);
+  box-shadow: 0 4px 16px rgba(57, 197, 187, 0.35);
 }
 
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.92;
+  opacity: 0.95;
   transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(57, 197, 187, 0.5);
 }
 
 .btn-primary:disabled {
@@ -992,7 +1001,8 @@ textarea:focus-visible {
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(57, 197, 187, 0.12);
+  border-color: rgba(57, 197, 187, 0.3);
 }
 
 .step-actions {
@@ -1018,17 +1028,19 @@ textarea:focus-visible {
 }
 
 .preset-chip {
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  color: #38bdf8;
+  background: rgba(57, 197, 187, 0.1);
+  border: 1px solid rgba(57, 197, 187, 0.3);
+  color: #39c5bb;
   padding: 0.35rem 0.75rem;
   border-radius: 20px;
   font-size: 0.8rem;
+  font-weight: 600;
   transition: all 0.2s;
 }
 
 .preset-chip:hover {
-  background: rgba(56, 189, 248, 0.2);
+  background: rgba(57, 197, 187, 0.22);
+  border-color: #39c5bb;
 }
 
 /* 导入 Tab */
@@ -1535,7 +1547,7 @@ textarea:focus-visible {
 
 .shot-card-row.active {
   border-color: var(--wls-primary);
-  background: rgba(230, 57, 70, 0.08);
+  background: rgba(57, 197, 187, 0.14);
 }
 
 .row-left {
@@ -1681,8 +1693,8 @@ textarea:focus-visible {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(90deg, rgba(230, 57, 70, 0.12) 0%, rgba(15, 23, 42, 0.7) 100%);
-  border-color: rgba(230, 57, 70, 0.3);
+  background: linear-gradient(90deg, rgba(57, 197, 187, 0.15) 0%, rgba(17, 34, 41, 0.7) 100%);
+  border-color: rgba(57, 197, 187, 0.35);
 }
 
 .cost-info {
@@ -1726,7 +1738,7 @@ textarea:focus-visible {
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #e63946, #10b981);
+  background: linear-gradient(90deg, #39c5bb, #ff7eb6);
   transition: width 0.3s;
 }
 
@@ -1911,15 +1923,22 @@ textarea:focus-visible {
   transform: translate(-50%, -50%);
   width: 64px;
   height: 64px;
-  background: rgba(230, 57, 70, 0.9);
+  background: rgba(57, 197, 187, 0.9);
   border: none;
   border-radius: 50%;
-  color: #fff;
+  color: #0b1419;
   font-size: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 20px rgba(57, 197, 187, 0.5);
+  transition: all 0.2s;
+}
+
+.video-center-play-btn:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+  background: #39c5bb;
+  box-shadow: 0 6px 28px rgba(57, 197, 187, 0.7);
 }
 
 .player-controls-bar {
@@ -1943,6 +1962,8 @@ textarea:focus-visible {
 .btn-control-play {
   background: var(--wls-primary);
   border-color: var(--wls-primary);
+  color: #0b1419;
+  font-weight: 700;
   flex: 1.4;
 }
 
@@ -1985,14 +2006,14 @@ textarea:focus-visible {
 }
 
 .playlist-item.active {
-  background: rgba(230, 57, 70, 0.1);
-  border-color: rgba(230, 57, 70, 0.4);
+  background: rgba(57, 197, 187, 0.14);
+  border-color: rgba(57, 197, 187, 0.5);
 }
 
 .item-order {
   font-weight: 700;
   font-size: 0.8rem;
-  color: #e63946;
+  color: #39c5bb;
 }
 
 .item-info {
@@ -2339,8 +2360,8 @@ textarea:focus-visible {
 }
 
 .export-draft-card {
-  background: linear-gradient(180deg, rgba(230, 57, 70, 0.08) 0%, var(--wls-card) 100%);
-  border: 1px solid rgba(230, 57, 70, 0.3);
+  background: linear-gradient(180deg, rgba(57, 197, 187, 0.08) 0%, var(--wls-card) 100%);
+  border: 1px solid rgba(57, 197, 187, 0.3);
   border-radius: 12px;
   padding: 1.15rem;
   margin-bottom: 1rem;
@@ -2360,8 +2381,8 @@ textarea:focus-visible {
 }
 
 .btn-export-jianying {
-  background: linear-gradient(135deg, #e63946 0%, #c1121f 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #39c5bb 0%, #2aa8a0 100%);
+  color: #0b1419;
   border: none;
   font-size: 0.85rem;
   font-weight: 700;
@@ -2371,13 +2392,13 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 4px 15px rgba(230, 57, 70, 0.3);
+  box-shadow: 0 4px 15px rgba(57, 197, 187, 0.35);
   transition: all 0.2s;
 }
 
 .btn-export-jianying:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(230, 57, 70, 0.45);
+  box-shadow: 0 6px 20px rgba(57, 197, 187, 0.55);
 }
 
 

@@ -26,12 +26,13 @@ import { StoryboardStep } from './steps/StoryboardStep.tsx'
 import { VisualStep } from './steps/VisualStep.tsx'
 import { GenerateBoard } from './steps/GenerateBoard.tsx'
 import { DeliverPlayer } from './steps/DeliverPlayer.tsx'
+import { hairDryerImg } from '../assets/presets/index.ts'
 
 const DEFAULT_PRODUCT_INPUT: ProductInput = {
   source: 'link',
   link: 'https://item.taobao.com/item.htm?id=sample_dryer',
   title: '高速负离子静音电吹风',
-  imagePreview: '/presets/hair_dryer.jpg',
+  imagePreview: hairDryerImg,
   sellingPointsManual: [
     '11万转高速马达，3分钟速干',
     '2亿级高浓度负离子抚平毛躁',

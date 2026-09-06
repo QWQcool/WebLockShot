@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import type { ProductInput } from '../../domain/product.ts'
 import { understandProductImage } from '../../director/nodes/productNode.ts'
 import { TOKEN_STORAGE_KEY } from '../../types.ts'
+import { hairDryerImg, clayMaskImg, techBagImg } from '../../assets/presets/index.ts'
 
 type Props = {
   productInput: ProductInput
@@ -21,21 +22,21 @@ const PRESET_PRODUCTS: {
     points: ['11万转高速马达，3分钟速干', '2亿级高浓度负离子抚平毛躁', '智能恒温算法，绝不伤发'],
     link: 'https://item.taobao.com/item.htm?id=sample_hair_dryer',
     desc: '反常识与前后对比型爆款品类',
-    image: '/presets/hair_dryer.jpg',
+    image: hairDryerImg,
   },
   {
     title: '毛孔级火山泥吸附面膜',
     points: ['亚马逊白泥+深层高岭土', '深层带走黑头白头，不撑大毛孔', '温和不紧绷，敏感肌可用'],
     link: 'https://detail.tmall.com/item.htm?id=sample_clay_mask',
     desc: '痛点放大与视觉冲击极强',
-    image: '/presets/clay_mask.jpg',
+    image: clayMaskImg,
   },
   {
     title: '机能防泼水数码收纳包',
     points: ['高密度军规防泼水面料', '内衬精密风琴分区，一目了然', '抗震抗摔，差旅通勤一包搞定'],
     link: 'https://haohuo.jinritemai.com/views/product/sample_bag',
     desc: '开箱测评与品质演示首选',
-    image: '/presets/tech_bag.jpg',
+    image: techBagImg,
   },
 ]
 
