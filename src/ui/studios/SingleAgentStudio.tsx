@@ -9,12 +9,17 @@ import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
 import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
 import { TOKEN_STORAGE_KEY, type TokenConfig } from '../../types.ts'
+import {
+  resolveAsset,
+  ALL_PRESET_ASSETS,
+} from '../../assets/presets/index.ts'
 
 export type SinglePromptPreset = {
   id: string
   title: string
   category: string
   icon: string
+  image: string
   prompt: string
   negative: string
   style: PolishStyle
@@ -26,6 +31,7 @@ export const SINGLE_PROMPT_PRESETS: SinglePromptPreset[] = [
     title: '3C 数码金属光泽与微距',
     category: '数码家电',
     icon: '📱',
+    image: resolveAsset('hair_dryer.jpg'),
     prompt:
       'High-speed ionic hair dryer, brushed metallic matte finish, precision engineered nozzles. Extreme macro close-up, dramatic studio rim lighting contrasting deep shadows, gentle slow orbital camera movement, dynamic air particle flow visualization, photorealistic 8K.',
     negative: 'blurry, plastic, cheap, low resolution, fingerprint, dust, deformed',
@@ -36,6 +42,7 @@ export const SINGLE_PROMPT_PRESETS: SinglePromptPreset[] = [
     title: '美妆水润精华露微距升格',
     category: '美妆个护',
     icon: '💄',
+    image: resolveAsset('clay_mask.jpg'),
     prompt:
       'Translucent hydrating serum droplet falling onto pristine glass surface, creating delicate concentric ripple waves in slow-motion 120fps. Studio softbox diffusion lighting, pristine subsurface scattering, sparkling reflections, ultra-clean luxury cosmetic commercial, 8K.',
     negative: 'murky, opaque, bubbles, noisy, low contrast, dull, pixelated',
@@ -46,6 +53,7 @@ export const SINGLE_PROMPT_PRESETS: SinglePromptPreset[] = [
     title: '潮流穿搭机能光影走秀',
     category: '服饰潮牌',
     icon: '👟',
+    image: resolveAsset('sneaker.svg'),
     prompt:
       'Futuristic urban street style sneaker suspended in mid-air, slow 360-degree rotation. Wet reflective concrete floor, moody neon ambient backlight, water droplets bouncing off waterproof mesh fabric, dynamic anamorphic lens flare, cinematic commercial, 8K.',
     negative: 'static, flat lighting, messy background, low quality, oversaturated',
@@ -56,6 +64,7 @@ export const SINGLE_PROMPT_PRESETS: SinglePromptPreset[] = [
     title: '美食甜品热气升腾慢动作',
     category: '食品生鲜',
     icon: '🍵',
+    image: resolveAsset('food_dessert.svg'),
     prompt:
       'Rich molten chocolate poured over velvety golden pastry, delicate steam wisps rising in slow-motion against warm dark wooden backdrop. Warm golden hour backlight emphasizing luscious gloss texture, 85mm shallow depth of field, appetizing masterpiece, 8K.',
     negative: 'cold, artificial, plastic, messy, overexposed, low detail',
@@ -66,6 +75,7 @@ export const SINGLE_PROMPT_PRESETS: SinglePromptPreset[] = [
     title: '户外防水背包抗压水雾测试',
     category: '户外箱包',
     icon: '🎒',
+    image: resolveAsset('tech_bag.jpg'),
     prompt:
       'Tactical waterproof backpack subjected to high-pressure water spray test. Extreme close-up on water droplets beading and rolling off hydrophobic Cordura fabric, high-speed shutter freezing individual water droplets, rugged industrial studio lighting, 8K photorealistic.',
     negative: 'soaked, leaking, cheap nylon, cartoonish, low resolution',
@@ -76,6 +86,7 @@ export const SINGLE_PROMPT_PRESETS: SinglePromptPreset[] = [
     title: '璀璨珠宝钻石棱镜微距折射',
     category: '珠宝首饰',
     icon: '✨',
+    image: resolveAsset('diamond_ring.svg'),
     prompt:
       'Flawless cut brilliant diamond ring resting on obsidian black mirror pedestal, slow graceful spin. Prismatic rainbow light dispersion caustics dancing across facets, macro 100mm lens, pinpoint starburst specular highlights, high-end fine jewelry commercial, 8K.',
     negative: 'cloudy, scratched, dull, fake, plastic, low poly, noisy',
@@ -92,6 +103,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [providerId, setProviderId] = useState<'mock' | 'kling' | 'jimeng'>('mock')
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9' | '1:1'>('9:16')
   const [durationSec, setDurationSec] = useState<number>(5)
+  const [isCustomDuration, setIsCustomDuration] = useState<boolean>(false)
 
   // 提示词与润色状态
   const [prompt, setPrompt] = useState(SINGLE_PROMPT_PRESETS[0].prompt)
@@ -105,6 +117,12 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
     lighting?: string
     tags?: string[]
   } | null>(null)
+
+  // 多模态参考素材：参考图片 (首帧/垫图) 与参考视频 (运镜参考)
+  const [referenceImage, setReferenceImage] = useState<string | null>(SINGLE_PROMPT_PRESETS[0].image)
+  const [referenceVideo, setReferenceVideo] = useState<string | null>(null)
+  const [referenceVideoName, setReferenceVideoName] = useState<string>('')
+  const [motionPrompt, setMotionPrompt] = useState<string>('')
 
   // 生成状态
   const [isGenerating, setIsGenerating] = useState(false)
@@ -123,11 +141,12 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
     }
   }
 
-  // 选用预设模版
+  // 选用预设模版，同时自动填充对应的商业/Mock 预设图片
   const handleSelectPreset = (p: SinglePromptPreset) => {
     setPrompt(p.prompt)
     setNegativePrompt(p.negative)
     setSelectedStyle(p.style)
+    setReferenceImage(p.image)
     setPolishMeta(null)
   }
 
@@ -184,13 +203,24 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         shotId: `single-${Date.now()}`,
         prompt,
         negative: negativePrompt,
+        imageBase64: referenceImage || undefined,
+        referenceVideoUrl: referenceVideo || undefined,
+        motionPrompt: motionPrompt || undefined,
         durationSec,
         ratio: '9:16',
         title: rawIdea || prompt.slice(0, 30),
       }
 
       setGenerationProgress(25)
-      setGenerationStatus(`已连接 ${providerId === 'kling' ? '可灵 Kling' : providerId === 'jimeng' ? '即梦 Jimeng' : 'Mock 本地录制'}，任务调度中...`)
+      setGenerationStatus(
+        `已连接 ${
+          providerId === 'kling'
+            ? '快手可灵 Kling'
+            : providerId === 'jimeng'
+            ? '字节即梦 Jimeng'
+            : 'Mock 本地录制'
+        }，任务调度中...`
+      )
 
       const { taskId } = await provider.submit(req)
 
@@ -288,19 +318,39 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             ))}
           </div>
 
-          {/* 时长 */}
-          <div className="control-pill-group">
+          {/* 时长：预设快速选择 + 自定义数字输入 (1~60s) */}
+          <div className="control-pill-group duration-pill-group">
             <span className="pill-label">时长:</span>
-            {[5, 10].map((d) => (
+            {[5, 10, 15].map((d) => (
               <button
                 key={d}
                 type="button"
-                className={`pill-btn ${durationSec === d ? 'active' : ''}`}
-                onClick={() => setDurationSec(d)}
+                className={`pill-btn ${!isCustomDuration && durationSec === d ? 'active' : ''}`}
+                onClick={() => {
+                  setDurationSec(d)
+                  setIsCustomDuration(false)
+                }}
               >
                 {d} 秒
               </button>
             ))}
+            <div className={`custom-duration-box ${isCustomDuration || ![5, 10, 15].includes(durationSec) ? 'active' : ''}`}>
+              <span className="custom-prefix">自定义:</span>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={durationSec}
+                onChange={(e) => {
+                  const val = Math.max(1, Math.min(60, Number(e.target.value) || 1))
+                  setDurationSec(val)
+                  setIsCustomDuration(true)
+                }}
+                className="custom-duration-input"
+                title="输入自定义生成时长 (1~60秒)"
+              />
+              <span className="custom-unit">秒</span>
+            </div>
           </div>
 
           <button
@@ -317,21 +367,24 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       <div className="studio-layout">
         {/* 左侧：输入与优化区 */}
         <div className="studio-left-pane">
-          {/* 1. 预设模版快速填充 */}
+          {/* 1. 预设模版快速填充 (附带真实/Mock 图像预览) */}
           <div className="panel-card">
             <div className="panel-header">
               <span className="panel-title">📚 爆款提示词预设模板</span>
-              <span className="panel-hint">点击一键载入行业精调模版</span>
+              <span className="panel-hint">点击一键载入行业精调模版与专属首帧 Mock 图</span>
             </div>
             <div className="preset-grid">
               {SINGLE_PROMPT_PRESETS.map((p) => (
                 <button
                   key={p.id}
                   type="button"
-                  className="preset-chip-card"
+                  className={`preset-chip-card ${referenceImage === p.image ? 'selected-preset' : ''}`}
                   onClick={() => handleSelectPreset(p)}
                 >
-                  <span className="chip-icon">{p.icon}</span>
+                  <div className="chip-media-thumb">
+                    <img src={p.image} alt={p.title} className="preset-img-cover" />
+                    <span className="chip-icon-overlay">{p.icon}</span>
+                  </div>
                   <div className="chip-text">
                     <strong>{p.title}</strong>
                     <span>{p.category}</span>
@@ -341,7 +394,157 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             </div>
           </div>
 
-          {/* 2. 🪄 AI 提示词智能完善/扩写工具 */}
+          {/* 2. 📸 参考素材与多模态输入 (参考图片/首帧图 + 参考视频/运镜轨迹) */}
+          <div className="panel-card reference-media-panel">
+            <div className="panel-header">
+              <div className="header-title-flex">
+                <span className="panel-title">📸 多模态参考素材 (图片 / 视频输入)</span>
+                <span className="ai-tag">Img2Video / Motion</span>
+              </div>
+              <span className="panel-hint">输入首帧参考图或运镜参考视频，AI 将精准锁定商品结构与运镜节奏</span>
+            </div>
+
+            <div className="reference-media-grid">
+              {/* 2.1 参考图片 / 首帧图 */}
+              <div className="ref-column">
+                <div className="ref-column-header">
+                  <strong>🖼️ 参考图片 / 首帧图 (Image-to-Video)</strong>
+                  {referenceImage && (
+                    <button
+                      type="button"
+                      className="btn-clear-ref"
+                      onClick={() => setReferenceImage(null)}
+                    >
+                      ✕ 清除图片
+                    </button>
+                  )}
+                </div>
+
+                {referenceImage ? (
+                  <div className="ref-preview-box">
+                    <img src={referenceImage} alt="参考商品图" className="ref-thumb-img" />
+                    <div className="ref-badge-tag">✓ 已装载首帧图 (生片将基于此图)</div>
+                  </div>
+                ) : (
+                  <label className="ref-dropzone">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="ref-file-input"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') setReferenceImage(reader.result)
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                    <span className="dropzone-icon">📤</span>
+                    <span className="dropzone-text">点击上传商品图 / 拖拽图片至此</span>
+                    <span className="dropzone-sub">支持 PNG, JPG, WebP 格式</span>
+                  </label>
+                )}
+
+                {/* 快捷选用官方预设 Mock 图 */}
+                <div className="ref-quick-gallery">
+                  <span className="quick-label">⚡ 快捷选用预设商业 Mock 图:</span>
+                  <div className="quick-thumbs-row">
+                    {ALL_PRESET_ASSETS.map((asset) => (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        className={`quick-thumb-btn ${referenceImage === asset.src ? 'active' : ''}`}
+                        title={asset.name}
+                        onClick={() => setReferenceImage(asset.src)}
+                      >
+                        <img src={asset.src} alt={asset.name} />
+                        <span className="quick-thumb-name">{asset.name.split(' ')[0]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2.2 参考视频 / 运镜参考 */}
+              <div className="ref-column">
+                <div className="ref-column-header">
+                  <strong>🎥 参考视频 / 运镜轨迹模仿 (Motion Mimic)</strong>
+                  {referenceVideo && (
+                    <button
+                      type="button"
+                      className="btn-clear-ref"
+                      onClick={() => {
+                        setReferenceVideo(null)
+                        setReferenceVideoName('')
+                      }}
+                    >
+                      ✕ 清除视频
+                    </button>
+                  )}
+                </div>
+
+                {referenceVideo ? (
+                  <div className="ref-preview-box">
+                    <video src={referenceVideo} controls playsInline className="ref-thumb-video" />
+                    <div className="ref-badge-tag">
+                      ✓ 已载入参考视频 {referenceVideoName ? `(${referenceVideoName})` : ''}
+                    </div>
+                  </div>
+                ) : (
+                  <label className="ref-dropzone">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="ref-file-input"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const url = URL.createObjectURL(file)
+                          setReferenceVideo(url)
+                          setReferenceVideoName(file.name)
+                        }
+                      }}
+                    />
+                    <span className="dropzone-icon">🎬</span>
+                    <span className="dropzone-text">点击上传参考视频 / 运镜片段</span>
+                    <span className="dropzone-sub">支持 MP4, WebM (供提取运镜速度与机位)</span>
+                  </label>
+                )}
+
+                {/* 在线视频 URL 输入 */}
+                <div className="ref-url-input-group">
+                  <input
+                    type="text"
+                    className="text-input text-input-small"
+                    placeholder="或输入在线参考视频 URL (https://...)"
+                    onBlur={(e) => {
+                      if (e.target.value.trim()) {
+                        setReferenceVideo(e.target.value.trim())
+                        setReferenceVideoName('在线视频')
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* 运镜模仿说明 */}
+                <div className="motion-note-input-group">
+                  <span className="input-hint-label">运镜模仿意图:</span>
+                  <input
+                    type="text"
+                    className="text-input text-input-small"
+                    placeholder="例如：参考视频中的下潜推移与微幅倾转节奏..."
+                    value={motionPrompt}
+                    onChange={(e) => setMotionPrompt(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. 🪄 AI 提示词智能完善/扩写工具 */}
           <div className="panel-card highlight-card">
             <div className="panel-header">
               <div className="header-title-flex">
@@ -430,7 +633,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             </div>
           </div>
 
-          {/* 3. 最终提示词编辑与负向提示词 */}
+          {/* 4. 最终提示词编辑与负向提示词 */}
           <div className="panel-card">
             <div className="panel-header">
               <span className="panel-title">📝 生成提示词 (Prompt)</span>
@@ -533,6 +736,8 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
                     <span>画幅: {aspectRatio}</span>
                     <span>时长: {durationSec}s</span>
                     <span>引擎: {providerId}</span>
+                    {referenceImage && <span className="badge-highlight">已载入参考底图</span>}
+                    {referenceVideo && <span className="badge-highlight">已载入运镜参考</span>}
                   </div>
                 </div>
               )}
@@ -543,3 +748,4 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
     </div>
   )
 }
+

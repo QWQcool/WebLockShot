@@ -5,6 +5,8 @@ export type VideoGenRequest = {
   prompt: string
   negative?: string
   imageBase64?: string
+  referenceVideoUrl?: string
+  motionPrompt?: string
   durationSec: number
   ratio: '9:16'
   shotId: string

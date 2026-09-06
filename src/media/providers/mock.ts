@@ -36,7 +36,9 @@ async function recordCanvasWebm(
   title: string,
   caption: string,
   durationSec: number,
-  imageSrc?: string
+  imageSrc?: string,
+  motionPrompt?: string,
+  hasRefVideo?: boolean
 ): Promise<string> {
   if (
     typeof window === 'undefined' ||
@@ -222,6 +224,20 @@ async function recordCanvasWebm(
       ctx.textAlign = 'right'
       ctx.fillText(`9:16 商业分镜 · ${durationSec}s`, 344, 36)
 
+      // 5.1 参考视频 / 运镜动力学标识
+      if (hasRefVideo || motionPrompt) {
+        ctx.fillStyle = 'rgba(57, 197, 187, 0.2)'
+        ctx.fillRect(14, 88, 332, 22)
+        ctx.fillStyle = '#39c5bb'
+        ctx.font = 'bold 10px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText(
+          `🎥 运镜轨迹参考锁定: ${(motionPrompt || '参考视频动力学驱动').slice(0, 24)}`,
+          180,
+          103
+        )
+      }
+
       // 6. 底部字幕条（爆款高转化视觉标语）
       if (caption) {
         ctx.fillStyle = 'rgba(11, 20, 25, 0.88)'
@@ -287,7 +303,9 @@ export class MockVideoProvider implements VideoProvider {
         req.title || '电商分镜',
         req.caption || req.prompt,
         req.durationSec || 3,
-        req.imageBase64
+        req.imageBase64,
+        req.motionPrompt,
+        Boolean(req.referenceVideoUrl)
       )
 
       task.progress = 100

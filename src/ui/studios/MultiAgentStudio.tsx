@@ -3,6 +3,10 @@ import { klingVideoProvider } from '../../media/providers/kling.ts'
 import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
 import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
+import {
+  resolveAsset,
+  ALL_PRESET_ASSETS,
+} from '../../assets/presets/index.ts'
 
 export type AgentRole = 'director' | 'camera' | 'critic' | 'dispatcher'
 
@@ -33,16 +37,19 @@ const PRESET_SWARM_THEMES = [
     id: 'theme-1',
     title: '未来钛合金机械手表',
     desc: '微距齿轮精密咬合与赛博夜景流光',
+    image: resolveAsset('cyber_watch.svg'),
   },
   {
     id: 'theme-2',
     title: '高定丝绸晚礼服光影',
     desc: '面料垂坠飘逸与聚光灯下动态摆动',
+    image: resolveAsset('silk_dress.svg'),
   },
   {
     id: 'theme-3',
     title: '超级跑车雨夜破风疾驰',
     desc: '水花飞溅、尾灯流光拖尾与空气动力学尾翼',
+    image: resolveAsset('super_car.svg'),
   },
 ]
 
@@ -53,6 +60,15 @@ type Props = {
 export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [themeInput, setThemeInput] = useState('未来钛合金机械手表，微距齿轮精密咬合与赛博夜景流光')
   const [providerId, setProviderId] = useState<'mock' | 'kling' | 'jimeng'>('mock')
+  const [durationSec, setDurationSec] = useState<number>(5)
+  const [isCustomDuration, setIsCustomDuration] = useState<boolean>(false)
+
+  // 多模态参考素材：首帧参考图与运镜参考视频
+  const [referenceImage, setReferenceImage] = useState<string | null>(PRESET_SWARM_THEMES[0].image)
+  const [referenceVideo, setReferenceVideo] = useState<string | null>(null)
+  const [referenceVideoName, setReferenceVideoName] = useState<string>('')
+  const [motionPrompt, setMotionPrompt] = useState<string>('')
+
   const [isDeliberating, setIsDeliberating] = useState(false)
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [swarmSpec, setSwarmSpec] = useState<SwarmSpec | null>(null)
@@ -85,7 +101,9 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         avatar: '🎬',
         title: '【创意编导】叙事弧线与核心抓手拆解',
         thought: `分析主题「${themeInput}」的核心审美诉求与前 3 秒抓眼视觉符号...`,
-        output: `【叙事设定】以微观工业精密奇观切入，展现机械自转与时光流转的工业浪漫。镜头核心抓手确立为“极微距游丝跳动”，以 1/8 秒极速建立高端科技与精密质感心智。`,
+        output: `【叙事设定】以微观工业精密奇观切入，展现机械自转与时光流转的工业浪漫。镜头核心抓手确立为“极微距游丝跳动”，以 1/8 秒极速建立高端科技与精密质感心智。${
+          referenceImage ? '\n· 首帧底图已锁定：将提取参考图几何比例与材质质感作为全片视觉基准。' : ''
+        }`,
         timestamp: '00:01',
       }
       setMessages([directorMsg])
@@ -99,7 +117,11 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         avatar: '📐',
         title: '【摄影运镜】3D 轨道轨迹与光学参数工程化',
         thought: '计算焦段匹配度、景深控制与相机位移速度，避免画面机械平移...',
-        output: `【运镜矩阵】\n· 焦段：85mm 黄金微距 Cine 镜头，光圈 f/1.8 浅景深柔化背景。\n· 运动轨迹：螺旋下潜式轨道推移 (Spiral Dolly-in)，配合 25 度逆时针微幅倾转 (Roll)。\n· 布光系统：左侧冷白轮廓侧光，右侧深青科技补光，齿轮边缘形成极致反光金线。`,
+        output: `【运镜矩阵】\n· 焦段：85mm 黄金微距 Cine 镜头，光圈 f/1.8 浅景深柔化背景。\n· 运动轨迹：螺旋下潜式轨道推移 (Spiral Dolly-in)，配合 25 度逆时针微幅倾转 (Roll)。\n· 布光系统：左侧冷白轮廓侧光，右侧深青科技补光，齿轮边缘形成极致反光金线。${
+          referenceVideo || motionPrompt
+            ? `\n· 运镜参考动力学约束已激活：对齐「${motionPrompt || '参考视频镜头推进节奏'}」。`
+            : ''
+        }`,
         timestamp: '00:02',
       }
       setMessages((prev) => [...prev, cameraMsg])
@@ -113,7 +135,9 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         avatar: '🧐',
         title: '【质检审片】物理连贯性与防畸变安全审计',
         thought: '检测高频齿轮结构可能引起的频闪和 AI 结构变形风险...',
-        output: `【质检综合评分：98 / 100】\n· 风险排查：金属高频齿轮易引发 AI 结构模糊熔断。\n· 纠偏补丁：强化正向提示词中的 "solid structural integrity, crisp mechanical edges, no melting"，并在负向提示词中注入 "deformed cogs, jitter, plastic finish"。通过安全性校验！`,
+        output: `【质检综合评分：98 / 100】\n· 风险排查：金属高频齿轮易引发 AI 结构模糊熔断。\n· 纠偏补丁：强化正向提示词中的 "solid structural integrity, crisp mechanical edges, no melting"，并在负向提示词中注入 "deformed cogs, jitter, plastic finish"。${
+          referenceImage ? '对首帧图轮廓边缘与生成帧物理连贯性通过完整性审计。' : ''
+        } 通过安全性校验！`,
         timestamp: '00:03',
       }
       setMessages((prev) => [...prev, criticMsg])
@@ -121,7 +145,8 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
 
       // Step 4: 渲染调度 Agent
       const synthesized = `Masterpiece commercial cinematography, ${themeInput}. Shot on 85mm anamorphic macro lens, extreme close-up with smooth spiral dolly-in movement, razor sharp gear cogs with flawless mechanical interlocking, delicate subsurface rim reflections, high contrast moody cyber teal rim lighting, raytraced reflections on brushed titanium, ultra realistic 8K.`
-      const negative = 'blurry, melted metal, jitter, deformed geometry, plastic, oversaturated, low resolution'
+      const negative =
+        'blurry, melted metal, jitter, deformed geometry, plastic, oversaturated, low resolution'
 
       const dispatcherMsg: AgentMessage = {
         id: 'msg-4',
@@ -130,7 +155,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         avatar: '⚡',
         title: '【调度执行】多 Agent 智能成果合成完毕',
         thought: '完成多智体协同汇编，生成终极指令 Payload，准备派发渲染引擎...',
-        output: `终极生片 Prompt 已合成完毕。包含焦段、轨迹、物理材质与负向防护网。已就绪，可随时向 ${providerId.toUpperCase()} 派发算力任务！`,
+        output: `终极生片 Prompt 与多模态参数已合成完毕。包含时长 (${durationSec}s)、焦段、轨迹、物理材质与负向防护网。已就绪，可随时向 ${providerId.toUpperCase()} 派发算力任务！`,
         timestamp: '00:04',
       }
       setMessages((prev) => [...prev, dispatcherMsg])
@@ -169,7 +194,10 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         shotId: `swarm-${Date.now()}`,
         prompt: swarmSpec.synthesizedPrompt,
         negative: swarmSpec.negativePrompt,
-        durationSec: 5,
+        imageBase64: referenceImage || undefined,
+        referenceVideoUrl: referenceVideo || undefined,
+        motionPrompt: motionPrompt || undefined,
+        durationSec,
         ratio: '9:16',
         title: swarmSpec.theme,
       }
@@ -257,6 +285,41 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             </button>
           </div>
 
+          {/* 时长：预设快速选择 + 自定义数字输入 (1~60s) */}
+          <div className="control-pill-group duration-pill-group">
+            <span className="pill-label">时长:</span>
+            {[5, 10, 15].map((d) => (
+              <button
+                key={d}
+                type="button"
+                className={`pill-btn ${!isCustomDuration && durationSec === d ? 'active' : ''}`}
+                onClick={() => {
+                  setDurationSec(d)
+                  setIsCustomDuration(false)
+                }}
+              >
+                {d} 秒
+              </button>
+            ))}
+            <div className={`custom-duration-box ${isCustomDuration || ![5, 10, 15].includes(durationSec) ? 'active' : ''}`}>
+              <span className="custom-prefix">自定义:</span>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={durationSec}
+                onChange={(e) => {
+                  const val = Math.max(1, Math.min(60, Number(e.target.value) || 1))
+                  setDurationSec(val)
+                  setIsCustomDuration(true)
+                }}
+                className="custom-duration-input"
+                title="输入自定义生成时长 (1~60秒)"
+              />
+              <span className="custom-unit">秒</span>
+            </div>
+          </div>
+
           <button
             type="button"
             className="btn-settings-small"
@@ -271,7 +334,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       <div className="studio-layout">
         {/* 左侧：多 Agent 协同工作区 */}
         <div className="studio-left-pane">
-          {/* 1. 主题输入与预设 */}
+          {/* 1. 主题输入与带图片的预设灵感 */}
           <div className="panel-card">
             <div className="panel-header">
               <span className="panel-title">💡 视频创作主题与灵感</span>
@@ -297,21 +360,180 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             </div>
 
             <div className="swarm-presets-row">
-              <span className="row-label">灵感预置:</span>
-              {PRESET_SWARM_THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className="theme-chip"
-                  onClick={() => setThemeInput(`${t.title}，${t.desc}`)}
-                >
-                  {t.title}
-                </button>
-              ))}
+              <span className="row-label">灵感预置 (附带 Mock 图):</span>
+              <div className="swarm-presets-grid">
+                {PRESET_SWARM_THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`theme-chip-card ${referenceImage === t.image ? 'active' : ''}`}
+                    onClick={() => {
+                      setThemeInput(`${t.title}，${t.desc}`)
+                      setReferenceImage(t.image)
+                    }}
+                  >
+                    <img src={t.image} alt={t.title} className="theme-thumb-img" />
+                    <div className="theme-text-box">
+                      <strong>{t.title}</strong>
+                      <span>{t.desc}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* 2. 四智体实时协同推演流 */}
+          {/* 2. 📸 多模态参考素材与首帧/运镜控制 */}
+          <div className="panel-card reference-media-panel">
+            <div className="panel-header">
+              <div className="header-title-flex">
+                <span className="panel-title">📸 多模态参考素材 (图片 / 视频输入)</span>
+                <span className="ai-tag">Swarm Multimodal</span>
+              </div>
+              <span className="panel-hint">传入首帧商品图或运镜参考片段，多 Agent 将提取特征注入生片指令</span>
+            </div>
+
+            <div className="reference-media-grid">
+              {/* 2.1 参考图片 / 首帧图 */}
+              <div className="ref-column">
+                <div className="ref-column-header">
+                  <strong>🖼️ 参考图片 / 首帧图 (Image-to-Video)</strong>
+                  {referenceImage && (
+                    <button
+                      type="button"
+                      className="btn-clear-ref"
+                      onClick={() => setReferenceImage(null)}
+                    >
+                      ✕ 清除图片
+                    </button>
+                  )}
+                </div>
+
+                {referenceImage ? (
+                  <div className="ref-preview-box">
+                    <img src={referenceImage} alt="参考商品图" className="ref-thumb-img" />
+                    <div className="ref-badge-tag">✓ 已装载首帧图 (多 Agent 将以此图为视觉基准)</div>
+                  </div>
+                ) : (
+                  <label className="ref-dropzone">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="ref-file-input"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') setReferenceImage(reader.result)
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                    <span className="dropzone-icon">📤</span>
+                    <span className="dropzone-text">点击上传商品图 / 拖拽图片至此</span>
+                    <span className="dropzone-sub">支持 PNG, JPG, WebP 格式</span>
+                  </label>
+                )}
+
+                {/* 快捷选用预设 Mock 图 */}
+                <div className="ref-quick-gallery">
+                  <span className="quick-label">⚡ 快捷选用官方预设 Mock 图:</span>
+                  <div className="quick-thumbs-row">
+                    {ALL_PRESET_ASSETS.map((asset) => (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        className={`quick-thumb-btn ${referenceImage === asset.src ? 'active' : ''}`}
+                        title={asset.name}
+                        onClick={() => setReferenceImage(asset.src)}
+                      >
+                        <img src={asset.src} alt={asset.name} />
+                        <span className="quick-thumb-name">{asset.name.split(' ')[0]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2.2 参考视频 / 运镜参考 */}
+              <div className="ref-column">
+                <div className="ref-column-header">
+                  <strong>🎥 参考视频 / 运镜轨迹模仿 (Motion Mimic)</strong>
+                  {referenceVideo && (
+                    <button
+                      type="button"
+                      className="btn-clear-ref"
+                      onClick={() => {
+                        setReferenceVideo(null)
+                        setReferenceVideoName('')
+                      }}
+                    >
+                      ✕ 清除视频
+                    </button>
+                  )}
+                </div>
+
+                {referenceVideo ? (
+                  <div className="ref-preview-box">
+                    <video src={referenceVideo} controls playsInline className="ref-thumb-video" />
+                    <div className="ref-badge-tag">
+                      ✓ 已载入参考视频 {referenceVideoName ? `(${referenceVideoName})` : ''}
+                    </div>
+                  </div>
+                ) : (
+                  <label className="ref-dropzone">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="ref-file-input"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const url = URL.createObjectURL(file)
+                          setReferenceVideo(url)
+                          setReferenceVideoName(file.name)
+                        }
+                      }}
+                    />
+                    <span className="dropzone-icon">🎬</span>
+                    <span className="dropzone-text">点击上传参考视频 / 运镜片段</span>
+                    <span className="dropzone-sub">供运镜与构图 Agent 提取镜头轨迹动力学</span>
+                  </label>
+                )}
+
+                {/* 在线视频 URL 输入 */}
+                <div className="ref-url-input-group">
+                  <input
+                    type="text"
+                    className="text-input text-input-small"
+                    placeholder="或输入在线参考视频 URL (https://...)"
+                    onBlur={(e) => {
+                      if (e.target.value.trim()) {
+                        setReferenceVideo(e.target.value.trim())
+                        setReferenceVideoName('在线视频')
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* 运镜模仿说明 */}
+                <div className="motion-note-input-group">
+                  <span className="input-hint-label">运镜模仿意图:</span>
+                  <input
+                    type="text"
+                    className="text-input text-input-small"
+                    placeholder="例如：参考视频中的轨道下潜推移与微幅倾转节奏..."
+                    value={motionPrompt}
+                    onChange={(e) => setMotionPrompt(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. 四智体实时协同推演流 */}
           <div className="panel-card swarm-chat-panel">
             <div className="panel-header">
               <div className="header-title-flex">
@@ -360,7 +582,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             </div>
           </div>
 
-          {/* 3. 最终多 Agent 联合成片方案确认与执行 */}
+          {/* 4. 最终多 Agent 联合成片方案确认与执行 */}
           {swarmSpec && (
             <div className="panel-card highlight-card">
               <div className="panel-header">
@@ -448,7 +670,10 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
                   <div className="idle-specs-badge">
                     <span>模式: 4-Agent Swarm</span>
                     <span>画幅: 9:16 竖屏</span>
+                    <span>时长: {durationSec}s</span>
                     <span>引擎: {providerId}</span>
+                    {referenceImage && <span className="badge-highlight">已载入参考底图</span>}
+                    {referenceVideo && <span className="badge-highlight">已载入运镜参考</span>}
                   </div>
                 </div>
               )}
@@ -459,3 +684,4 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
     </div>
   )
 }
+

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="100%" height="100%">
+  <defs>
+    <linearGradient id="watchBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a1215"/>
+      <stop offset="50%" stop-color="#112429"/>
+      <stop offset="100%" stop-color="#060b0d"/>
+    </linearGradient>
+    <radialGradient id="titaniumGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#39c5bb" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#39c5bb" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="titanium" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cbd5e1"/>
+      <stop offset="50%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="600" height="600" fill="url(#watchBg)"/>
+  <circle cx="300" cy="280" r="230" fill="url(#titaniumGlow)"/>
+
+  <!-- Watch Bezel -->
+  <g transform="translate(150, 130)">
+    <circle cx="150" cy="150" r="135" fill="#0f172a" stroke="url(#titanium)" stroke-width="18"/>
+    <circle cx="150" cy="150" r="122" fill="none" stroke="#39c5bb" stroke-width="2" opacity="0.6"/>
+
+    <!-- Screws on Bezel -->
+    <circle cx="150" cy="25" r="4" fill="#94a3b8"/>
+    <circle cx="275" cy="150" r="4" fill="#94a3b8"/>
+    <circle cx="150" cy="275" r="4" fill="#94a3b8"/>
+    <circle cx="25" cy="150" r="4" fill="#94a3b8"/>
+
+    <!-- Tourbillon & Skeleton Cogs -->
+    <circle cx="150" cy="150" r="95" fill="#061014" stroke="#1e293b" stroke-width="3"/>
+    <circle cx="150" cy="150" r="60" fill="none" stroke="#39c5bb" stroke-width="5" stroke-dasharray="12, 6"/>
+    <circle cx="190" cy="170" r="35" fill="none" stroke="#ff7eb6" stroke-width="4" stroke-dasharray="8, 4"/>
+    <circle cx="120" cy="120" r="25" fill="none" stroke="#facc15" stroke-width="3" stroke-dasharray="6, 3"/>
+
+    <!-- Center Escapement -->
+    <circle cx="150" cy="150" r="12" fill="#39c5bb"/>
+    <line x1="150" y1="150" x2="190" y2="100" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    <line x1="150" y1="150" x2="110" y2="180" stroke="#ff7eb6" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Typography Badge -->
+  <rect x="40" y="40" width="145" height="28" rx="6" fill="#112429" stroke="#39c5bb" stroke-width="1"/>
+  <text x="50" y="59" fill="#39c5bb" font-family="sans-serif" font-size="13" font-weight="bold">TITANIUM SKELETON</text>
+  <text x="40" y="550" fill="#fff" font-family="sans-serif" font-size="20" font-weight="bold">未来钛合金机械手表</text>
+  <text x="40" y="572" fill="#5b7a86" font-family="sans-serif" font-size="13">85MM MACRO TOURBILLON COG INTERLOCK</text>
+</svg>
