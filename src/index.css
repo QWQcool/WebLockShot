@@ -4006,6 +4006,24 @@ textarea:focus-visible {
   gap: 0.4rem;
 }
 
+/* 全链路（pipeline）顶部常驻引擎条 */
+.pipeline-engine-bar {
+  display: flex;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  margin-bottom: 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--wls-border);
+  border-radius: 10px;
+}
+.pipeline-engine-bar .control-pill-group {
+  margin: 0;
+}
+.pipeline-engine-bar + .comfy-ping-banner,
+.pipeline-engine-bar ~ .studio-error-banner.global-studio-alert {
+  margin-bottom: 0.9rem;
+}
+
 .comfy-ping-banner.testing::before {
   content: "";
   width: 0.7rem;
