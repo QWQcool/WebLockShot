@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import type { ProductInput } from '../domain/product.ts'
 import type { Script } from '../domain/script.ts'
 import type { VisualPlan } from '../domain/sellVisual.ts'
-import type { ShotJob } from '../domain/shotJob.ts'
+import type { ShotJob, VideoProviderId } from '../domain/shotJob.ts'
 import type { Story, TokenConfig } from '../types.ts'
 import { TOKEN_STORAGE_KEY } from '../types.ts'
 import { STRUCTURE_TEMPLATES } from '../prompts/library/structures.ts'
@@ -150,11 +150,22 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
     advanceToStep(4)
   }
 
+  const readVideoProvider = (): VideoProviderId => {
+    try {
+      const p = sessionStorage.getItem('weblockshot.video_provider')
+      if (p === 'kling') return 'kling'
+      return 'mock'
+    } catch {
+      return 'mock'
+    }
+  }
+
   // 4 -> 5：确认视觉方案，开始向调度引擎提交 6 镜
   const handleStartGeneration = async () => {
     if (visualPlans.length === 0) return
     advanceToStep(5)
-    await executorEngine.enqueueShots(visualPlans, 'mock')
+    const provider = readVideoProvider()
+    await executorEngine.enqueueShots(visualPlans, provider)
   }
 
   // 单镜失败重试

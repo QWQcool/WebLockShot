@@ -2311,4 +2311,73 @@ textarea:focus-visible {
   gap: 0.75rem;
 }
 
+/* TTS 口播与剪映草稿导出组件 */
+.btn-control-tts {
+  background: var(--wls-card);
+  border: 1px solid var(--wls-border);
+  color: var(--wls-text-muted);
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.btn-control-tts:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-control-tts.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+.export-draft-card {
+  background: linear-gradient(180deg, rgba(230, 57, 70, 0.08) 0%, var(--wls-card) 100%);
+  border: 1px solid rgba(230, 57, 70, 0.3);
+  border-radius: 12px;
+  padding: 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.export-draft-card h4 {
+  margin: 0 0 0.4rem 0;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.export-draft-card p {
+  margin: 0 0 0.85rem 0;
+  font-size: 0.78rem;
+  color: var(--wls-text-muted);
+  line-height: 1.5;
+}
+
+.btn-export-jianying {
+  background: linear-gradient(135deg, #e63946 0%, #c1121f 100%);
+  color: #fff;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.65rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 15px rgba(230, 57, 70, 0.3);
+  transition: all 0.2s;
+}
+
+.btn-export-jianying:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(230, 57, 70, 0.45);
+}
+
 

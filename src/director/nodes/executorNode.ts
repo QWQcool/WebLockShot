@@ -2,21 +2,36 @@ import { computeTaskKey, type ShotJob, type VideoProviderId } from '../../domain
 import type { VisualPlan } from '../../domain/sellVisual.ts'
 import type { VideoProvider } from '../../media/types.ts'
 import { mockVideoProvider } from '../../media/providers/mock.ts'
+import { klingVideoProvider } from '../../media/providers/kling.ts'
 
 export type JobUpdateListener = (jobs: ShotJob[]) => void
 
+export function resolveVideoProvider(providerId: VideoProviderId): VideoProvider {
+  if (providerId === 'kling') {
+    return klingVideoProvider
+  }
+  return mockVideoProvider
+}
+
 export class ExecutorEngine {
   private jobs: Map<string, ShotJob> = new Map()
-  private provider: VideoProvider = mockVideoProvider
+  private customProvider?: VideoProvider
   private isProcessing = false
   private listeners: Set<JobUpdateListener> = new Set()
 
-  constructor(provider: VideoProvider = mockVideoProvider) {
-    this.provider = provider
+  constructor(customProvider?: VideoProvider) {
+    this.customProvider = customProvider
   }
 
   setProvider(provider: VideoProvider) {
-    this.provider = provider
+    this.customProvider = provider
+  }
+
+  resolveProvider(providerId: VideoProviderId): VideoProvider {
+    if (this.customProvider) {
+      return this.customProvider
+    }
+    return resolveVideoProvider(providerId)
   }
 
   subscribe(listener: JobUpdateListener) {
@@ -119,9 +134,11 @@ export class ExecutorEngine {
         job.progress = 10
         this.notify()
 
+        const provider = this.resolveProvider(job.provider)
+
         try {
           // 1. 提交至 provider
-          const { taskId } = await this.provider.submit({
+          const { taskId } = await provider.submit({
             clientTaskId: job.taskKey,
             prompt: plan.positive,
             negative: plan.negative,
@@ -141,14 +158,14 @@ export class ExecutorEngine {
             await new Promise((r) => setTimeout(r, 600))
             pollAttempts++
 
-            const result = await this.provider.poll(taskId)
+            const result = await provider.poll(taskId)
             job.progress = Math.max(job.progress, result.progress || 0)
 
             if (result.status === 'succeeded') {
               finished = true
               job.status = 'succeeded'
               job.progress = 100
-              job.asset = await this.provider.getAsset(taskId)
+              job.asset = await provider.getAsset(taskId)
               this.notify()
             } else if (result.status === 'failed') {
               finished = true

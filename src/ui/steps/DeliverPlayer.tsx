@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import type { ShotJob } from '../../domain/shotJob.ts'
 import type { VisualPlan } from '../../domain/sellVisual.ts'
 import type { Story } from '../../types.ts'
+import { voiceoverEngine, isTtsSupported } from '../../media/audio.ts'
+import { downloadJianyingDraft } from '../../export/jianyingDraft.ts'
 
 type Props = {
   jobs: ShotJob[]
@@ -20,6 +22,7 @@ export const DeliverPlayer: React.FC<Props> = ({
 }) => {
   const [currentShotIndex, setCurrentShotIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [ttsEnabled, setTtsEnabled] = useState(isTtsSupported())
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const activeJob = jobs[currentShotIndex] || jobs[0]
@@ -27,16 +30,32 @@ export const DeliverPlayer: React.FC<Props> = ({
   const activeShot = story.shots[currentShotIndex] || story.shots[0]
 
   useEffect(() => {
+    voiceoverEngine.enabled = ttsEnabled
+  }, [ttsEnabled])
+
+  useEffect(() => {
     if (videoRef.current && activeJob?.asset?.url) {
       videoRef.current.src = activeJob.asset.url
       videoRef.current.load()
       if (isPlaying) {
         videoRef.current.play().catch(() => setIsPlaying(false))
+        if (ttsEnabled) {
+          const line = activeShot?.line || activePlan?.caption || ''
+          voiceoverEngine.speak(line, activeShot?.durationSec || 5)
+        }
       }
     }
-  }, [currentShotIndex, activeJob?.asset?.url, isPlaying])
+  }, [currentShotIndex, activeJob?.asset?.url, isPlaying, ttsEnabled, activeShot?.line, activePlan?.caption, activeShot?.durationSec])
+
+  // 组件卸载时停止配音
+  useEffect(() => {
+    return () => {
+      voiceoverEngine.stop()
+    }
+  }, [])
 
   const handleVideoEnded = () => {
+    voiceoverEngine.stop()
     if (currentShotIndex < jobs.length - 1) {
       // 自动播放下一镜
       setCurrentShotIndex((prev) => prev + 1)
@@ -51,9 +70,19 @@ export const DeliverPlayer: React.FC<Props> = ({
     if (!videoRef.current) return
     if (isPlaying) {
       videoRef.current.pause()
+      voiceoverEngine.stop()
       setIsPlaying(false)
     } else {
-      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+      videoRef.current
+        .play()
+        .then(() => {
+          setIsPlaying(true)
+          if (ttsEnabled) {
+            const line = activeShot?.line || activePlan?.caption || ''
+            voiceoverEngine.speak(line, activeShot?.durationSec || 5)
+          }
+        })
+        .catch(() => setIsPlaying(false))
     }
   }
 
@@ -134,6 +163,14 @@ export const DeliverPlayer: React.FC<Props> = ({
             >
               下一镜 ⏭
             </button>
+            <button
+              type="button"
+              className={`btn-control-tts ${ttsEnabled ? 'active' : ''}`}
+              onClick={() => setTtsEnabled(!ttsEnabled)}
+              title="切换浏览器智能台词口播配音"
+            >
+              {ttsEnabled ? '🔊 口播开' : '🔇 口播关'}
+            </button>
           </div>
         </div>
 
@@ -190,6 +227,28 @@ export const DeliverPlayer: React.FC<Props> = ({
                 💾 下载此镜视频 (WebM)
               </button>
             </div>
+          </div>
+
+          {/* 剪映草稿工程导出卡 */}
+          <div className="export-draft-card">
+            <h4>📦 导出剪映 / CapCut 草稿工程</h4>
+            <p>
+              将 6 镜分镜素材与智能口播台词一键打包为剪映标准工程文件 (<code>draft_content.json</code>)。下载后直接放进电脑版剪映工程文件夹，自动对齐 9:16 画布、分段镜头与字幕轨道，立即可进行专业二次混剪与添加 BGM！
+            </p>
+            <button
+              type="button"
+              className="btn-export-jianying"
+              onClick={() =>
+                downloadJianyingDraft({
+                  story,
+                  visualPlans,
+                  jobs,
+                  projectTitle: story.title || 'WebLockShot_带货工程',
+                })
+              }
+            >
+              🎬 一键打包下载剪映草稿 (draft_content.json)
+            </button>
           </div>
 
           {/* 新一轮生成入口 */}

@@ -31,7 +31,7 @@ export const GenerateBoard: React.FC<Props> = ({
       <div className="step-header-intro">
         <h2>⑥ 媒体渲染生成台（浏览器串行队列）</h2>
         <p>
-          单机串行队列调度中。P0 阶段采用 MediaRecorder 对 9:16 动态舞台进行真实录制，产出真正的可播放 WebM 视频。
+          单机串行队列调度中。支持快手可灵 (Kling) 官方模型 API 真实出片，或 MediaRecorder 对 9:16 动态舞台进行真实录制。
         </p>
       </div>
 
@@ -75,7 +75,7 @@ export const GenerateBoard: React.FC<Props> = ({
               <div className="job-body">
                 <div className="job-meta-row">
                   <span className="meta-label">Provider：</span>
-                  <span className="meta-val">Mock 真实录制</span>
+                  <span className="meta-val">{job.provider === 'kling' ? '快手可灵 (Kling)' : 'Mock 真实录制'}</span>
                 </div>
                 <div className="job-meta-row">
                   <span className="meta-label">重试次数：</span>

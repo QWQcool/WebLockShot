@@ -55,7 +55,14 @@ export function classifyChatError(err: unknown): RetryClassify {
   return classifyTokenError(err)
 }
 
-type ChatMessage = { role: 'system' | 'user'; content: string }
+export type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'low' | 'high' | 'auto' } }
+
+export type ChatMessage = {
+  role: 'system' | 'user' | 'assistant'
+  content: string | ChatContentPart[]
+}
 
 export async function chatCompletionsText(
   config: TokenConfig,

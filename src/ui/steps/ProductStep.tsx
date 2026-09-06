@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react'
 import type { ProductInput } from '../../domain/product.ts'
+import { understandProductImage } from '../../director/nodes/productNode.ts'
+import { TOKEN_STORAGE_KEY } from '../../types.ts'
 
 type Props = {
   productInput: ProductInput
@@ -47,6 +49,7 @@ export const ProductStep: React.FC<Props> = ({
   )
   const [newPoint, setNewPoint] = useState('')
   const [extractedFrames, setExtractedFrames] = useState<string[]>([])
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const handleApplyPreset = (p: (typeof PRESET_PRODUCTS)[0]) => {
@@ -223,6 +226,36 @@ export const ProductStep: React.FC<Props> = ({
                   )}
                 </label>
               </div>
+
+              {productInput.imagePreview && (
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={isAnalyzing}
+                    onClick={async () => {
+                      setIsAnalyzing(true)
+                      try {
+                        let token = null
+                        try {
+                          const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)
+                          if (raw) token = JSON.parse(raw)
+                        } catch {}
+                        const insight = await understandProductImage(productInput.imagePreview!, token)
+                        onChange({
+                          ...productInput,
+                          title: insight.category || productInput.title,
+                          sellingPointsManual: insight.sellingPoints,
+                        })
+                      } finally {
+                        setIsAnalyzing(false)
+                      }
+                    }}
+                  >
+                    {isAnalyzing ? '⚡ 视觉模型正在深度理解中...' : '🤖 AI 智能解析商品图（自动提炼卖点）'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
