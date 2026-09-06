@@ -92,13 +92,12 @@ export const WorkbenchHeader: React.FC<Props> = ({
             className={`workflow-zone-card zone-pipeline ${
               studioMode === 'pipeline' ? 'active' : ''
             }`}
+            onClick={() => onStudioModeChange?.('pipeline')}
+            role="button"
+            tabIndex={0}
+            title="点击切换到电商全链路工作流"
           >
-            <div
-              className="zone-header-trigger"
-              onClick={() => onStudioModeChange?.('pipeline')}
-              role="button"
-              tabIndex={0}
-            >
+            <div className="zone-header-trigger">
               <span className="zone-tag">🛒 电商全链路工作流</span>
             </div>
 

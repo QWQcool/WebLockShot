@@ -884,11 +884,11 @@ textarea:focus-visible {
 
 /* 左侧红框：电商全流程工作流 */
 .zone-pipeline {
-  flex: 1 1 auto;
-  min-width: 580px;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  cursor: pointer;
 }
 
 .zone-header-trigger {
@@ -961,7 +961,8 @@ textarea:focus-visible {
 /* 中间与右侧红框卡片 */
 .zone-single,
 .zone-multi {
-  flex: 0 0 260px;
+  flex: 1 1 240px;
+  max-width: 320px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
