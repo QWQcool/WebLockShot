@@ -7,14 +7,15 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --experimental-strip-types --test src/ai/retry.test.ts",
+    "test": "node --experimental-strip-types --test src/ai/retry.test.ts src/director/__tests__/executor.test.ts src/prompts/library/__tests__/structures.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
     "gsap": "^3.15.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
