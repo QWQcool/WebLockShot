@@ -192,6 +192,8 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
 
   const handleSelectProvider = (id: 'mock' | 'kling' | 'jimeng' | 'comfyui') => {
     setProviderId(id)
+    // 切换引擎时立即清掉上一个引擎的报错，避免 ping 期间仍显示旧 engine 的错误
+    setErrorMsg(null)
     if (id === 'kling') {
       try {
         const key = sessionStorage.getItem('weblockshot.kling_key')
@@ -219,7 +221,6 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
     }
     // 切到 mock 时清掉 ComfyUI 探测残留状态
     setComfyPing({ status: 'idle' })
-    setErrorMsg(null)
   }
 
   // AI 提示词智能润色/扩写

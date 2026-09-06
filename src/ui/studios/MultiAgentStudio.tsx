@@ -121,6 +121,8 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
 
   const handleSelectProvider = (id: 'mock' | 'kling' | 'jimeng' | 'comfyui') => {
     setProviderId(id)
+    // 切换引擎时立即清掉上一个引擎的报错，避免 ping 期间仍显示旧 engine 的错误
+    setErrorMsg(null)
     if (id === 'kling') {
       try {
         const key = sessionStorage.getItem('weblockshot.kling_key')
@@ -147,7 +149,6 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       return
     }
     setComfyPing({ status: 'idle' })
-    setErrorMsg(null)
   }
 
   // 触发 4 个 Agent 协同共创
