@@ -4263,3 +4263,112 @@ textarea:focus-visible {
   font-size: 0.7rem;
 }
 
+/* =========================================================
+   全局醒目错误告警与 API 配置引导
+   ========================================================= */
+.studio-error-banner {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.studio-error-banner.global-studio-alert {
+  margin: 0.75rem 1.5rem 0.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.2) 0%, rgba(30, 27, 75, 0.6) 100%);
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.15);
+}
+
+.global-studio-alert .alert-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.global-studio-alert .alert-icon {
+  font-size: 1.1rem;
+}
+
+.global-studio-alert .alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-alert-action {
+  background: #f59e0b;
+  color: #0b1419;
+  border: none;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-alert-action:hover {
+  background: #fbbf24;
+  transform: translateY(-1px);
+}
+
+.btn-alert-dismiss {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--wls-text-muted);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-alert-dismiss:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* ComfyUI 部署说明卡片 */
+.comfy-deploy-guide-box {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.comfy-deploy-guide-box .guide-title {
+  color: #38bdf8;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.comfy-deploy-guide-box .guide-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--wls-text);
+}
+
+.comfy-deploy-guide-box .guide-steps li {
+  margin-bottom: 0.35rem;
+}
+
+.comfy-deploy-guide-box code {
+  background: rgba(0, 0, 0, 0.4);
+  color: #f59e0b;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
+}
+

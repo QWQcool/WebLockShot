@@ -156,6 +156,29 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
     setPolishMeta(null)
   }
 
+  const handleSelectProvider = (id: 'mock' | 'kling' | 'jimeng' | 'comfyui') => {
+    setProviderId(id)
+    if (id === 'kling') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.kling_key')
+        if (!key?.trim()) {
+          setErrorMsg('未检测到快手可灵 API Key！请点击下方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式。')
+          return
+        }
+      } catch {}
+    }
+    if (id === 'jimeng') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.jimeng_key')
+        if (!key?.trim()) {
+          setErrorMsg('未检测到字节即梦 (Jimeng) API Key！请点击下方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式。')
+          return
+        }
+      } catch {}
+    }
+    setErrorMsg(null)
+  }
+
   // AI 提示词智能润色/扩写
   const handlePolishPrompt = async (isRegen = false) => {
     if (!rawIdea.trim() && !prompt.trim()) return
@@ -193,6 +216,26 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
     if (!prompt.trim()) {
       setErrorMsg('请输入生成提示词！')
       return
+    }
+
+    if (providerId === 'kling') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.kling_key')
+        if (!key?.trim()) {
+          setErrorMsg('当前选用了快手可灵 (Kling) 渲染引擎，但尚未配置 API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式。')
+          return
+        }
+      } catch {}
+    }
+
+    if (providerId === 'jimeng') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.jimeng_key')
+        if (!key?.trim()) {
+          setErrorMsg('当前选用了字节即梦 (Jimeng) 渲染引擎，但尚未配置 API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式。')
+          return
+        }
+      } catch {}
     }
 
     // 0. 熔断与幂等检查
@@ -349,28 +392,28 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             <button
               type="button"
               className={`pill-btn ${providerId === 'mock' ? 'active' : ''}`}
-              onClick={() => setProviderId('mock')}
+              onClick={() => handleSelectProvider('mock')}
             >
               Mock 实验画布 (免费)
             </button>
             <button
               type="button"
               className={`pill-btn ${providerId === 'kling' ? 'active' : ''}`}
-              onClick={() => setProviderId('kling')}
+              onClick={() => handleSelectProvider('kling')}
             >
               快手可灵 (Kling)
             </button>
             <button
               type="button"
               className={`pill-btn ${providerId === 'jimeng' ? 'active' : ''}`}
-              onClick={() => setProviderId('jimeng')}
+              onClick={() => handleSelectProvider('jimeng')}
             >
               字节即梦 (Jimeng)
             </button>
             <button
               type="button"
               className={`pill-btn comfyui-btn ${providerId === 'comfyui' ? 'active' : ''}`}
-              onClick={() => setProviderId('comfyui')}
+              onClick={() => handleSelectProvider('comfyui')}
             >
               🔥 ComfyUI 私有算力
             </button>
@@ -437,6 +480,35 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         </div>
       </div>
 
+      {/* 全局醒目错误与 API 配置引导条 */}
+      {errorMsg && (
+        <div className="studio-error-banner global-studio-alert">
+          <div className="alert-content">
+            <span className="alert-icon">⚠️</span>
+            <span className="alert-text">{errorMsg}</span>
+          </div>
+          <div className="alert-actions">
+            {(errorMsg.includes('Key') || errorMsg.includes('API')) && (
+              <button
+                type="button"
+                className="btn-alert-action"
+                onClick={onOpenSettings}
+              >
+                ⚙️ 前往配置 API Key
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-alert-dismiss"
+              onClick={() => setErrorMsg(null)}
+            >
+              ✕ 关闭提示
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 主工作区 */}
       <div className="studio-layout">
         {/* 左侧：输入与优化区 */}
         <div className="studio-left-pane">

@@ -368,6 +368,26 @@ export const TokenSettingsModal: React.FC<Props> = ({
                   </div>
                 )}
 
+                {/* ComfyUI 部署与启动指引说明 */}
+                <div className="comfy-deploy-guide-box">
+                  <div className="guide-title">
+                    💡 为什么测试连接失败？及如何本地/远程部署 ComfyUI：
+                  </div>
+                  <ol className="guide-steps">
+                    <li>
+                      <strong>本地尚未启动 ComfyUI</strong>：若您尚未在电脑启动 ComfyUI，前端探测 <code>127.0.0.1:8188</code> 自然会提示 <code>Failed to fetch</code>。
+                    </li>
+                    <li>
+                      <strong>启动命令必须携带 <code>--listen</code> 参数</strong>：
+                      <code>python main.py --listen 127.0.0.1 --port 8188</code>
+                      （如部署在远程 GPU 服务器，请使用 <code>--listen 0.0.0.0</code> 并在上方填入对应公网 IP）。
+                    </li>
+                    <li>
+                      <strong>支持的底模</strong>：已内置适配阿里开源 <strong>Wan 2.1 (WanVideo I2V)</strong>、智谱 <strong>CogVideoX-5B</strong> 及 <strong>SVD-XT</strong>。本地启动成功后点击「测试连接」即可瞬间读取显卡型号与可用显存！
+                    </li>
+                  </ol>
+                </div>
+
                 <div className="form-item mt-2">
                   <label>预设生视频工作流底模：</label>
                   <select

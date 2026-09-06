@@ -51,13 +51,21 @@ type Props = {
 export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
   const [initialSession] = useState<PipelineSessionV2 | null>(() => loadPipelineSession())
 
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const urlMode = urlParams?.get('mode') as StudioMode | null
+  const urlStep = urlParams?.get('step') ? (Number(urlParams.get('step')) as WorkbenchStep) : null
+
   const [currentStep, setCurrentStep] = useState<WorkbenchStep>(
-    (initialSession?.activeStep as WorkbenchStep) || 0
+    urlStep !== null ? urlStep : (initialSession?.activeStep as WorkbenchStep) || 0
   )
   const [maxReachedStep, setMaxReachedStep] = useState<WorkbenchStep>(
-    (initialSession?.activeStep as WorkbenchStep) || 0
+    urlStep !== null ? Math.max(urlStep, 6) as WorkbenchStep : (initialSession?.activeStep as WorkbenchStep) || 0
   )
-  const [studioMode, setStudioMode] = useState<StudioMode>('pipeline')
+  const [studioMode, setStudioMode] = useState<StudioMode>(
+    urlMode === 'single-agent' || urlMode === 'multi-agent' || urlMode === 'pipeline'
+      ? urlMode
+      : 'pipeline'
+  )
   const [productInput, setProductInput] = useState<ProductInput>(
     initialSession?.productInput || DEFAULT_PRODUCT_INPUT
   )
@@ -70,8 +78,8 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
   const [visualPlans, setVisualPlans] = useState<VisualPlan[]>(initialSession?.visualPlans || [])
   const [jobs, setJobs] = useState<ShotJob[]>(initialSession?.jobs || [])
   const [isExpanding, setIsExpanding] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isWalletOpen, setIsWalletOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(urlParams?.get('settings') === 'open')
+  const [isWalletOpen, setIsWalletOpen] = useState(urlParams?.get('wallet') === 'open')
   const [hasToken, setHasToken] = useState<boolean>(() => {
     try {
       const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)
@@ -173,8 +181,28 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
   // 4 -> 5：确认视觉方案，开始向调度引擎提交 6 镜
   const handleStartGeneration = async () => {
     if (visualPlans.length === 0) return
-    advanceToStep(5)
     const provider = readVideoProvider()
+    if (provider === 'kling') {
+      try {
+        const k = sessionStorage.getItem('weblockshot.kling_key')
+        if (!k?.trim()) {
+          alert('当前工作流选用了快手可灵 (Kling) 官方 API，但尚未配置 API Key！即将打开设置窗口，请配置密钥或切换为 Mock / ComfyUI 模式。')
+          setIsSettingsOpen(true)
+          return
+        }
+      } catch {}
+    }
+    if (provider === 'jimeng') {
+      try {
+        const k = sessionStorage.getItem('weblockshot.jimeng_key')
+        if (!k?.trim()) {
+          alert('当前工作流选用了字节即梦 (Jimeng) 官方 API，但尚未配置 API Key！即将打开设置窗口，请配置密钥或切换为 Mock / ComfyUI 模式。')
+          setIsSettingsOpen(true)
+          return
+        }
+      } catch {}
+    }
+    advanceToStep(5)
     await executorEngine.enqueueShots(visualPlans, provider)
   }
 

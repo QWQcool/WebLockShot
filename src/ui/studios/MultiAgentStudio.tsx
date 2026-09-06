@@ -86,9 +86,56 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  const handleSelectProvider = (id: 'mock' | 'kling' | 'jimeng' | 'comfyui') => {
+    setProviderId(id)
+    if (id === 'kling') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.kling_key')
+        if (!key?.trim()) {
+          setErrorMsg('未检测到快手可灵 API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式。')
+          return
+        }
+      } catch {}
+    }
+    if (id === 'jimeng') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.jimeng_key')
+        if (!key?.trim()) {
+          setErrorMsg('未检测到字节即梦 (Jimeng) API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式。')
+          return
+        }
+      } catch {}
+    }
+    setErrorMsg(null)
+  }
+
   // 触发 4 个 Agent 协同共创
   const handleStartSwarm = async () => {
-    if (!themeInput.trim()) return
+    if (!themeInput.trim()) {
+      setErrorMsg('请输入创作主题与构想！')
+      return
+    }
+
+    if (providerId === 'kling') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.kling_key')
+        if (!key?.trim()) {
+          setErrorMsg('当前选用了快手可灵 (Kling) 渲染引擎，但尚未配置 API Key！请点击右侧「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 模式。')
+          return
+        }
+      } catch {}
+    }
+
+    if (providerId === 'jimeng') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.jimeng_key')
+        if (!key?.trim()) {
+          setErrorMsg('当前选用了字节即梦 (Jimeng) 渲染引擎，但尚未配置 API Key！请点击右侧「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 模式。')
+          return
+        }
+      } catch {}
+    }
+
     setIsDeliberating(true)
     setMessages([])
     setSwarmSpec(null)
@@ -186,6 +233,26 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   // 启动多 Agent 联合视频渲染
   const handleRenderSwarmVideo = async () => {
     if (!swarmSpec) return
+
+    if (providerId === 'kling') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.kling_key')
+        if (!key?.trim()) {
+          setErrorMsg('当前选用了快手可灵 (Kling) 渲染引擎，但尚未配置 API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 模式。')
+          return
+        }
+      } catch {}
+    }
+
+    if (providerId === 'jimeng') {
+      try {
+        const key = sessionStorage.getItem('weblockshot.jimeng_key')
+        if (!key?.trim()) {
+          setErrorMsg('当前选用了字节即梦 (Jimeng) 渲染引擎，但尚未配置 API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 模式。')
+          return
+        }
+      } catch {}
+    }
 
     // 0. 熔断与幂等排查
     const breakerCheck = circuitBreaker.isAvailable(providerId)
@@ -332,28 +399,28 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             <button
               type="button"
               className={`pill-btn ${providerId === 'mock' ? 'active' : ''}`}
-              onClick={() => setProviderId('mock')}
+              onClick={() => handleSelectProvider('mock')}
             >
               Mock 实验画布
             </button>
             <button
               type="button"
               className={`pill-btn ${providerId === 'kling' ? 'active' : ''}`}
-              onClick={() => setProviderId('kling')}
+              onClick={() => handleSelectProvider('kling')}
             >
               快手可灵 (Kling)
             </button>
             <button
               type="button"
               className={`pill-btn ${providerId === 'jimeng' ? 'active' : ''}`}
-              onClick={() => setProviderId('jimeng')}
+              onClick={() => handleSelectProvider('jimeng')}
             >
               字节即梦 (Jimeng)
             </button>
             <button
               type="button"
               className={`pill-btn comfyui-btn ${providerId === 'comfyui' ? 'active' : ''}`}
-              onClick={() => setProviderId('comfyui')}
+              onClick={() => handleSelectProvider('comfyui')}
             >
               🔥 ComfyUI 私有算力
             </button>
@@ -405,6 +472,35 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         </div>
       </div>
 
+      {/* 全局醒目错误与 API 配置引导条 */}
+      {errorMsg && (
+        <div className="studio-error-banner global-studio-alert">
+          <div className="alert-content">
+            <span className="alert-icon">⚠️</span>
+            <span className="alert-text">{errorMsg}</span>
+          </div>
+          <div className="alert-actions">
+            {(errorMsg.includes('Key') || errorMsg.includes('API')) && (
+              <button
+                type="button"
+                className="btn-alert-action"
+                onClick={onOpenSettings}
+              >
+                ⚙️ 前往配置 API Key
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-alert-dismiss"
+              onClick={() => setErrorMsg(null)}
+            >
+              ✕ 关闭提示
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 主工作区 */}
       <div className="studio-layout">
         {/* 左侧：多 Agent 协同工作区 */}
         <div className="studio-left-pane">

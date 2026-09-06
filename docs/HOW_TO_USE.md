@@ -80,6 +80,8 @@ npm run dev
 
 ## （二）电商全链路六步爆款工作流
 
+![电商全链路六步爆款工作流界面](./screenshots/01_workbench_pipeline.png)
+
 点击顶部导航的 **「🛒 电商全链路工作流」**，即可按科学工业化步骤执行生成。
 
 ### Step 0：商品信息多模态导入
@@ -124,6 +126,9 @@ npm run dev
 除了标准的六步全链路外，顶部工具栏还提供针对快速单挑和复杂编导的双工作室：
 
 ### 模式 A：单 Agent 极速直出模式
+
+![单 Agent 极速直出工作室](./screenshots/02_single_agent_studio.png)
+
 适合单镜头快速实验与电商图生视频（Image-to-Video）：
 - **精选灵感库**：内置 3C 数码金属光泽、美妆水润精华露微距、潮流穿搭光影等高转化提示词预设；
 - **AI 智能运镜润色**：输入简略构思（如“吹风机快速吹干水滴”），AI 自动扩写为运镜、布光、景深齐全的电影级 Prompt；
@@ -133,6 +138,9 @@ npm run dev
 - **时长自由调节**：支持 5s、10s、15s 预设切换，或在微调框中键入 1~60 秒自定义时长。
 
 ### 模式 B：多 Agent 协同编导研讨室
+
+![多 Agent 协同编导研讨室](./screenshots/03_multi_agent_studio.png)
+
 适合高定短片与复杂多镜头影视级创作：
 - **4 Agent 协同共创推演**：
   1. 🎬 **导演 Agent (Director)**：负责整体视觉调性、节奏节奏把控与场景构建；
@@ -144,6 +152,8 @@ npm run dev
 ---
 
 ## （四）视频供应商配置与 ComfyUI 自建私有算力指南
+
+![API 配置与 ComfyUI 私有算力 GPU 探测](./screenshots/04_token_settings_comfyui.png)
 
 点击右上角 **「⚙️ API 设置」** 即可完成各生成渠道的配置。
 
@@ -215,6 +225,9 @@ WebLockShot 导出的 `draft_content.json` 是标准的 CapCut/剪映工程格�
 - **自动熔断器 (Circuit Breaker)**：若某一云端 API 连续出现 3 次 5xx 或网络异常，熔断器自动跳闸保护，暂时阻断同渠道任务并建议切换至 ComfyUI / Mock 模式，30 秒后自动半开探测。
 
 ### 3. 虚拟钱包两阶段提交事务 (Two-Phase Commit Wallet)
+
+![工业级虚拟钱包两阶段结算与审计流水中心](./screenshots/05_virtual_wallet.png)
+
 - 顶部导航常驻 **「💰 虚拟钱包」**；
 - **阶段 1：预冻结 (Freeze)**：点击生成时，若余额充足，将预估费用移入「任务冻结中」，锁定资金防并发超支；
 - **阶段 2A：成功核销 (Settle)**：出片成功后正式划扣冻结款项；
