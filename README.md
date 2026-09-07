@@ -29,7 +29,7 @@ npm install
 # 2. 启动本地开发服务 (默认监听 5173，自动开启 ComfyUI 反向代理)
 npm run dev
 
-# 3. 运行质量检测 (115 项自动化测试：node 100 + vitest UI 15)
+# 3. 运行质量检测 (116 项自动化测试：node 101 + vitest UI 15)
 npm test
 
 # 4. 生产打包验证
@@ -72,7 +72,18 @@ Windows 用户可直接双击 `start-weblockshot.bat`（自动安装依赖/构�
 
 ---
 
-## 🐳 Docker 部署
+## 🚀 生产部署
+
+### 1. BackendAdapter 双模式（数据持久化）
+
+所有会话持久化经 `BackendAdapter` 预留层访问，模式由 `VITE_BACKEND_URL` 构建 / 运行环境决定：
+
+| 模式 | 触发条件 | 行为 |
+|---|---|---|
+| **本地模式**（默认） | `VITE_BACKEND_URL` 为空 | 与纯前端现状完全一致：localStorage + IndexedDB，数据不出浏览器 |
+| **服务端模式**（预留） | 配置了 `VITE_BACKEND_URL` | 会话快照 `PUT/GET/DELETE {后端}/api/sessions/:id`；后端不可达自动降级回本地模式 |
+
+### 2. Docker 一键部署
 
 ```bash
 # 构建并启动（前端 + 伴生 server 单容器）
@@ -81,8 +92,37 @@ docker compose up --build
 ```
 
 - 多阶段构建：`node:22-alpine` 构建前端 → 运行层仅含 `dist/`、`server/` 与生产依赖
-- 预留配置（compose `environment`）：`WLS_STORAGE` / `WLS_LLM_TARGET` / `WLS_KEYS` / `WLS_LOG_LEVEL` / `SENTRY_DSN`
+- CI 每次推送执行 `docker-build` job 验证镜像可构建（只 build 不 push）
 - HTTPS：compose 内含 Caddy 反代注释模板（自动签发证书），或按注释换 nginx
+
+### 3. 服务端环境变量（预留开关，不设置 = 本地默认模式）
+
+| 变量 | 说明 |
+|---|---|
+| `PORT` / `DIST_DIR` / `DRAFT_DIR` | 端口 / 静态目录 / 剪映草稿目录（CLI 参数优先） |
+| `WLS_STORAGE` | 会话存储模式：`memory`（默认，现状）/ `sqlite`（持久化；better-sqlite3 → node:sqlite → memory 三级降级） |
+| `WLS_SQLITE_PATH` | sqlite 库文件路径（默认 `data/weblockshot-sessions.sqlite3`） |
+| `WLS_KEYS` | 反代密钥注入（JSON：`{"kling":"Bearer xx","llm":"sk-xx"}`）；设置后对应引擎反代覆盖客户端 Authorization；未设置 = 透传模式 |
+| `WLS_LLM_TARGET` | LLM API 反代目标；设置后 `/api/llm` 生效，未设置返回 501 |
+| `WLS_LOG_LEVEL` | pino 日志级别（默认 `info`，JSON 结构化输出） |
+| `SENTRY_DSN` | 错误上报（预留 no-op，`/healthz` 上报 configured） |
+
+### 4. 健康检查
+
+```bash
+curl http://localhost:5174/healthz
+# {"ok":true,"version":"0.1.0","storage":"memory","uptimeSec":2,"node":"v22.x",
+#  "keyMode":"passthrough","llmProxy":"off","sentry":"off"}
+```
+
+---
+
+## 📶 手机端（PWA + 响应式）
+
+- **安装到主屏幕**：手机浏览器（iOS Safari / Android Chrome）访问部署地址 → 「添加到主屏幕」，以独立窗口（standalone）全屏运行；新版本发布后会弹出「🚀 发现新版本」提示条，点击刷新即完成自更新（不打断进行中的生成任务）
+- **响应式断点**：≥1024px 桌面现状不变 / 768~1024px 侧栏与横条压缩 / <768px 单栏堆叠（六步横条变紧凑步骤指示器、双栏工作区纵向排列、表格横向滑动）
+- **触控适配**：触屏设备所有可点击区域 ≥44px，卡片提供 :active 按压等价反馈；商品录入页在手机上直接调起后置相机拍摄
+- **后台正确性**：生成任务切到后台再回来会立即刷新一次轮询状态，不傻等剩余间隔
 
 ---
 

@@ -28,6 +28,9 @@
 - [（七）本地伴生服务部署与剪映草稿一键落盘](#七本地伴生服务部署与剪映草稿一键落盘)
 - [（八）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环](#八工业级可靠性体系幂等防抖状态机与两阶段钱包闭环)
 - [（九）常见问题与避坑指南（FAQ）](#九常见问题与避坑指南faq)
+- [（十）手机端使用：PWA 添加到主屏幕](#十手机端使用pwa-添加到主屏幕)
+- [（十一）Docker 生产部署](#十一docker-生产部署)
+- [（十二）小程序版轻端](#十二小程序版轻端)
 
 ---
 
@@ -186,10 +189,16 @@ npm run dev
 ### 1. 快手可灵 (Kling) API 直连
 - 申请快手可灵官方开发者平台 API 密钥（Access Key ID 与 Secret Key）；
 - 填入对应输入框并选择首选生片时长；
+- **两种鉴权形态**（M2 契约升级）：
+  - 填入裸 Key 字符串 → Bearer 直传模式（历史行为）；
+  - 填入 JSON `{"ak":"你的AK","sk":"你的SK"}` → 客户端按官方文档自动签发 JWT（HS512，`iss/exp/nbf` 载荷，请求头直接携带 token，无需 Bearer 前缀），签名实现已按官方向量做契约测试锁定；
 - 生成计费：在虚拟钱包中约 10 灵感币/镜头。
 
 ### 2. 字节即梦 (Jimeng) API 直连
 - 填入即梦开放平台 API Key 与端点地址；
+- **两种鉴权形态**（M2 契约升级）：
+  - 填入裸 Key 字符串 → Bearer 直传模式（历史行为）；
+  - 填入 JSON `{"ak":"你的AK","sk":"你的SK"}` → 客户端按火山引擎 V4 规范逐请求计算 HMAC-SHA256 签名（`X-Date` / `X-Content-Sha256` / `Authorization` 三头），签名实现已按官方向量做契约测试锁定；
 - 生成计费：在虚拟钱包中约 8 灵感币/镜头。
 
 ### 3. ComfyUI 本地/局域网私有 GPU 算力集群（Wan 2.1 / CogVideoX）
@@ -288,7 +297,7 @@ WebLockShot 内置「投放 → 回流 → 加权 → 再生成」的数据闭�
 
 ## （七）本地伴生服务部署与剪映草稿一键落盘
 
-纯前端版在 GitHub Pages 上无法直连 ComfyUI 与视频平台 API（跨域限制），也无法替你把草稿写进本地磁盘。**零依赖伴生服务**（纯 Node，无任何 npm 运行时依赖）解决这两件事：
+纯前端版在 GitHub Pages 上无法直连 ComfyUI 与视频平台 API（跨域限制），也无法替你把草稿写进本地磁盘。**伴生服务**（纯 Node，运行时仅依赖 pino 日志库）解决这两件事，并提供一系列「预留开关」能力（不设置任何 `WLS_*` 环境变量 = 与纯前端现状完全一致的本地默认模式）：
 
 ![伴生服务启动与剪映落盘](./screenshots/14_companion_server.png)
 
@@ -309,6 +318,13 @@ Windows 用户可直接双击根目录 **`start-weblockshot.bat`**（自动安�
 | 静态托管 | 托管 `dist/` 生产构建，打开 `http://localhost:5174` 即用 |
 | API 反代 | `/api/kling`、`/api/jimeng`、`/api/comfyui` 三个前缀反向代理，生产环境也能直连 ComfyUI 与视频平台 |
 | 剪映草稿落盘 | `POST /api/jianying/draft-zip`（body 为 zip 二进制），自动解压到 `--draft-dir` 指定目录，免去手动解压复制 |
+| 健康检查（预留） | `GET /healthz` 返回版本 / 存储模式 / uptime / 密钥注入模式等 JSON 自观测 |
+| 会话存储 API（预留） | `PUT/GET/DELETE /api/sessions/:id`，配合前端 `VITE_BACKEND_URL` 的服务端模式；`WLS_STORAGE=sqlite` 时落盘持久化 |
+| LLM 反代（预留） | 设置 `WLS_LLM_TARGET` 后 `/api/llm` 反代至目标 LLM API；未设置返回 501 |
+| 密钥注入（预留） | 设置 `WLS_KEYS`（JSON）后反代注入真实密钥头，小程序/无密钥客户端也能出片；未设置 = 透传模式 |
+| 结构化日志 | pino JSON 行输出，级别经 `WLS_LOG_LEVEL` 控制 |
+
+> 全部预留开关的环境变量表见主仓 README「🚀 生产部署」章节；本指南末尾「（十一）Docker 生产部署」有一键部署实操。
 
 ### 剪映草稿一键落盘实操
 
@@ -359,6 +375,102 @@ Windows 用户可直接双击根目录 **`start-weblockshot.bat`**（自动安�
 
 #### Q4：导出的剪映草稿打开后素材显示离线？
 - 剪映草稿中记录了各视频素材的本地路径或网络 URL。若为本地录制的 Blob URL，请将下载的视频素材文件保存在剪映草稿同级目录下，剪映将自动完成重链接。
+
+---
+
+## （十）手机端使用：PWA 添加到主屏幕
+
+WebLockShot 已支持 PWA（Progressive Web App），手机浏览器即可安装为「类原生应用」：
+
+### 添加到主屏幕步骤
+
+1. 手机浏览器（iOS Safari / Android Chrome）访问你的部署地址（在线版或自建域名均可）；
+2. **iOS Safari**：点击底部「分享」按钮 → 选择「添加到主屏幕」→ 确认，桌面出现 WLS 图标；
+3. **Android Chrome**：地址栏右侧「⋮」菜单 → 「添加到主屏幕 / 安装应用」→ 确认；
+4. 从主屏幕图标打开后即为 **standalone 独立全屏窗口**（无浏览器地址栏），主题色为 WebLockShot 青（#22d3ee）。
+
+### 使用要点
+
+- **版本自更新**：发布新版本后，应用内会弹出「🚀 发现新版本，刷新即可更新」底部提示条，点击「刷新」即完成更新（prompt 模式不会打断进行中的生成任务，可等任务出片后再更新）；
+- **密钥与数据**：与桌面端一致，API Key 仅存于浏览器 `sessionStorage`，会话数据存 IndexedDB，均不上传第三方服务器；
+- **响应式布局**：<768px 自动切换单栏堆叠（六步横条变紧凑步骤指示器、引擎条可折叠、表格横向滑动），≥768px 与桌面体验一致；
+- **触控适配**：触屏设备所有可点击区域 ≥44px，商品录入页直接调起后置相机拍摄商品图（`capture="environment"`，仅触屏生效）；
+- **后台正确性**：生成任务切后台再回前台，轮询状态会立即刷新一次，不傻等剩余间隔。
+
+---
+
+## （十一）Docker 生产部署
+
+适合服务器部署 / 团队内网共享 / 私有化交付场景。
+
+### 一键启动
+
+```bash
+git clone https://github.com/QWQcool/WebLockShot.git
+cd WebLockShot
+docker compose up --build      # 首次构建约 2~4 分钟
+```
+
+启动成功后：
+
+- 应用地址：`http://localhost:8080`（端口在 `docker-compose.yml` 的 `ports` 中调整）
+- 健康检查：`http://localhost:8080/healthz`，返回版本 / 存储模式 / uptime 等自观测 JSON
+- compose 已内置 healthcheck（30s 间隔探测 `/healthz`），异常自动重启
+
+### 预留开关配置（compose environment）
+
+所有 `WLS_*` 环境变量均为「预留接口做好不用」原则的实现——**不设置任何变量 = 本地默认模式，行为与纯前端现状完全一致**。常用配置：
+
+```yaml
+environment:
+  - PORT=5174
+  # 会话持久化（预留）：sqlite 落盘到容器 /app/data 卷
+  - WLS_STORAGE=sqlite
+  # LLM 反代（预留）：设置后 /api/llm 反代到目标
+  - WLS_LLM_TARGET=https://api.openai.com
+  # 密钥注入（预留）：服务端持有真实密钥，客户端免配 Key（小程序轻端依赖此机制）
+  - WLS_KEYS={"kling":"Bearer ak-xxx","llm":"Bearer sk-xxx"}
+```
+
+### HTTPS 上线
+
+compose 内含 Caddy 反代注释模板：取消注释、编写 `Caddyfile`（`your-domain.com { reverse_proxy weblockshot:5174 }`），Caddy 将自动签发并续期 Let's Encrypt 证书；也可按同思路换 nginx + certbot。
+
+### 镜像结构
+
+多阶段构建：阶段 1（node:22-alpine）`npm ci` + `tsc -b && vite build` 产出 `dist/`；阶段 2 运行层仅含 `dist/`、`server/` 与生产依赖（不含任何 devDependency）。CI 每次 push 均执行「只 build 不 push」的镜像构建验证 job。
+
+---
+
+## （十二）小程序版轻端
+
+`miniapp/` 目录提供微信小程序（weapp）轻端（Taro 4 + React 18，主分支目录而非独立分支），覆盖「录入商品 → 任务进度 → 看片交付」轻链路。
+
+### 能力边界（诚实标注）
+
+小程序端**不做**剪映草稿导出（需桌面文件系统能力）、**不做** Mock 引擎与 GSAP 动画体系；看片后复制视频链接，回桌面工作台「审片交付」继续完成剪映交付。完整边界说明见 [miniapp/README.md](../miniapp/README.md)。
+
+### 与桌面端的复用关系
+
+- 通过 `@domain` 别名直接复用主仓 `src/domain` 零依赖领域模块（轮询窗口 `pollingConfig` 等），主仓 src 层面零改动；
+- 依赖完全独立（miniapp 自有 package.json，React 锁 18.3.1 保证 Taro 兼容），不污染根 package.json。
+
+### 后端依赖与密钥安全
+
+- 所有任务请求经 `TARO_APP_API_BASE` 指向的后端 `/api` 反代提交（伴生 server 或云端网关）；
+- **小程序端不持有任何 API Key**——密钥由服务端 `WLS_KEYS` 注入（见上文 Docker 部署）；未配置 `WLS_KEYS` 时为透传模式，远端将显式返回 401。
+
+### 构建与部署要求
+
+```bash
+cd miniapp
+npm install
+npm run build:weapp    # 不依赖微信开发者工具即可完成编译，产物在 miniapp/dist/
+```
+
+- **request 合法域名**：小程序后台需将后端域名加入 request 合法域名列表（要求 **HTTPS + ICP 备案域名**）；
+- **账号主体**：`touristappid`（游客模式）仅限本地开发者工具预览；`web-view` 与部分高级接口需**企业主体**账号；
+- 构建产物结构：`dist/app.json` 三页注册 + 每页 js/json/wxml/wxss 四件套（无需微信开发者工具即可校验）。
 
 ---
 
