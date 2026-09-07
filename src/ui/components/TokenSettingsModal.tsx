@@ -71,7 +71,7 @@ export const TokenSettingsModal: React.FC<Props> = ({
       }
       const savedProvider = sessionStorage.getItem('weblockshot.video_provider')
       if (savedProvider === 'kling' || savedProvider === 'jimeng' || savedProvider === 'comfyui') {
-        setVideoProvider(savedProvider as any)
+        setVideoProvider(savedProvider)
       }
       const savedKling = sessionStorage.getItem('weblockshot.kling_key')
       if (savedKling) setKlingKey(savedKling)

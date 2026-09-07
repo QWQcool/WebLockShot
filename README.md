@@ -37,6 +37,25 @@ npm run build
 
 ---
 
+## 📦 剪映草稿 zip 包使用说明（解压后放入剪映草稿目录）
+
+在「交付播放器」页点击 **📦 下载完整草稿 zip 包 (含素材)**，得到 `<工程名>_剪映草稿.zip`，内含：
+
+- `draft_content.json` / `draft_meta_info.json`：剪映标准草稿工程（9:16 画布、视频主轨、旁白音轨、花字字幕轨微秒级对齐）
+- `assets/`：已生成的分镜视频素材与（可选的）旁白音频
+- `README-使用说明.txt`：本包专属素材清单与导入指引
+
+导入步骤：
+1. 解压压缩包；
+2. 打开电脑版剪映 (JianyingPro)，新建一个空草稿；
+3. 关闭剪映，进入草稿目录（Windows 默认 `%LOCALAPPDATA%\JianyingPro\User Data\Projects\com.lveditor.draft\<草稿名>\`）；
+4. 将解压出的 `draft_content.json`、`draft_meta_info.json` 与 `assets/` 复制进该目录（同名文件覆盖）；
+5. 重新打开剪映即可看到三轨对齐的完整工程。
+
+> 注：浏览器 Web Speech TTS 无法导出音频文件，若 `assets/voice_*.mp3` 缺失，可自行录制同名旁白放入 assets/，或在剪映中删除空音频片段。
+
+---
+
 ## 💎 核心能力对比一览
 
 | 能力模块 | 传统人工剪辑 | 一般套壳 AI 网页 | WebLockShot 工业化平台 |

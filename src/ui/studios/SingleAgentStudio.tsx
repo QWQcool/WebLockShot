@@ -1,19 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   polishPrompt,
   STYLE_OPTIONS,
   type PolishStyle,
 } from '../../ai/agents/promptPolisher.ts'
-import { klingVideoProvider } from '../../media/providers/kling.ts'
-import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
-import { mockVideoProvider } from '../../media/providers/mock.ts'
-import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
-import { walletManager } from '../../domain/wallet.ts'
-import { circuitBreaker } from '../../domain/fsm.ts'
-import { idempotencyManager } from '../../domain/idempotency.ts'
+import { useVideoPipeline } from '../../hooks/useVideoPipeline.ts'
 import {
-  getPollingWindow,
   setPollingWindowMinutes,
   POLL_WINDOW_PRESETS,
 } from '../../domain/pollingConfig.ts'
@@ -135,12 +128,18 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [motionPrompt, setMotionPrompt] = useState<string>('')
   const [isImageLightboxOpen, setIsImageLightboxOpen] = useState(false)
 
-  // 生成状态
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generationProgress, setGenerationProgress] = useState(0)
-  const [generationStatus, setGenerationStatus] = useState<string>('')
-  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null)
+  // 生成状态：收敛到共享管线 hook（钱包/轮询/熔断/幂等只此一份实现）
+  const { state: pipeline, run: runPipeline } = useVideoPipeline()
+  const isGenerating = pipeline.running
+  const generationProgress = pipeline.progress
+  const generationStatus = pipeline.statusText
+  const generatedVideoUrl = pipeline.videoUrl
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  useEffect(() => {
+    if (pipeline.error) setErrorMsg(pipeline.error)
+  }, [pipeline.error])
+
   // 轮询窗口（分钟），与 executor 共享同一份全局配置
   const [pollMinutes, setPollMinutes] = useState<number>(POLL_WINDOW_PRESETS[2].minutes)
 
@@ -255,8 +254,8 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         lighting: result.lighting,
         tags: result.tags,
       })
-    } catch (err: any) {
-      setErrorMsg(`润色失败: ${err.message || '未知错误'}`)
+    } catch (err) {
+      setErrorMsg(`润色失败: ${err instanceof Error ? err.message : '未知错误'}`)
     } finally {
       setIsPolishing(false)
     }
@@ -297,137 +296,19 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       }
     }
 
-    // 0. 熔断与幂等检查
-    const breakerCheck = circuitBreaker.isAvailable(providerId)
-    if (!breakerCheck.allowed) {
-      setErrorMsg(breakerCheck.reason || '当前服务暂时熔断保护中')
-      return
-    }
-
-    const taskKey = idempotencyManager.generateKey({
+    // 熔断 / 幂等 / 钱包两阶段 / 轮询 / 结算退款全部收敛于共享管线 hook
+    await runPipeline({
+      providerId,
       intent: 'single-studio-generate',
-      providerId,
       prompt,
+      negative: negativePrompt,
+      imageBase64: referenceImage || undefined,
+      referenceVideoUrl: referenceVideo || undefined,
+      motionPrompt: motionPrompt || undefined,
       durationSec,
-      ratio: aspectRatio,
+      title: rawIdea || prompt.slice(0, 30),
+      billingLabel: `单 Agent 直出 (${providerId === 'kling' ? '可灵' : providerId === 'jimeng' ? '即梦' : providerId === 'comfyui' ? 'ComfyUI' : 'Mock'})`,
     })
-
-    const lockResult = idempotencyManager.acquireLock(taskKey)
-    if (!lockResult.success) {
-      setErrorMsg(lockResult.reason || '任务正在执行中，请勿连击')
-      return
-    }
-
-    // 1. 钱包预冻结
-    const cost = walletManager.getCost(providerId, 1)
-    const freezeSuccess = walletManager.freeze(
-      cost,
-      taskKey,
-      providerId,
-      `单 Agent 直出 (${providerId === 'kling' ? '可灵' : providerId === 'jimeng' ? '即梦' : '自建/Mock'})`
-    )
-
-    if (!freezeSuccess) {
-      idempotencyManager.releaseLock(taskKey)
-      setErrorMsg(`钱包可用余额不足 (需 ${cost} 灵感币)，请在顶部虚拟钱包中模拟充值。`)
-      return
-    }
-
-    setIsGenerating(true)
-    setGenerationProgress(10)
-    setGenerationStatus('正在向视频生成服务提交请求...')
-    setErrorMsg(null)
-
-    try {
-      let provider: VideoProvider = mockVideoProvider
-      if (providerId === 'kling') provider = klingVideoProvider
-      if (providerId === 'jimeng') provider = jimengVideoProvider
-      if (providerId === 'comfyui') provider = comfyUIVideoProvider
-      const req: VideoGenRequest = {
-        clientTaskId: taskKey,
-        shotId: `single-${Date.now()}`,
-        prompt,
-        negative: negativePrompt,
-        imageBase64: referenceImage || undefined,
-        referenceVideoUrl: referenceVideo || undefined,
-        motionPrompt: motionPrompt || undefined,
-        durationSec,
-        ratio: '9:16',
-        title: rawIdea || prompt.slice(0, 30),
-      }
-
-      setGenerationProgress(25)
-      setGenerationStatus(
-        `已连接 ${
-          providerId === 'kling'
-            ? '快手可灵 Kling'
-            : providerId === 'jimeng'
-            ? '字节即梦 Jimeng'
-            : providerId === 'comfyui'
-            ? 'ComfyUI 本地/私有 GPU 集群 (Wan2.1)'
-            : 'Mock 本地录制'
-        }，任务调度中...`
-      )
-
-      const { taskId } = await provider.submit(req)
-
-      // 轮询查询视频渲染结果（轮询窗口可配置，默认 10 分钟）
-      const pollingWindow = getPollingWindow()
-      let attempts = 0
-      const maxAttempts = pollingWindow.maxAttempts
-      const pollTimer = setInterval(async () => {
-        attempts++
-        try {
-          const pollRes = await provider.poll(taskId)
-          setGenerationProgress(Math.min(95, 25 + attempts * 3))
-          setGenerationStatus(`模型神经渲染中... (${Math.round(attempts * (pollingWindow.intervalMs / 1000))}s)`)
-
-          if (pollRes.status === 'succeeded') {
-            clearInterval(pollTimer)
-            const asset = await provider.getAsset(taskId)
-            setGenerationProgress(100)
-            setGenerationStatus('视频生成完成！')
-            setGeneratedVideoUrl(asset.url)
-            setIsGenerating(false)
-
-            // 资金与熔断结算
-            walletManager.settle(taskKey, cost, providerId, '单 Agent 视频生成成功核销')
-            circuitBreaker.recordSuccess(providerId)
-            idempotencyManager.releaseLock(taskKey)
-          } else if (pollRes.status === 'failed') {
-            clearInterval(pollTimer)
-            setIsGenerating(false)
-            setErrorMsg(`生成失败: ${pollRes.error || '远端生成异常'}`)
-
-            // 失败全额退款
-            walletManager.refund(taskKey, cost, providerId, `生成异常退还: ${pollRes.error || '远端生成异常'}`)
-            circuitBreaker.recordFailure(providerId)
-            idempotencyManager.releaseLock(taskKey)
-          } else if (attempts >= maxAttempts) {
-            // 轮询超时：绝不 settle、绝不取降级产物，必须全额退款
-            clearInterval(pollTimer)
-            setIsGenerating(false)
-            setErrorMsg('生成超时，请检查网络或 API 余额。已自动全额退款。')
-            walletManager.refund(taskKey, cost, providerId, '生成超时全额退款')
-            circuitBreaker.recordFailure(providerId)
-            idempotencyManager.releaseLock(taskKey)
-          }
-        } catch (err: any) {
-          clearInterval(pollTimer)
-          setIsGenerating(false)
-          setErrorMsg(err.message || '查询任务状态出错')
-          walletManager.refund(taskKey, cost, providerId, `查询异常退款: ${err.message}`)
-          circuitBreaker.recordFailure(providerId)
-          idempotencyManager.releaseLock(taskKey)
-        }
-      }, pollingWindow.intervalMs)
-    } catch (err: any) {
-      setIsGenerating(false)
-      setErrorMsg(err.message || '提交生片请求失败')
-      walletManager.refund(taskKey, cost, providerId, `提交异常退款: ${err.message}`)
-      circuitBreaker.recordFailure(providerId)
-      idempotencyManager.releaseLock(taskKey)
-    }
   }
 
   return (

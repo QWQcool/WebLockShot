@@ -28,8 +28,11 @@ export type IdempotentPayload = {
 }
 
 class IdempotencyManager {
-  private inFlightLocks = new Map<string, { timestamp: number; timeoutTimer: any }>()
-  private completedCache = new Map<string, { timestamp: number; result: any }>()
+  private inFlightLocks = new Map<
+    string,
+    { timestamp: number; timeoutTimer: ReturnType<typeof setTimeout> }
+  >()
+  private completedCache = new Map<string, { timestamp: number; result: unknown }>()
   private readonly defaultLockTimeoutMs = 120_000 // 锁最大保持 2 分钟，防死锁
   private readonly cacheTtlMs = 600_000 // 已完成缓存保留 10 分钟
 
@@ -91,7 +94,7 @@ class IdempotencyManager {
   /**
    * 记录已完成的结果
    */
-  public recordResult(key: string, result: any): void {
+  public recordResult(key: string, result: unknown): void {
     this.completedCache.set(key, {
       timestamp: Date.now(),
       result,
@@ -101,7 +104,7 @@ class IdempotencyManager {
   /**
    * 检查是否有可复用的已完成结果
    */
-  public getCachedResult(key: string): any | null {
+  public getCachedResult(key: string): unknown | null {
     const cached = this.completedCache.get(key)
     if (!cached) return null
 

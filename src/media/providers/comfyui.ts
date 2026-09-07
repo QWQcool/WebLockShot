@@ -104,8 +104,15 @@ function buildWan21Workflow(req: VideoGenRequest): Record<string, any> {
 
 export class ComfyUIVideoProvider implements VideoProvider {
   readonly id = 'comfyui' as const
+  /** 可选构造期 baseUrl 覆盖（测试与高级用法），未提供时按会话/环境自动解析 */
+  private baseUrlOverride?: string
+
+  constructor(baseUrl?: string) {
+    this.baseUrlOverride = baseUrl
+  }
 
   getBaseUrl(): string {
+    if (this.baseUrlOverride) return this.baseUrlOverride
     if (typeof window !== 'undefined') {
       try {
         const stored = sessionStorage.getItem(COMFY_URL_STORAGE_KEY)
@@ -160,11 +167,11 @@ export class ComfyUIVideoProvider implements VideoProvider {
         vramFreeGb: vramFree ? Number(vramFree) : undefined,
         pythonVersion: data.system?.python_version,
       }
-    } catch (err: any) {
+    } catch (err) {
       return {
         ok: false,
         error:
-          err.message ||
+          (err instanceof Error ? err.message : '') ||
           '无法连接到 ComfyUI 实例。请确保在本地启动了 ComfyUI (默认 http://127.0.0.1:8188) 并携带了 --listen 参数。',
       }
     }
@@ -242,9 +249,9 @@ export class ComfyUIVideoProvider implements VideoProvider {
       })
 
       return { taskId: promptId }
-    } catch (err: any) {
+    } catch (err) {
       throw new Error(
-        `提交到 ComfyUI 失败: ${err.message || '网络连接超时'}。提示：请在右上角配置中确认 ComfyUI 地址。`
+        `提交到 ComfyUI 失败: ${err instanceof Error ? err.message : '网络连接超时'}。提示：请在右上角配置中确认 ComfyUI 地址。`
       )
     }
   }
@@ -289,8 +296,12 @@ export class ComfyUIVideoProvider implements VideoProvider {
       const queueResp = await fetch(`${base}/queue`)
       if (queueResp.ok) {
         const queueData = await queueResp.json()
-        const isRunning = queueData.queue_running?.some((q: any) => q[1] === taskId)
-        const isPending = queueData.queue_pending?.some((q: any) => q[1] === taskId)
+        const isRunning = queueData.queue_running?.some(
+          (q: [string, string, ...unknown[]]) => q[1] === taskId
+        )
+        const isPending = queueData.queue_pending?.some(
+          (q: [string, string, ...unknown[]]) => q[1] === taskId
+        )
 
         if (isRunning) {
           if (task) {
@@ -315,7 +326,7 @@ export class ComfyUIVideoProvider implements VideoProvider {
       }
 
       return { status: 'running', progress: task?.progress || 50 }
-    } catch (err: any) {
+    } catch {
       return { status: 'running', progress: task?.progress || 30 }
     }
   }

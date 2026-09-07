@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildJianyingDraft, buildJianyingDraftMetaInfo } from '../jianyingDraft.ts'
+import {
+  buildJianyingDraft,
+  buildJianyingDraftMetaInfo,
+  buildJianyingZipPackage,
+} from '../jianyingDraft.ts'
 import type { Story } from '../../types.ts'
 import type { VisualPlan } from '../../domain/sellVisual.ts'
 import type { ShotJob } from '../../domain/shotJob.ts'
@@ -137,4 +141,90 @@ test('剪映草稿工程导出：生成符合 9:16 规格且音视字三轨微�
   })
   assert.equal(meta.draft_name, '负离子吹风机_带货工程')
   assert.equal(meta.tm_duration, 7_000_000)
+})
+
+test('剪映草稿工程导出：片段携带真实导入所需字段 (clip/render_index/extra_material_refs/common_keyframes)', () => {
+  const story: Story = {
+    id: 'story-clip',
+    title: '真实结构校验',
+    input: { theme: '带货', character: '主播', conflict: 'x', hook: 'y' },
+    characters: [],
+    setting: { place: 'p', time: 't', light: 'l' },
+    shots: [
+      {
+        id: 's1',
+        order: 1,
+        purpose: 'p',
+        line: '字幕文本',
+        durationSec: 2,
+        shotSize: 'cu',
+        motionId: 'push_in',
+        cast: [],
+      },
+    ],
+  }
+
+  const draft = buildJianyingDraft({ story, projectTitle: 'clip校验' })
+  const seg = draft.tracks[0].segments[0]
+
+  assert.ok(seg.clip, '片段必须携带 clip 变换信息')
+  assert.equal(seg.clip?.alpha, 1.0)
+  assert.deepEqual(seg.clip?.flip, { horizontal: false, vertical: false })
+  assert.equal(seg.clip?.rotation, 0)
+  assert.deepEqual(seg.clip?.scale, { x: 1, y: 1 })
+  assert.equal(seg.render_index, 0, '必须携带 render_index')
+  assert.deepEqual(seg.extra_material_refs, [], '必须携带 extra_material_refs 数组')
+  assert.deepEqual(seg.common_keyframes, [], '必须携带 common_keyframes 数组')
+  assert.deepEqual(seg.uniform_scale, { on: true, value: 1 })
+
+  // 音频素材 path 指向包内相对路径
+  assert.equal(draft.materials.audios[0].path, 'assets/voice_s1.mp3')
+  // 平台信息与封面字段存在
+  assert.equal(draft.platform.app_source, 'weblockshot')
+  assert.equal(draft.cover, '')
+})
+
+test('剪映草稿 zip 打包：视频素材落包 + 路径改写 + 使用说明', async () => {
+  const story: Story = {
+    id: 'story-zip',
+    title: 'zip打包校验',
+    input: { theme: '带货', character: '主播', conflict: 'x', hook: 'y' },
+    characters: [],
+    setting: { place: 'p', time: 't', light: 'l' },
+    shots: [
+      {
+        id: 's1',
+        order: 1,
+        purpose: 'p',
+        line: '台词一',
+        durationSec: 2,
+        shotSize: 'cu',
+        motionId: 'push_in',
+        cast: [],
+      },
+    ],
+  }
+  const jobs: ShotJob[] = [
+    {
+      shotId: 's1',
+      taskKey: 'k1',
+      provider: 'mock',
+      status: 'succeeded',
+      attempt: 0,
+      progress: 100,
+      asset: { shotId: 's1', url: 'blob:http://localhost/s1.webm', durationSec: 2 },
+    },
+  ]
+
+  // Node 环境无法解析 blob: URL —— 期望素材进入 missingAssets 而不是抛错
+  const result = await buildJianyingZipPackage({ story, jobs, projectTitle: 'zip校验' })
+
+  assert.ok(result.bytes.length > 0, 'zip 字节流必须非空')
+  assert.match(result.filename, /zip校验_剪映草稿\.zip/)
+  const decoder = new TextDecoder()
+  const zipText = decoder.decode(result.bytes)
+  assert.ok(zipText.includes('draft_content.json'), 'zip 必须包含 draft_content.json')
+  assert.ok(zipText.includes('draft_meta_info.json'), 'zip 必须包含 draft_meta_info.json')
+  assert.ok(zipText.includes('README-使用说明.txt'), 'zip 必须包含使用说明')
+  assert.equal(result.missingAssets.length, 1, 'blob: URL 在 Node 下无法抓取，应记录缺失而非崩溃')
 })

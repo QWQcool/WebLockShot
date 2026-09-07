@@ -1,14 +1,7 @@
-import React, { useState } from 'react'
-import { klingVideoProvider } from '../../media/providers/kling.ts'
-import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
+import React, { useState, useEffect } from 'react'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
-import { mockVideoProvider } from '../../media/providers/mock.ts'
-import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
-import { walletManager } from '../../domain/wallet.ts'
-import { circuitBreaker } from '../../domain/fsm.ts'
-import { idempotencyManager } from '../../domain/idempotency.ts'
+import { useVideoPipeline } from '../../hooks/useVideoPipeline.ts'
 import {
-  getPollingWindow,
   setPollingWindowMinutes,
   POLL_WINDOW_PRESETS,
 } from '../../domain/pollingConfig.ts'
@@ -84,12 +77,18 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [swarmSpec, setSwarmSpec] = useState<SwarmSpec | null>(null)
 
-  // 渲染状态
-  const [isRendering, setIsRendering] = useState(false)
-  const [renderProgress, setRenderProgress] = useState(0)
-  const [renderStatus, setRenderStatus] = useState('')
-  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null)
+  // 渲染状态：收敛到共享管线 hook（钱包/轮询/熔断/幂等只此一份实现）
+  const { state: pipeline, run: runPipeline } = useVideoPipeline()
+  const isRendering = pipeline.running
+  const renderProgress = pipeline.progress
+  const renderStatus = pipeline.statusText
+  const renderedVideoUrl = pipeline.videoUrl
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  useEffect(() => {
+    if (pipeline.error) setErrorMsg(pipeline.error)
+  }, [pipeline.error])
+
   // 轮询窗口（分钟），与 executor 共享同一份全局配置
   const [pollMinutes, setPollMinutes] = useState<number>(POLL_WINDOW_PRESETS[2].minutes)
 
@@ -197,7 +196,6 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
     setMessages([])
     setSwarmSpec(null)
     setErrorMsg(null)
-    setRenderedVideoUrl(null)
 
     // 辅助延时函数，让多 Agent 思考有生动的动画交互感
     const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
@@ -280,8 +278,8 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         synthesizedPrompt: synthesized,
         negativePrompt: negative,
       })
-    } catch (err: any) {
-      setErrorMsg(`Agent 协同推演异常: ${err.message || '未知错误'}`)
+    } catch (err) {
+      setErrorMsg(`Agent 协同推演异常: ${err instanceof Error ? err.message : '未知错误'}`)
     } finally {
       setIsDeliberating(false)
     }
@@ -311,129 +309,19 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
       } catch {}
     }
 
-    // 0. 熔断与幂等排查
-    const breakerCheck = circuitBreaker.isAvailable(providerId)
-    if (!breakerCheck.allowed) {
-      setErrorMsg(breakerCheck.reason || '当前服务处于熔断保护状态')
-      return
-    }
-
-    const taskKey = idempotencyManager.generateKey({
+    // 熔断 / 幂等 / 钱包两阶段 / 轮询 / 结算退款全部收敛于共享管线 hook
+    await runPipeline({
+      providerId,
       intent: 'multi-swarm-render',
-      providerId,
       prompt: swarmSpec.synthesizedPrompt,
+      negative: swarmSpec.negativePrompt,
+      imageBase64: referenceImage || undefined,
+      referenceVideoUrl: referenceVideo || undefined,
+      motionPrompt: motionPrompt || undefined,
       durationSec,
-      extra: themeInput,
+      title: swarmSpec.theme,
+      billingLabel: `多 Agent 协同渲染 (${providerId === 'kling' ? '可灵' : providerId === 'jimeng' ? '即梦' : providerId === 'comfyui' ? 'ComfyUI' : 'Mock'})`,
     })
-
-    const lockResult = idempotencyManager.acquireLock(taskKey)
-    if (!lockResult.success) {
-      setErrorMsg(lockResult.reason || '多 Agent 任务正在渲染中，请勿重复提交')
-      return
-    }
-
-    // 1. 钱包预扣款冻结
-    const cost = walletManager.getCost(providerId, 1)
-    const freezeSuccess = walletManager.freeze(
-      cost,
-      taskKey,
-      providerId,
-      `多 Agent 协同渲染 (${providerId === 'kling' ? '可灵' : providerId === 'jimeng' ? '即梦' : '自建/Mock'})`
-    )
-
-    if (!freezeSuccess) {
-      idempotencyManager.releaseLock(taskKey)
-      setErrorMsg(`钱包可用余额不足 (需 ${cost} 灵感币)，请在顶部虚拟钱包中模拟充值。`)
-      return
-    }
-
-    setIsRendering(true)
-    setRenderProgress(15)
-    setRenderStatus('正在通过调度 Agent 派发视频渲染请求...')
-    setErrorMsg(null)
-
-    try {
-      let provider: VideoProvider = mockVideoProvider
-      if (providerId === 'kling') provider = klingVideoProvider
-      if (providerId === 'jimeng') provider = jimengVideoProvider
-      if (providerId === 'comfyui') provider = comfyUIVideoProvider
-      const req: VideoGenRequest = {
-        clientTaskId: taskKey,
-        shotId: `swarm-${Date.now()}`,
-        prompt: swarmSpec.synthesizedPrompt,
-        negative: swarmSpec.negativePrompt,
-        imageBase64: referenceImage || undefined,
-        referenceVideoUrl: referenceVideo || undefined,
-        motionPrompt: motionPrompt || undefined,
-        durationSec,
-        ratio: '9:16',
-        title: swarmSpec.theme,
-      }
-
-      setRenderProgress(30)
-      setRenderStatus(
-        providerId === 'comfyui'
-          ? '已连接 ComfyUI 本地/私有 GPU 集群 (Wan2.1)，多 Agent 联合神经渲染中...'
-          : `已连接 ${providerId.toUpperCase()} 集群，多 Agent 联合神经渲染中...`
-      )
-
-      const { taskId } = await provider.submit(req)
-
-      // 轮询查询渲染结果（轮询窗口可配置，默认 10 分钟）
-      const pollingWindow = getPollingWindow()
-      let attempts = 0
-      const maxAttempts = pollingWindow.maxAttempts
-      const pollTimer = setInterval(async () => {
-        attempts++
-        try {
-          const pollRes = await provider.poll(taskId)
-          setRenderProgress(Math.min(95, 30 + attempts * 3))
-          setRenderStatus(`4 Agent 协同质检并监视渲染进度... (${Math.round(attempts * (pollingWindow.intervalMs / 1000))}s)`)
-
-          if (pollRes.status === 'succeeded') {
-            clearInterval(pollTimer)
-            const asset = await provider.getAsset(taskId)
-            setRenderProgress(100)
-            setRenderStatus('多 Agent 协同成片渲染完成！')
-            setRenderedVideoUrl(asset.url)
-            setIsRendering(false)
-
-            walletManager.settle(taskKey, cost, providerId, '多 Agent 协同渲染成功核销')
-            circuitBreaker.recordSuccess(providerId)
-            idempotencyManager.releaseLock(taskKey)
-          } else if (pollRes.status === 'failed') {
-            clearInterval(pollTimer)
-            setIsRendering(false)
-            setErrorMsg(`渲染失败: ${pollRes.error || '远端生成异常'}`)
-
-            walletManager.refund(taskKey, cost, providerId, `渲染失败全额退款: ${pollRes.error || '异常'}`)
-            circuitBreaker.recordFailure(providerId)
-            idempotencyManager.releaseLock(taskKey)
-          } else if (attempts >= maxAttempts) {
-            // 轮询超时：绝不 settle、绝不取降级产物，必须全额退款
-            clearInterval(pollTimer)
-            setIsRendering(false)
-            setErrorMsg('生成超时，请检查网络或 API 密钥配置。已自动全额退款。')
-            walletManager.refund(taskKey, cost, providerId, '渲染超时全额退款')
-            circuitBreaker.recordFailure(providerId)
-            idempotencyManager.releaseLock(taskKey)
-          }
-        } catch (err: any) {
-          clearInterval(pollTimer)
-          setIsRendering(false)
-          setErrorMsg(err.message || '查询任务状态出错')
-          walletManager.refund(taskKey, cost, providerId, `状态查询异常退款: ${err.message}`)
-          circuitBreaker.recordFailure(providerId)
-          idempotencyManager.releaseLock(taskKey)
-        }
-      }, pollingWindow.intervalMs)
-    } catch (err: any) {
-      setIsRendering(false)
-      setErrorMsg(err.message || '派发请求失败')
-      walletManager.refund(taskKey, cost, providerId, `派发请求失败退款: ${err.message}`)
-      circuitBreaker.recordFailure(providerId)
-      idempotencyManager.releaseLock(taskKey)
-    }
   }
 
   return (

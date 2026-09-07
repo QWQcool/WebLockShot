@@ -25,6 +25,12 @@ export const WalletModal: React.FC<Props> = ({ isOpen, onClose }) => {
       refresh()
       setRechargeTip(null)
     }
+    // 订阅钱包变更：本页资金操作与其它标签页 storage 同步均实时刷新
+    const unsubscribe = walletManager.subscribe(() => {
+      setSnapshot(walletManager.getSnapshot())
+      setTransactions(walletManager.getTransactions())
+    })
+    return unsubscribe
   }, [isOpen])
 
   if (!isOpen) return null

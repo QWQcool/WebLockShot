@@ -1,12 +1,48 @@
 import type { MediaAsset } from '../../domain/shotJob.ts'
 import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
+import { withRetry, isRetryableHttpStatus, isAbortError } from '../../ai/retry.ts'
+import { probeVideoBlob } from '../assetSize.ts'
 
 export type KlingConfig = {
   apiKey: string
   baseUrl?: string
 }
 
-const klingCache = new Map<string, { url: string; durationSec: number; shotId: string }>()
+/** 带状态码的 HTTP 错误，供 withRetry 分类可重试性 */
+export class KlingHttpError extends Error {
+  readonly status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'KlingHttpError'
+    this.status = status
+  }
+}
+
+/** 任务生成模式：与 poll 端点一一对应 */
+export type KlingTaskKind = 'text2video' | 'image2video'
+
+type KlingCacheEntry = {
+  url: string
+  durationSec: number
+  shotId: string
+  kind: KlingTaskKind
+}
+
+const klingCache = new Map<string, KlingCacheEntry>()
+
+/** 网络类错误（fetch 抛出的 TypeError 等）可重试 */
+function isNetworkError(err: unknown): boolean {
+  return err instanceof TypeError || (err instanceof Error && err.name === 'FetchError')
+}
+
+function classifyKlingError(err: unknown): { retry: boolean; retryAfter?: string | null } {
+  if (isAbortError(err)) return { retry: false }
+  if (err instanceof KlingHttpError) {
+    return { retry: isRetryableHttpStatus(err.status) }
+  }
+  if (isNetworkError(err)) return { retry: true }
+  return { retry: false }
+}
 
 export class KlingVideoProvider implements VideoProvider {
   readonly id = 'kling' as const
@@ -38,41 +74,46 @@ export class KlingVideoProvider implements VideoProvider {
 
   async submit(req: VideoGenRequest): Promise<{ taskId: string }> {
     const auth = this.getAuthHeader()
-    const isImage2Video = Boolean(req.imageBase64)
-    const endpoint = isImage2Video
-      ? `${this.baseUrl}/v1/videos/image2video`
-      : `${this.baseUrl}/v1/videos/text2video`
+    const kind: KlingTaskKind = req.imageBase64 ? 'image2video' : 'text2video'
+    const endpoint = `${this.baseUrl}/v1/videos/${kind}`
 
-    const bodyPayload = isImage2Video
-      ? {
-          model_name: 'kling-v1',
-          image: req.imageBase64,
-          prompt: req.prompt,
-          negative_prompt: req.negative,
-          duration: String(Math.max(5, req.durationSec || 5)),
-          aspect_ratio: '9:16',
-        }
-      : {
-          model_name: 'kling-v1',
-          prompt: req.prompt,
-          negative_prompt: req.negative,
-          duration: String(Math.max(5, req.durationSec || 5)),
-          aspect_ratio: '9:16',
-        }
+    const bodyPayload =
+      kind === 'image2video'
+        ? {
+            model_name: 'kling-v1',
+            image: req.imageBase64,
+            prompt: req.prompt,
+            negative_prompt: req.negative,
+            duration: String(Math.max(5, req.durationSec || 5)),
+            aspect_ratio: '9:16',
+          }
+        : {
+            model_name: 'kling-v1',
+            prompt: req.prompt,
+            negative_prompt: req.negative,
+            duration: String(Math.max(5, req.durationSec || 5)),
+            aspect_ratio: '9:16',
+          }
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: auth,
+    const res = await withRetry(
+      async () => {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: auth,
+          },
+          body: JSON.stringify(bodyPayload),
+        })
+
+        if (!resp.ok) {
+          const errText = await resp.text().catch(() => '')
+          throw new KlingHttpError(resp.status, `可灵 API 提交失败 (${resp.status}): ${errText}`)
+        }
+        return resp
       },
-      body: JSON.stringify(bodyPayload),
-    })
-
-    if (!res.ok) {
-      const errText = await res.text()
-      throw new Error(`可灵 API 提交失败 (${res.status}): ${errText}`)
-    }
+      { classify: classifyKlingError }
+    )
 
     const data = await res.json()
     if (data.code !== 0 && data.code !== 200) {
@@ -88,6 +129,7 @@ export class KlingVideoProvider implements VideoProvider {
       url: '',
       durationSec: req.durationSec || 5,
       shotId: req.shotId,
+      kind,
     })
 
     return { taskId }
@@ -95,17 +137,24 @@ export class KlingVideoProvider implements VideoProvider {
 
   async poll(taskId: string): Promise<PollResult> {
     const auth = this.getAuthHeader()
-    const endpoint = `${this.baseUrl}/v1/videos/text2video/${taskId}`
+    // 按任务生成模式区分查询端点：text2video / image2video
+    const kind = klingCache.get(taskId)?.kind || 'text2video'
+    const endpoint = `${this.baseUrl}/v1/videos/${kind}/${taskId}`
 
-    const res = await fetch(endpoint, {
-      headers: {
-        Authorization: auth,
+    const res = await withRetry(
+      async () => {
+        const resp = await fetch(endpoint, {
+          headers: {
+            Authorization: auth,
+          },
+        })
+        if (!resp.ok) {
+          throw new KlingHttpError(resp.status, `可灵轮询失败 HTTP ${resp.status}`)
+        }
+        return resp
       },
-    })
-
-    if (!res.ok) {
-      return { status: 'failed', error: `轮询请求失败 HTTP ${res.status}` }
-    }
+      { classify: classifyKlingError }
+    )
 
     const data = await res.json()
     const taskStatus = data.data?.task_status || data.task_status
@@ -144,11 +193,17 @@ export class KlingVideoProvider implements VideoProvider {
       throw new Error(`可灵视频尚未就绪 (taskId: ${taskId})`)
     }
 
+    // 真实 blob.size 替换硬编码估算值
+    const probed = await probeVideoBlob(cached.url)
+    if (cached) {
+      cached.url = probed.url
+    }
+
     return {
       shotId: cached.shotId,
-      url: cached.url,
+      url: probed.url,
       durationSec: cached.durationSec,
-      sizeBytes: 1024 * 1024 * 3,
+      sizeBytes: probed.sizeBytes,
     }
   }
 

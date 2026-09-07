@@ -1,5 +1,6 @@
 import type { MediaAsset } from '../../domain/shotJob.ts'
 import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
+import { probeVideoBlob } from '../assetSize.ts'
 
 const jimengCache = new Map<string, { url: string; durationSec: number; shotId: string }>()
 
@@ -81,12 +82,13 @@ export class JimengVideoProvider implements VideoProvider {
         shotId: req.shotId,
       })
       return { taskId }
-    } catch (err: any) {
-      if (err.message?.includes('未检测到字节即梦')) throw err
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      if (errMsg.includes('未检测到字节即梦')) throw err
       // 绝不静默降级：网络/服务异常必须显式抛错，由上层走 failed -> refund 退款流程
       console.warn('[JimengProvider] 网络请求失败，任务显式失败:', err)
       throw new Error(
-        `即梦视频提交失败: ${err.message || '网络异常'}。请检查网络与 API Key 配置，或切换为 Mock / ComfyUI 模式。`
+        `即梦视频提交失败: ${errMsg || '网络异常'}。请检查网络与 API Key 配置，或切换为 Mock / ComfyUI 模式。`
       )
     }
   }
@@ -137,11 +139,16 @@ export class JimengVideoProvider implements VideoProvider {
     if (!cached || !cached.url) {
       throw new Error(`即梦视频尚未就绪 (taskId: ${taskId})`)
     }
+
+    // 真实 blob.size 替换硬编码估算值
+    const probed = await probeVideoBlob(cached.url)
+    cached.url = probed.url
+
     return {
       shotId: cached.shotId,
-      url: cached.url,
+      url: probed.url,
       durationSec: cached.durationSec,
-      sizeBytes: 1024 * 1024 * 3,
+      sizeBytes: probed.sizeBytes,
     }
   }
 

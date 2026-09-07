@@ -14,6 +14,7 @@
 import type { Story } from '../types.ts'
 import type { VisualPlan } from '../domain/sellVisual.ts'
 import type { ShotJob } from '../domain/shotJob.ts'
+import { buildZip, blobToUint8Array, textEntry, type ZipEntry } from './zip.ts'
 
 function randomId(prefix = ''): string {
   return `${prefix}${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`
@@ -24,6 +25,17 @@ export type JianyingDraftOptions = {
   visualPlans?: VisualPlan[]
   jobs?: ShotJob[]
   projectTitle?: string
+  /** 可选的旁白音频：shotId -> 音频 URL (blob:/data:/http)，zip 打包时落入 assets/ 并在草稿中挂载 */
+  audioByShotId?: Record<string, string>
+}
+
+/** 剪映片段 clip 变换信息（导入必读字段） */
+export type JianyingSegmentClip = {
+  alpha: number
+  flip: { horizontal: boolean; vertical: boolean }
+  rotation: number
+  scale: { x: number; y: number }
+  transform: { x: number; y: number }
 }
 
 export type JianyingDraftContent = {
@@ -34,9 +46,18 @@ export type JianyingDraftContent = {
   }
   color_space: number
   config: Record<string, unknown>
+  cover: string
   duration: number
   fps: number
   id: string
+  platform: {
+    all: boolean
+    app_id: number
+    app_source: string
+    app_version: string
+    device_id: string
+    os: string
+  }
   materials: {
     videos: Array<{
       id: string
@@ -46,6 +67,9 @@ export type JianyingDraftContent = {
       material_name: string
       path: string
       type: string
+      category_name: string
+      extra_type_option: number
+      has_audio: boolean
     }>
     audios: Array<{
       id: string
@@ -53,6 +77,8 @@ export type JianyingDraftContent = {
       material_name: string
       path: string
       type: string
+      category_name: string
+      extra_type_option: number
     }>
     texts: Array<{
       id: string
@@ -81,6 +107,11 @@ export type JianyingDraftContent = {
       }
       speed?: number
       volume?: number
+      render_index: number
+      extra_material_refs: string[]
+      clip: JianyingSegmentClip
+      common_keyframes: unknown[]
+      uniform_scale: { on: boolean; value: number }
     }>
     type: string
   }>
@@ -96,6 +127,17 @@ export type JianyingDraftMetaInfo = {
   tm_draft_create: number
   tm_draft_modified: number
   tm_duration: number
+}
+
+/** 片段通用 clip 变换（与剪映 C clip 结构对齐） */
+function defaultClip(): JianyingSegmentClip {
+  return {
+    alpha: 1.0,
+    flip: { horizontal: false, vertical: false },
+    rotation: 0,
+    scale: { x: 1.0, y: 1.0 },
+    transform: { x: 0, y: 0 },
+  }
 }
 
 /**
@@ -134,6 +176,9 @@ export function buildJianyingDraft(options: JianyingDraftOptions): JianyingDraft
       material_name: videoName,
       path: videoAssetUrl,
       type: 'video',
+      category_name: 'local',
+      extra_type_option: 0,
+      has_audio: true,
     })
 
     videoSegments.push({
@@ -149,18 +194,26 @@ export function buildJianyingDraft(options: JianyingDraftOptions): JianyingDraft
       },
       speed: 1.0,
       volume: 1.0,
+      render_index: 0,
+      extra_material_refs: [],
+      clip: defaultClip(),
+      common_keyframes: [],
+      uniform_scale: { on: true, value: 1.0 },
     })
 
     // 2. 旁白配音素材及片段 (音频轨 - 与视频绝对微秒对齐)
     const audioMatId = randomId('mat_a_')
     const audioName = `Voice_${index + 1}_${shot.id}.mp3`
-    // 假设配音时长覆盖镜头播放区间，如字数较多由自适应语速算法压缩在 durUs 内
+    // 音频 path 统一指向 zip 包内相对路径 assets/voice_<shotId>.mp3；
+    // 若提供 audioByShotId，打包时会抓取音频字节落入同名文件，草稿导入即有声。
     audioMaterials.push({
       id: audioMatId,
       duration: durUs,
       material_name: audioName,
-      path: '', // 若有本地导出音频或 TTS 生成数据可挂载
+      path: `assets/voice_${shot.id}.mp3`,
       type: 'audio',
+      category_name: 'local',
+      extra_type_option: 0,
     })
 
     audioSegments.push({
@@ -176,6 +229,11 @@ export function buildJianyingDraft(options: JianyingDraftOptions): JianyingDraft
       },
       speed: 1.0,
       volume: 1.0,
+      render_index: 0,
+      extra_material_refs: [],
+      clip: defaultClip(),
+      common_keyframes: [],
+      uniform_scale: { on: true, value: 1.0 },
     })
 
     // 3. 字幕素材及片段 (花字轨道 - 与镜头同步进出场)
@@ -219,6 +277,11 @@ export function buildJianyingDraft(options: JianyingDraftOptions): JianyingDraft
         duration: durUs,
         start: currentStartUs,
       },
+      render_index: 0,
+      extra_material_refs: [],
+      clip: defaultClip(),
+      common_keyframes: [],
+      uniform_scale: { on: true, value: 1.0 },
     })
 
     // 推进全局微秒时间轴
@@ -232,6 +295,7 @@ export function buildJianyingDraft(options: JianyingDraftOptions): JianyingDraft
       width: 1080,
     },
     color_space: 0,
+    cover: '',
     config: {
       adjust_max_index: 1,
       attachment_info: [],
@@ -256,6 +320,14 @@ export function buildJianyingDraft(options: JianyingDraftOptions): JianyingDraft
     duration: currentStartUs,
     fps: 30.0,
     id: randomId('draft_'),
+    platform: {
+      all: false,
+      app_id: 3704,
+      app_source: 'weblockshot',
+      app_version: '6.0.0',
+      device_id: '',
+      os: 'windows',
+    },
     materials: {
       videos: videoMaterials,
       audios: audioMaterials,
@@ -352,4 +424,168 @@ export function downloadDraftMetaInfo(options: JianyingDraftOptions): void {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+/* ============================== ZIP 打包导出 ============================== */
+
+function guessAssetExt(url: string): string {
+  const clean = url.split('?')[0].split('#')[0].toLowerCase()
+  if (clean.endsWith('.webm')) return '.webm'
+  if (clean.endsWith('.mov')) return '.mov'
+  return '.mp4'
+}
+
+function sanitizeFileName(name: string): string {
+  return (name || 'WebLockShot_带货工程').replace(/[\\/:*?"<>|]/g, '_').slice(0, 60)
+}
+
+function buildZipReadme(projectTitle: string, includedAssets: string[], missingAssets: string[]): string {
+  const assetLines = includedAssets.length
+    ? includedAssets.map((n) => `  - ${n}`).join('\n')
+    : '  (无成功打包的素材文件)'
+  const missingLines = missingAssets.length
+    ? missingAssets.map((n) => `  - ${n}`).join('\n')
+    : '  (无)'
+  return `WebLockShot 剪映草稿工程包: ${projectTitle}
+================================================
+
+【使用步骤】
+1. 解压本压缩包，得到 draft_content.json、draft_meta_info.json 与 assets/ 素材目录。
+2. 打开电脑版剪映 (JianyingPro / CapCut)，先随便新建一个草稿工程，记下草稿名。
+3. 关闭剪映，进入草稿目录（Windows 默认:
+   %LOCALAPPDATA%\\JianyingPro\\User Data\\Projects\\com.lveditor.draft\\<你的草稿名>\\ ）。
+4. 将解压出的 draft_content.json、draft_meta_info.json 与 assets/ 文件夹
+   覆盖/复制进该草稿目录（同名文件直接替换）。
+5. 重新打开剪映，即可看到 9:16 画布、视频主轨、旁白音轨与花字字幕轨三轨对齐的工程。
+
+【本包内素材清单】
+${assetLines}
+
+【缺失/未打包素材】
+${missingLines}
+
+【音频说明】
+- 旁白音轨引用 assets/voice_<镜号>.mp3。浏览器 Web Speech TTS 无法导出音频文件，
+  若包内缺少对应音频文件，剪映导入时会提示素材缺失，可：
+  a) 自行录制/合成旁白并以同名文件放入 assets/ 后重新打开草稿；或
+  b) 在剪映中直接删除空音频片段，仅保留画面与字幕。
+
+由 WebLockShot 生成 · 时间单位为微秒 (1s = 1,000,000us) · 画布 1080x1920 9:16
+`
+}
+
+export type JianyingZipResult = {
+  bytes: Uint8Array
+  filename: string
+  includedAssets: string[]
+  missingAssets: string[]
+}
+
+/**
+ * 构建剪映草稿完整 zip 包（draft_content.json + draft_meta_info.json + 素材 + 使用说明）
+ * 纯前端可用：视频素材直接从 job.asset.url (blob:) 抓取，零依赖手写 store 模式 zip。
+ */
+export async function buildJianyingZipPackage(options: JianyingZipResultOptions): Promise<JianyingZipResult> {
+  const { audioByShotId = {}, projectTitle = 'WebLockShot_带货工程' } = options
+  const entries: ZipEntry[] = []
+  const includedAssets: string[] = []
+  const missingAssets: string[] = []
+
+  // 1. 抓取视频素材字节
+  const assetNameByShotId = new Map<string, string>()
+  for (const [index, shot] of options.story.shots.entries()) {
+    const job = options.jobs?.find((j) => j.shotId === shot.id)
+    const url = job?.asset?.url
+    const zipName = `assets/Shot_${index + 1}_${shot.id}${guessAssetExt(url || '')}`
+    if (url && typeof fetch === 'function') {
+      try {
+        const resp = await fetch(url)
+        if (resp.ok) {
+          const blob = await resp.blob()
+          if (blob.size > 0) {
+            entries.push({ name: zipName, data: await blobToUint8Array(blob) })
+            assetNameByShotId.set(shot.id, zipName)
+            includedAssets.push(zipName)
+            continue
+          }
+        }
+        missingAssets.push(`${zipName} (素材下载失败: HTTP ${resp.status})`)
+      } catch (err) {
+        missingAssets.push(`${zipName} (素材抓取异常: ${err instanceof Error ? err.message : String(err)})`)
+      }
+    } else {
+      missingAssets.push(`${zipName} (该镜头无已生成视频资产)`)
+    }
+  }
+
+  // 2. 抓取旁白音频（若提供）
+  for (const [shotId, url] of Object.entries(audioByShotId)) {
+    if (typeof fetch !== 'function') break
+    const zipName = `assets/voice_${shotId}.mp3`
+    try {
+      const resp = await fetch(url)
+      if (resp.ok) {
+        const blob = await resp.blob()
+        if (blob.size > 0) {
+          entries.push({ name: zipName, data: await blobToUint8Array(blob) })
+          includedAssets.push(zipName)
+          continue
+        }
+      }
+      missingAssets.push(`${zipName} (音频下载失败)`)
+    } catch (err) {
+      missingAssets.push(`${zipName} (音频抓取异常: ${err instanceof Error ? err.message : String(err)})`)
+    }
+  }
+
+  // 3. 草稿 JSON：视频素材路径改写为包内相对路径，保证解压后导入即可用
+  const draft = buildJianyingDraft({
+    ...options,
+    // zip 内草稿引用 assets/ 相对路径
+  })
+  if (assetNameByShotId.size > 0) {
+    for (const mat of draft.materials.videos) {
+      const shotId = options.story.shots.find((s) => mat.material_name.includes(s.id))?.id
+      const zipName = shotId ? assetNameByShotId.get(shotId) : undefined
+      if (zipName) mat.path = zipName
+    }
+  }
+
+  entries.unshift(
+    textEntry('draft_content.json', JSON.stringify(draft, null, 2)),
+    textEntry('draft_meta_info.json', JSON.stringify(buildJianyingDraftMetaInfo(options), null, 2)),
+    textEntry('README-使用说明.txt', buildZipReadme(projectTitle, includedAssets, missingAssets))
+  )
+
+  return {
+    bytes: buildZip(entries),
+    filename: `${sanitizeFileName(projectTitle)}_剪映草稿.zip`,
+    includedAssets,
+    missingAssets,
+  }
+}
+
+export type JianyingZipResultOptions = JianyingDraftOptions
+
+/**
+ * 触发浏览器下载剪映草稿 zip 包
+ */
+export async function downloadJianyingDraftZip(options: JianyingZipResultOptions): Promise<JianyingZipResult> {
+  const result = await buildJianyingZipPackage(options)
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    // 测试/Node 环境：仅返回字节流，不触发下载
+    return result
+  }
+
+  const copy = new Uint8Array(result.bytes)
+  const blob = new Blob([copy.buffer as ArrayBuffer], { type: 'application/zip' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = result.filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  return result
 }

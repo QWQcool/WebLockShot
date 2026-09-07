@@ -3,7 +3,7 @@ import type { ShotJob } from '../../domain/shotJob.ts'
 import type { VisualPlan } from '../../domain/sellVisual.ts'
 import type { Story } from '../../types.ts'
 import { voiceoverEngine, isTtsSupported } from '../../media/audio.ts'
-import { downloadJianyingDraft } from '../../export/jianyingDraft.ts'
+import { downloadJianyingDraft, downloadJianyingDraftZip } from '../../export/jianyingDraft.ts'
 
 type Props = {
   jobs: ShotJob[]
@@ -23,6 +23,7 @@ export const DeliverPlayer: React.FC<Props> = ({
   const [currentShotIndex, setCurrentShotIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [ttsEnabled, setTtsEnabled] = useState(isTtsSupported())
+  const [zipExporting, setZipExporting] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const activeJob = jobs[currentShotIndex] || jobs[0]
@@ -248,6 +249,31 @@ export const DeliverPlayer: React.FC<Props> = ({
               }
             >
               🎬 一键打包下载剪映草稿 (draft_content.json)
+            </button>
+            <button
+              type="button"
+              className="btn-export-jianying"
+              style={{ marginLeft: '0.6rem' }}
+              onClick={async () => {
+                setZipExporting(true)
+                try {
+                  const result = await downloadJianyingDraftZip({
+                    story,
+                    visualPlans,
+                    jobs,
+                    projectTitle: story.title || 'WebLockShot_带货工程',
+                  })
+                  if (result.missingAssets.length > 0) {
+                    console.warn('[WebLockShot] 剪映 zip 导出存在缺失素材:', result.missingAssets)
+                  }
+                } finally {
+                  setZipExporting(false)
+                }
+              }}
+              disabled={zipExporting}
+              title="包含视频素材 + draft_content.json + 使用说明，解压后放入剪映草稿目录即可导入"
+            >
+              {zipExporting ? '📦 素材打包中...' : '📦 下载完整草稿 zip 包 (含素材)'}
             </button>
           </div>
 

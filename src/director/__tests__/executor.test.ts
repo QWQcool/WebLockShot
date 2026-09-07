@@ -105,7 +105,7 @@ test('ExecutorEngine：单镜重试机制', async () => {
   const retriedJobs = engine.getJobs()
   const s1Retried = retriedJobs.find((j) => j.shotId === 's1')
   assert.ok(s1Retried, '重试后 s1 依然存在')
-  assert.ok(s1Retried.attempt > 0, 'attempt 次数应递增')
+  assert.ok((s1Retried?.attempt ?? 0) > 0, 'attempt 次数应递增')
 })
 
 test('ExecutorEngine：处理中 retry 不丢任务（竞态回归测试）', async () => {

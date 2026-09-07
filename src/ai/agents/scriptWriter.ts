@@ -1,4 +1,5 @@
 import type { Script, ScriptBeat } from '../../domain/script.ts'
+import { ScriptSchema } from '../../domain/script.ts'
 import {
   STRUCTURE_TEMPLATES,
   type StructureTemplate,
@@ -121,6 +122,38 @@ export function generateLocalScript(
 }
 
 /**
+ * 剥离 LLM 输出中可能包裹的 Markdown 围栏与前后噪音文本
+ */
+function stripJsonFences(raw: string): string {
+  return raw
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim()
+}
+
+/**
+ * 用 zod Schema 严格校验 LLM 返回的脚本体；
+ * 非法结构（beats 缺失、role 非法、长度不符等）返回 null 而非 as 断言透传脏数据。
+ */
+export function parseLLMScript(raw: string): Script | null {
+  try {
+    const json = JSON.parse(stripJsonFences(raw))
+    const result = ScriptSchema.safeParse(json)
+    if (result.success) {
+      return result.data
+    }
+    console.warn(
+      '[ScriptWriter] LLM 脚本输出未通过 zod 校验:',
+      result.error.issues.slice(0, 5)
+    )
+    return null
+  } catch (err) {
+    console.warn('[ScriptWriter] LLM 输出不是合法 JSON:', err)
+    return null
+  }
+}
+
+/**
  * ScriptWriter Agent 主入口：支持 LLM 智能扩写与 Local Fallback
  */
 export async function writeScript(input: ScriptWriterInput): Promise<Script> {
@@ -137,7 +170,7 @@ export async function writeScript(input: ScriptWriterInput): Promise<Script> {
     )
   }
 
-  // 若提供了 TokenConfig，可调用 LLM（此处带异常兜底）
+  // 若提供了 TokenConfig，可调用 LLM（校验失败自动重试一次，再失败降级本地引擎）
   try {
     const { chatCompletionsText } = await import('../client.ts')
     const systemPrompt = `你是一名抖音带货爆款编导。请根据用户提供的商品信息和选定的套路模板，扩写出一份严格包含 6 拍（beats）的带货脚本 JSON。
@@ -153,18 +186,24 @@ export async function writeScript(input: ScriptWriterInput): Promise<Script> {
 核心卖点：${input.sellingPoints.join('；')}
 套路模板：${selectedTemplate.name}（${selectedTemplate.tagline}）`
 
-    const res = await chatCompletionsText(
-      input.tokenConfig,
-      [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMsg },
-      ]
-    )
+    // 最多尝试 2 次：第一次输出未通过 Schema 校验时，附上错误要点要求模型修正
+    let correctionHint = ''
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await chatCompletionsText(
+        input.tokenConfig,
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: correctionHint ? `${userMsg}\n\n上一次输出未通过结构校验，请严格修正：${correctionHint}` : userMsg },
+        ]
+      )
 
-    const parsed = JSON.parse(res.trim())
-    if (parsed.beats && parsed.beats.length === 6) {
-      return parsed as Script
+      const script = parseLLMScript(res)
+      if (script) {
+        return script
+      }
+      correctionHint = '必须是合法 JSON；beats 恰好 6 个元素且 order 1~6；role 依次为 hook, pain, reveal, demo, proof, cta；字段名与示例完全一致。'
     }
+    console.warn('[ScriptWriter] LLM 输出两次校验均失败，降级为本地高质量扩写引擎')
   } catch (err) {
     console.warn('LLM 扩写失败或未提供有效配置，自动降级为本地高质量扩写引擎:', err)
   }

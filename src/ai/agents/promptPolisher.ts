@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { chatCompletionsText } from '../client.ts'
 import type { TokenConfig } from '../../types.ts'
 
@@ -83,6 +84,45 @@ const FALLBACK_EXPANSIONS: Record<
 }
 
 /**
+ * LLM 润色输出 Schema：废除裸 JSON.parse + as 断言，
+ * 结构不合法时安全降级为内置模板，不让脏数据流入 UI。
+ */
+export const PolishedPromptSchema = z.object({
+  polishedPrompt: z.string().min(1),
+  negativePrompt: z.string().optional(),
+  cameraMovement: z.string().optional(),
+  lighting: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+})
+
+export type LLMPolishedRaw = z.infer<typeof PolishedPromptSchema>
+
+/**
+ * 用 zod 严格校验 LLM 返回的润色结果；失败返回 null
+ */
+export function parseLLMPolishedPrompt(raw: string): LLMPolishedRaw | null {
+  try {
+    const cleaned = raw
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim()
+    const json = JSON.parse(cleaned)
+    const result = PolishedPromptSchema.safeParse(json)
+    if (result.success) {
+      return result.data
+    }
+    console.warn(
+      '[PromptPolisher] LLM 润色输出未通过 zod 校验:',
+      result.error.issues.slice(0, 5)
+    )
+    return null
+  } catch (err) {
+    console.warn('[PromptPolisher] LLM 输出不是合法 JSON:', err)
+    return null
+  }
+}
+
+/**
  * 提示词智能润色 / 扩写 Agent
  * 接收用户自然语言短语，扩写为高质量可灵 / 即梦专业级视频提示词
  */
@@ -119,18 +159,18 @@ export async function polishPrompt(params: {
         { role: 'user', content: `用户原始需求：${trimmed}` },
       ])
 
-      const cleaned = rawJson.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-      const parsed = JSON.parse(cleaned)
-      if (parsed.polishedPrompt) {
+      const parsed = parseLLMPolishedPrompt(rawJson)
+      if (parsed) {
         return {
           polishedPrompt: parsed.polishedPrompt,
           negativePrompt: parsed.negativePrompt || styleConf.negative,
           cameraMovement: parsed.cameraMovement || styleConf.camera,
           lighting: parsed.lighting || styleConf.lighting,
           styleLabel: currentOption?.label || '高品质大片',
-          tags: parsed.tags || styleConf.tags,
+          tags: parsed.tags && parsed.tags.length > 0 ? parsed.tags : styleConf.tags,
         }
       }
+      // 校验失败：落到下方内置模板降级路径
     } catch (err) {
       console.warn('[PromptPolisher] 大模型润色失败，无缝降级为内置高级模版:', err)
     }

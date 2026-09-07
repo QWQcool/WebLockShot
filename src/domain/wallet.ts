@@ -43,36 +43,124 @@ export const PROVIDER_UNIT_COSTS: Record<string, number> = {
 class WalletManager {
   private state: WalletState
   /**
-   * per-refId 冻结账本：refId -> 冻结金额。
+   * per-refId 冻结账本：refId -> { amount, providerId, frozenAt }。
    * settle / refund 必须能在此账本中找到对应 freeze 记录，否则拒绝执行，
    * 防止无冻结凭据的虚假核销/退款。settle 消费后移除记录（重复 settle 幂等拒绝）。
+   * frozenAt 用于孤儿冻结 TTL 回收（进程重启后无主冻结款自动退回）。
    */
-  private frozenRefs = new Map<string, number>()
+  private frozenRefs = new Map<string, { amount: number; providerId: string; frozenAt: number }>()
+  private listeners: Set<() => void> = new Set()
+  private storageHandler?: (e: StorageEvent) => void
+  private sweepTimer: ReturnType<typeof setInterval> | null = null
+
+  /** 孤儿冻结默认回收阈值：30 分钟内无主冻结款自动退回 */
+  public static readonly ORPHAN_FREEZE_TTL_MS = 30 * 60_000
 
   constructor() {
     this.state = this.loadFromStorage()
     this.rebuildFrozenRefs()
+    this.bindStorageSync()
+    this.startOrphanSweep()
   }
 
   /**
    * 从持久化流水中重建冻结账本（进程/页面重启后恢复一致性）：
-   * freeze 累加，settle 与 refund 消耗。
+   * freeze 累加（记录首次冻结时间），settle 与 refund 消耗。
    */
   private rebuildFrozenRefs() {
     this.frozenRefs.clear()
     for (const tx of this.state.transactions) {
       if (tx.type === 'freeze' && tx.refId) {
-        this.frozenRefs.set(tx.refId, (this.frozenRefs.get(tx.refId) || 0) + Math.abs(tx.amount))
+        const existing = this.frozenRefs.get(tx.refId)
+        this.frozenRefs.set(tx.refId, {
+          amount: (existing?.amount || 0) + Math.abs(tx.amount),
+          providerId: tx.providerId || 'unknown',
+          frozenAt: existing?.frozenAt ?? tx.timestamp,
+        })
       } else if ((tx.type === 'settle' || tx.type === 'refund') && tx.refId) {
-        const current = this.frozenRefs.get(tx.refId) || 0
+        const entry = this.frozenRefs.get(tx.refId)
+        if (!entry) continue
         const consumed = Math.abs(tx.amount)
-        if (consumed >= current) {
+        if (consumed >= entry.amount) {
           this.frozenRefs.delete(tx.refId)
         } else {
-          this.frozenRefs.set(tx.refId, current - consumed)
+          entry.amount -= consumed
         }
       }
     }
+  }
+
+  /**
+   * 多标签页同步：storage 事件在其它标签页写入 localStorage 时触发，
+   * 本页重新加载账本并通知订阅者，保证跨标签页钱包视图一致。
+   */
+  private bindStorageSync() {
+    if (typeof window === 'undefined') return
+    this.storageHandler = (e: StorageEvent) => {
+      if (e.key !== WALLET_STORAGE_KEY || !e.newValue) return
+      try {
+        const parsed = JSON.parse(e.newValue) as WalletState
+        if (typeof parsed.balance === 'number' && typeof parsed.frozen === 'number') {
+          this.state = parsed
+          this.rebuildFrozenRefs()
+          this.notify()
+        }
+      } catch {
+        // ignore malformed cross-tab payload
+      }
+    }
+    window.addEventListener('storage', this.storageHandler)
+  }
+
+  /** 周期性孤儿冻结回收（仅浏览器环境，每 60 秒扫描一次） */
+  private startOrphanSweep() {
+    if (typeof window === 'undefined') return
+    this.sweepTimer = setInterval(() => {
+      this.sweepOrphanFrozen(WalletManager.ORPHAN_FREEZE_TTL_MS)
+    }, 60_000)
+    // 不阻塞页面卸载
+    if (typeof this.sweepTimer === 'object' && 'unref' in this.sweepTimer) {
+      this.sweepTimer.unref()
+    }
+  }
+
+  public dispose() {
+    if (this.storageHandler && typeof window !== 'undefined') {
+      window.removeEventListener('storage', this.storageHandler)
+    }
+    if (this.sweepTimer) clearInterval(this.sweepTimer)
+  }
+
+  /**
+   * 订阅钱包变更（本页任何资金操作 / 其它标签页 storage 同步都会通知）
+   */
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  private notify() {
+    this.listeners.forEach((fn) => fn())
+  }
+
+  /**
+   * 孤儿冻结回收：冻结记录超过 TTL 仍无主（无任务会 settle/refund，例如进程重启后丢失的会话），
+   * 自动原路退回可用余额。返回回收的笔数。
+   */
+  public sweepOrphanFrozen(ttlMs: number = WalletManager.ORPHAN_FREEZE_TTL_MS, now = Date.now()): number {
+    let swept = 0
+    for (const [refId, entry] of Array.from(this.frozenRefs.entries())) {
+      if (now - entry.frozenAt >= ttlMs) {
+        const ok = this.refund(
+          refId,
+          entry.amount,
+          entry.providerId,
+          `孤儿冻结自动回收 (超过 ${Math.round(ttlMs / 60_000)} 分钟无主)`
+        )
+        if (ok) swept++
+      }
+    }
+    return swept
   }
 
   private loadFromStorage(): WalletState {
@@ -119,6 +207,7 @@ class WalletManager {
     } catch {
       // ignore
     }
+    this.notify()
   }
 
   public getSnapshot(): { balance: number; frozen: number; total: number } {
@@ -167,7 +256,12 @@ class WalletManager {
       frozen: nextFrozen,
       transactions: [...this.state.transactions, tx],
     })
-    this.frozenRefs.set(refId, (this.frozenRefs.get(refId) || 0) + amount)
+    const existing = this.frozenRefs.get(refId)
+    this.frozenRefs.set(refId, {
+      amount: (existing?.amount || 0) + amount,
+      providerId,
+      frozenAt: existing?.frozenAt ?? Date.now(),
+    })
     return true
   }
 
@@ -204,7 +298,14 @@ class WalletManager {
       frozen: nextFrozen,
       transactions: [...this.state.transactions, tx],
     })
-    this.frozenRefs.delete(refId)
+
+    // 部分核销边界：本次核销额未覆盖凭据全额时，仅扣减凭据余额，保留剩余凭据可追
+    const entry = this.frozenRefs.get(refId)!
+    if (amount < entry.amount) {
+      entry.amount -= amount
+    } else {
+      this.frozenRefs.delete(refId)
+    }
     return true
   }
 
@@ -234,7 +335,7 @@ class WalletManager {
       frozenAfter: nextFrozen,
       refId,
       providerId,
-      description: `[全额退款] ${reason}`,
+      description: amount >= (this.frozenRefs.get(refId)?.amount ?? amount) ? `[全额退款] ${reason}` : `[部分退款] ${reason}`,
     }
 
     this.persist({
@@ -242,7 +343,14 @@ class WalletManager {
       frozen: nextFrozen,
       transactions: [...this.state.transactions, tx],
     })
-    this.frozenRefs.delete(refId)
+
+    // 与 settle 对齐：部分退款时保留剩余凭据余额可追，全额退款才销毁凭据
+    const entry = this.frozenRefs.get(refId)!
+    if (amount < entry.amount) {
+      entry.amount -= amount
+    } else {
+      this.frozenRefs.delete(refId)
+    }
     return true
   }
 
