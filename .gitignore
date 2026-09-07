@@ -22,8 +22,9 @@ dist-ssr
 .workbuddy/
 .playwright-cli/
 
-# 伴生服务运行产物（剪映草稿 zip 落盘目录）
+# 伴生服务运行产物（剪映草稿 zip 落盘目录 / TTS 音频 / ffmpeg 成片）
 jianying-drafts/
+data/
 
 # Editor directories and files
 .vscode/*

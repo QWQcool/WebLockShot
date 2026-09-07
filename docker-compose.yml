@@ -38,6 +38,12 @@ services:
       # - WLS_HOST=0.0.0.0
       # draft-zip 累计解压字节上限（MB，默认 1024 = 1GB，zip bomb 防护）
       # - WLS_MAX_UNZIP_MB=1024
+      # Edge-TTS 语音合成（默认 on，/api/tts 可用；=off 关闭并返回 501）
+      # - WLS_TTS=on
+      # ffmpeg 成片合成（默认 auto 探测二进制；镜像已内置 ffmpeg；=off 关闭并返回 501）
+      # - WLS_FFMPEG=auto
+      # 单渲染任务超时（秒，默认 600）
+      # - WLS_RENDER_TIMEOUT_SEC=600
       # 会话存储：memory（默认，现状）| sqlite（持久化到 /app/data）
       # - WLS_STORAGE=sqlite
       # LLM 反代目标（设置后 /api/llm 反代到该地址；未设置 = 501）
@@ -49,8 +55,8 @@ services:
       # 错误上报（预留 no-op）
       # - SENTRY_DSN=
     volumes:
-      # 预留：持久化目录（sqlite 会话库 / 剪映草稿）
-      # - ./data:/app/data
+      # 持久化：sqlite 会话库 / TTS 音频（data/tts）/ 成片（data/render）
+      - ./data:/app/data
       - ./jianying-drafts:/app/jianying-drafts
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:5174/healthz']

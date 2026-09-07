@@ -318,7 +318,9 @@ Windows 用户可直接双击根目录 **`start-weblockshot.bat`**（自动安�
 | 静态托管 | 托管 `dist/` 生产构建，打开 `http://localhost:5174` 即用 |
 | API 反代 | `/api/kling`、`/api/jimeng`、`/api/comfyui` 三个前缀反向代理，生产环境也能直连 ComfyUI 与视频平台 |
 | 剪映草稿落盘 | `POST /api/jianying/draft-zip`（body 为 zip 二进制），自动解压到 `--draft-dir` 指定目录，免去手动解压复制 |
-| 健康检查（预留） | `GET /healthz` 返回版本 / 存储模式 / uptime / 密钥注入模式等 JSON 自观测 |
+| 语音合成 | `POST /api/tts`：Edge-TTS 合成旁白 mp3 落盘（默认开；`WLS_TTS=off` 关闭），`GET /files/tts/<file>.mp3` 回读 |
+| 成片合成 | `POST /api/render`：ffmpeg 合成视频 + 音轨 + 字幕成 mp4（默认 auto 探测；`WLS_FFMPEG=off` 关闭），`GET /files/render/<file>.mp4` 回读 |
+| 健康检查（预留） | `GET /healthz` 返回版本 / 存储模式 / uptime / 密钥注入模式 / 能力位（tts、ffmpeg）等 JSON 自观测 |
 | 会话存储 API（预留） | `PUT/GET/DELETE /api/sessions/:id`，配合前端 `VITE_BACKEND_URL` 的服务端模式；`WLS_STORAGE=sqlite` 时落盘持久化 |
 | LLM 反代（预留） | 设置 `WLS_LLM_TARGET` 后 `/api/llm` 反代至目标 LLM API；未设置返回 501 |
 | 密钥注入（预留） | 设置 `WLS_KEYS`（JSON）后反代注入真实密钥头，小程序/无密钥客户端也能出片；未设置 = 透传模式 |
@@ -328,9 +330,48 @@ Windows 用户可直接双击根目录 **`start-weblockshot.bat`**（自动安�
 
 ### 剪映草稿一键落盘实操
 
+**方式 A：工作台内一键落盘（推荐，P1-3 起）**
+
+1. 按上文启动伴生服务；
+2. 打开工作台「交付播放器」页，前端会自动探测 `/healthz`——伴生服务在线时，「导出剪映草稿工程」卡片会出现 **📤 发送到伴生服务落盘** 按钮；
+3. 点击按钮，前端把完整草稿 zip（含素材）直接 POST 到 `/api/jianying/draft-zip`，服务端自动解压；按钮下方会显示落盘路径（`savedPath`），把该目录（或把 `--draft-dir` 直接指向剪映草稿目录）即可在剪映中打开；
+4. 若探测不到伴生服务（纯前端模式），按钮不显示，体验与之前完全一致——用方式 B。
+
+**方式 B：curl 手动落盘**
+
 1. 按上文启动伴生服务（记下启动日志中的「草稿落盘」目录）；
 2. 用任意 HTTP 客户端（或 curl）将「📦 下载完整草稿 zip 包」得到的 zip 原样 POST 到 `http://localhost:5174/api/jianying/draft-zip`；
-3. 服务返回 `{ ok: true, dir: "...", files: [...] }`，按返回的 `dir` 路径把内容挪进剪映草稿目录（或直接将 `--draft-dir` 指向剪映草稿目录），打开剪映即可。
+3. 服务返回 `{ ok: true, savedPath: "...", files: [...] }`，按返回的 `savedPath` 路径把内容挪进剪映草稿目录（或直接将 `--draft-dir` 指向剪映草稿目录），打开剪映即可。
+
+### Edge-TTS 语音合成实操（TTS 生成 → 音轨进剪映）
+
+1. 确认伴生服务已启动且 `WLS_TTS` 未设为 `off`（`curl http://localhost:5174/healthz` 应看到 `"tts":"on"`）；
+2. 合成旁白：
+
+   ```bash
+   curl -X POST http://localhost:5174/api/tts \
+     -H "Content-Type: application/json" \
+     -d '{"text":"你的旁白台词","voice":"zh-CN-XiaoxiaoNeural","rate":"+10%"}'
+   ```
+
+3. 响应中的 `url`（如 `/files/tts/xxx.mp3`）可直接在浏览器打开试听，文件落在 `data/tts/` 目录；
+4. 剪映内使用：把 mp3 拖入剪映音频轨，或将其重命名为 `voice_<镜号>.mp3` 放进草稿包 `assets/` 目录，补齐草稿缺失的旁白素材；
+5. 进阶：把生成的 mp3 URL 传给 `POST /api/render` 的 `audioUrl`，直接在服务端合成带旁白的成片。
+
+### ffmpeg 服务端成片实操
+
+1. 本机需安装 ffmpeg（Windows：`winget install ffmpeg`；macOS：`brew install ffmpeg`；Docker 镜像已内置），启动后 `/healthz` 应看到 `"ffmpeg":"on"`；
+2. 合成成片（视频来源支持本站 `/files/...` 相对路径或公网 http(s) URL）：
+
+   ```bash
+   curl -X POST http://localhost:5174/api/render \
+     -H "Content-Type: application/json" \
+     -d '{"videoUrl":"/files/tts/video.mp4","audioUrl":"/files/tts/xxx.mp3","title":"我的成片"}'
+   ```
+
+3. 响应返回 `{ url: "/files/render/render_xxx.mp4", bytes }`，浏览器直接打开 `url` 下载/预览成片；
+4. 可选传 `subtitleSrt`（SRT 文本内容）软封字幕轨；同一时间仅允许 1 个渲染任务（忙时 429），单任务默认 10 分钟超时（`WLS_RENDER_TIMEOUT_SEC` 可调）；
+5. 安全约束：禁止 `file://` 与内网地址（SSRF 防护），远程下载上限 500MB。
 
 ---
 
@@ -426,6 +467,11 @@ environment:
   - PORT=5174
   # 会话持久化（预留）：sqlite 落盘到容器 /app/data 卷
   - WLS_STORAGE=sqlite
+  # 语音合成（默认 on）：/api/tts Edge-TTS 出 mp3，产物落 /app/data/tts 卷
+  # - WLS_TTS=off
+  # 成片合成（默认 auto）：镜像已内置 ffmpeg，/api/render 出 mp4，产物落 /app/data/render 卷
+  # - WLS_FFMPEG=auto
+  # - WLS_RENDER_TIMEOUT_SEC=600
   # LLM 反代（预留）：设置后 /api/llm 反代到目标
   - WLS_LLM_TARGET=https://api.openai.com
   # 密钥注入（预留）：服务端持有真实密钥，客户端免配 Key（小程序轻端依赖此机制）
@@ -438,7 +484,7 @@ compose 内含 Caddy 反代注释模板：取消注释、编写 `Caddyfile`（`y
 
 ### 镜像结构
 
-多阶段构建：阶段 1（node:22-alpine）`npm ci` + `tsc -b && vite build` 产出 `dist/`；阶段 2 运行层仅含 `dist/`、`server/` 与生产依赖（不含任何 devDependency）。CI 每次 push 均执行「只 build 不 push」的镜像构建验证 job。
+多阶段构建：阶段 1（node:22-slim）`npm ci` + `tsc -b && vite build` 产出 `dist/`；阶段 2 运行层（node:22-alpine，**已内置 ffmpeg** 支撑 `/api/render` 成片合成）仅含 `dist/`、`server/` 与生产依赖（不含任何 devDependency）。`./data`（TTS 音频/成片/sqlite 会话库）与 `./jianying-drafts`（剪映落盘）已挂载持久化卷。CI 每次 push 均执行「只 build 不 push」的镜像构建验证 job。
 
 ---
 

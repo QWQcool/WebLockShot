@@ -31,6 +31,9 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 
+# ffmpeg：/api/render 服务端成片合成依赖（WLS_FFMPEG=auto 默认启用，探测到即 on）
+RUN apk add --no-cache ffmpeg
+
 ENV NODE_ENV=production \
     PORT=5174
 

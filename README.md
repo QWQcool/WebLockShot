@@ -8,7 +8,9 @@
 - **📊 数据反馈闭环**：回流看板手动录入平台数据（3 秒完播率/完播率/转化），按结构/钩子/品类聚合胜率（Laplace 平滑），ScriptWriter 采样按真实胜率加权。
 - **🔥 自建 ComfyUI 私有 GPU 算力穿透**：本地开发走 Vite 反代、生产走零依赖伴生服务反代，直调 Wan 2.1 工作流，内置一键 Ping GPU 显存探测。
 - **💰 虚拟钱包两阶段结算事务**：per-refId 冻结账本，生片前预冻结，成功核销，异常/超时/取消全额原路退款；无冻结凭据的核销/退款一律拒绝，重复结算幂等，孤儿冻结 30 分钟 TTL 自动回收。
-- **📥 剪映 / CapCut 电脑版草稿交付**：视频轨 + 旁白音轨 + 花字字幕轨微秒级对齐的 `draft_content.json` 工程文件与完整素材 zip 包（视频素材 + 使用说明），解压放入剪映草稿目录即可导入；可经伴生服务接口一键落盘。
+- **📥 剪映 / CapCut 电脑版草稿交付**：视频轨 + 旁白音轨 + 花字字幕轨微秒级对齐的 `draft_content.json` 工程文件与完整素材 zip 包（视频素材 + 使用说明），解压放入剪映草稿目录即可导入；伴生服务在线时界面自动出现「发送到伴生服务落盘」按钮，一键解压到本地草稿目录。
+- **🔊 Edge-TTS 语音合成（伴生服务）**：`POST /api/tts` 调用 Edge TTS（纯 JS 实现，无需 Python / API Key）合成旁白 mp3 落盘，浏览器直接回读；开关 `WLS_TTS`，默认开启。
+- **🎬 ffmpeg 服务端成片合成（伴生服务）**：`POST /api/render` 将分镜视频 + TTS 音轨 + 可选字幕合成为最终 mp4（音轨自动重编码、字幕软封），落盘后可直接回读下载；开关 `WLS_FFMPEG=auto` 自动探测 ffmpeg，镜像已内置。
 - **🎭 剧情短剧粗剪台（保留兼容）**：内置《门缝》《未读》《13层》6 镜剧情预演与提示词包导出，零回归。
 
 > 📖 **详尽实战手册请查阅**：[docs/HOW_TO_USE.md](./docs/HOW_TO_USE.md)（包含从零安装、ComfyUI 部署、剪映导入到踩坑排错的完整教程）。
@@ -50,9 +52,9 @@ npx weblockshot          # 或: npm run build && npm run start:server
 
 Windows 用户可直接双击 `start-weblockshot.bat`（自动安装依赖/构建/启动）。
 
-能力：静态托管 `dist/` + `/api/kling` `/api/jimeng` `/api/comfyui` 反代（生产也能连 ComfyUI）+ `POST /api/jianying/draft-zip`（zip 直解到本地草稿目录）。
+能力：静态托管 `dist/` + `/api/kling` `/api/jimeng` `/api/comfyui` 反代（生产也能连 ComfyUI）+ `POST /api/jianying/draft-zip`（zip 直解到本地草稿目录）+ `POST /api/tts`（Edge-TTS 语音合成出 mp3）+ `POST /api/render`（ffmpeg 服务端成片合成）。
 
-预留能力（配置开关，不设置 = 本地默认模式）：`GET /healthz`（版本/存储模式/uptime）、`WLS_STORAGE=memory|sqlite` 会话存储、`/api/llm` LLM 反代（需 `WLS_LLM_TARGET`）、`WLS_KEYS` 反代密钥注入（未设置 = 透传）、`PUT/GET/DELETE /api/sessions/:id`（BackendAdapter rest 模式后端）。
+预留能力（配置开关，不设置 = 本地默认模式）：`GET /healthz`（版本/存储模式/uptime/能力位）、`WLS_STORAGE=memory|sqlite` 会话存储、`/api/llm` LLM 反代（需 `WLS_LLM_TARGET`）、`WLS_KEYS` 反代密钥注入（未设置 = 透传）、`PUT/GET/DELETE /api/sessions/:id`（BackendAdapter rest 模式后端）。
 
 ---
 
@@ -67,6 +69,9 @@ Windows 用户可直接双击 `start-weblockshot.bat`（自动安装依赖/构�
 | 请求体形状 / 响应解析 / 错误码映射 | ✅ 契约验证 | `test/fixtures/kling|jimeng/` + `src/media/__tests__/providerContract.test.ts` |
 | 可灵 / 即梦真实出片连通 | ⏳ 待真实环境 | `npm run verify:providers -- --kling-key=AK:SK --jimeng-key=AK:SK` 真实探测 |
 | Docker 镜像构建 | ✅ CI 验证 | `.github/workflows/docker-build.yml`（只 build 不 push）；本地 `docker compose up --build` 可完整跑通 |
+| Edge-TTS 语音合成（`/api/tts`） | ✅ 本机验证 | 真实出 mp3（zh-CN-XiaoxiaoNeural，38KB）；协议层 mock 单测不依赖网络 |
+| ffmpeg 成片合成（`/api/render`） | ✅ CI 验证 / ⏳ 待生产长稳 | fake 子进程协议测试全链路；真实 ffmpeg 链路（testsrc+正弦音轨）在带 ffmpeg 环境（CI ubuntu runner）自动执行 |
+| 剪映草稿一键落盘（伴生服务在线时按钮） | ✅ 本地验证（对接伴生 server） | UI 冒烟 mock fetch：探测可达→按钮出现→落盘成功；不可达→按钮不出现 |
 | 手机 PWA（安装/SW 自更新/真机相机） | ⏳ 待真机 | manifest + SW 产物已生成并有构建验证 |
 | BackendAdapter rest 模式 → 云后端 | ✅ 本地验证（对接伴生 server） / ⏳ 待真实云后端 | `/api/sessions/:id` 全流程有自动化测试 |
 
@@ -104,6 +109,11 @@ docker compose up --build
 | `WLS_SQLITE_PATH` | sqlite 库文件路径（默认 `data/weblockshot-sessions.sqlite3`） |
 | `WLS_KEYS` | 反代密钥注入（JSON：`{"kling":"Bearer xx","llm":"sk-xx"}`）；设置后对应引擎反代覆盖客户端 Authorization；未设置 = 透传模式 |
 | `WLS_LLM_TARGET` | LLM API 反代目标；设置后 `/api/llm` 生效，未设置返回 501 |
+| `WLS_TTS` | Edge-TTS 语音合成开关：`on`（默认）/ `off`（`/api/tts` 返回 501） |
+| `TTS_DIR` | TTS mp3 落盘目录（默认 `data/tts`） |
+| `WLS_FFMPEG` | ffmpeg 成片合成开关：`auto`（默认，探测二进制，缺失返回 501 + 安装提示）/ `off` |
+| `RENDER_DIR` | 成片 mp4 落盘目录（默认 `data/render`） |
+| `WLS_RENDER_TIMEOUT_SEC` | 单渲染任务超时秒数（默认 600，超时 kill 子进程返回 504） |
 | `WLS_LOG_LEVEL` | pino 日志级别（默认 `info`，JSON 结构化输出） |
 | `SENTRY_DSN` | 错误上报（预留 no-op，`/healthz` 上报 configured） |
 
@@ -112,8 +122,10 @@ docker compose up --build
 ```bash
 curl http://localhost:5174/healthz
 # {"ok":true,"version":"0.1.0","storage":"memory","uptimeSec":2,"node":"v22.x",
-#  "keyMode":"passthrough","llmProxy":"off","sentry":"off"}
+#  "keyMode":"passthrough","llmProxy":"off","sentry":"off","tts":"on","ffmpeg":"on"}
 ```
+
+> `tts` / `ffmpeg` 为能力位：前端据此决定是否显示「发送到伴生服务落盘」等新按钮（探测失败 = 纯前端模式，行为与现状一致）。
 
 ---
 
@@ -154,6 +166,8 @@ npm run build:weapp   # 不依赖微信开发者工具即可完成编译，产�
 - `assets/`：已生成的分镜视频素材与（可选的）旁白音频
 - `README-使用说明.txt`：本包专属素材清单与导入指引
 
+**免手动解压（伴生服务在线时）**：页面会自动探测本机伴生服务（`/healthz`），在线时显示 **📤 发送到伴生服务落盘** 按钮——点击后 zip 直发 `POST /api/jianying/draft-zip`，服务端自动解压到剪映草稿目录（响应返回 `savedPath`），跳过下方手动步骤；探测失败则按钮不显示，纯前端体验不变。
+
 导入步骤：
 1. 解压压缩包；
 2. 打开电脑版剪映 (JianyingPro)，新建一个空草稿；
@@ -162,6 +176,43 @@ npm run build:weapp   # 不依赖微信开发者工具即可完成编译，产�
 5. 重新打开剪映即可看到三轨对齐的完整工程。
 
 > 注：浏览器 Web Speech TTS 无法导出音频文件，若 `assets/voice_*.mp3` 缺失，可自行录制同名旁白放入 assets/，或在剪映中删除空音频片段。
+
+---
+
+## 🔊 语音合成（伴生服务 /api/tts）
+
+启动伴生服务后（默认开启），可用 Edge-TTS 将任意文案合成旁白 mp3（纯 JS WebSocket 实现，无需 Python / API Key）：
+
+```bash
+curl -X POST http://localhost:5174/api/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text":"三秒抓住买家注意力","voice":"zh-CN-XiaoxiaoNeural","rate":"+10%"}'
+# {"url":"/files/tts/1c83ab2f9286-mtr2oayj.mp3","path":".../data/tts/....mp3","bytes":38736,"voice":"zh-CN-XiaoxiaoNeural"}
+```
+
+- 声音：任意 Edge TTS ShortName（默认 `zh-CN-XiaoxiaoNeural`）；`rate` 支持相对语速（如 `+20%`）
+- 限长：`text` ≤ 5000 字符（超限 400）；产物经 `GET /files/tts/<file>.mp3` 回读（`audio/mpeg`）
+- 开关：`WLS_TTS=off` 关闭（返回 501）；`/healthz` 能力位 `tts: on|off`
+- 验证层级：✅ 本机验证（真实出 mp3）；协议层 mock 单测不依赖网络
+
+---
+
+## 🎬 成片合成（伴生服务 /api/render）
+
+将分镜视频 + TTS 音轨 + 可选字幕合成为最终 mp4（服务端 ffmpeg，本机需安装 ffmpeg；Docker 镜像已内置）：
+
+```bash
+curl -X POST http://localhost:5174/api/render \
+  -H "Content-Type: application/json" \
+  -d '{"videoUrl":"/files/tts/video.mp4","audioUrl":"/files/tts/voice.mp3","subtitleSrt":"1\n00:00:00,000 --> 00:00:03,000\n字幕","title":"我的成片"}'
+# {"url":"/files/render/render_2026-09-07T10-00-00.mp4","path":".../data/render/....mp4","bytes":...}
+```
+
+- 来源：`videoUrl`/`audioUrl` 支持 http(s) 与本站相对路径（`/files/...`）；禁止 `file://` 与内网地址（SSRF 防护）；远程下载 500MB 上限
+- 合成策略：视频流 copy + 音频重编码 aac（`-c:v copy` 因容器不兼容失败时自动回退 libx264 重编码）；字幕软封 `mov_text`
+- 并发/超时：同一时间最多 1 个渲染任务（忙时 429）；单任务默认 10 分钟超时（`WLS_RENDER_TIMEOUT_SEC` 可调，超时 504）
+- 开关：`WLS_FFMPEG=auto`（默认，探测 ffmpeg，缺失返回 501 + 安装提示）/ `off`；`/healthz` 能力位 `ffmpeg: on|off`
+- 验证层级：✅ CI 验证（fake 子进程协议测试 + 真实 ffmpeg 链路）/ ⏳ 待生产长稳
 
 ---
 
