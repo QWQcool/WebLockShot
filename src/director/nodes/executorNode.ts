@@ -53,7 +53,10 @@ export class ExecutorEngine {
 
   subscribe(listener: JobUpdateListener) {
     this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+    // 显式无返回值（React effect cleanup 约定），避免 StrictMode 双挂载歧义
+    return () => {
+      this.listeners.delete(listener)
+    }
   }
 
   private notify() {

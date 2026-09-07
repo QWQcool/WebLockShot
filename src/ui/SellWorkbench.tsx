@@ -126,7 +126,12 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
       if (cancelled || !hydrated) return
       if (hydrated.productInput) setProductInput(hydrated.productInput)
       if (hydrated.visualPlans && hydrated.visualPlans.length > 0) setVisualPlans(hydrated.visualPlans)
-      if (hydrated.jobs && hydrated.jobs.length > 0) setJobs(hydrated.jobs)
+      // 关键守卫：仅当 executor 引擎为空（无进行中/已完成会话）时才恢复持久化的 jobs。
+      // 否则水合的陈旧快照会覆盖 executorEngine.subscribe 推送的实时状态，
+      // 导致渲染页卡在「排队中」而引擎内部早已出片成功。
+      if (hydrated.jobs && hydrated.jobs.length > 0 && executorEngine.getJobs().length === 0) {
+        setJobs(hydrated.jobs)
+      }
     })
     return () => {
       cancelled = true
