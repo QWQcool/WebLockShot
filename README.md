@@ -86,6 +86,26 @@ docker compose up --build
 
 ---
 
+## 📱 小程序版（miniapp 轻端）
+
+`miniapp/` 为 Taro 4 + React 18 的微信小程序（weapp）轻端，与主仓通过 `@domain` 别名共享零依赖领域模块（轮询窗口等），**主仓 src 层面零改动**；依赖完全独立（独立 package.json，React 锁 18.3.1 以保证 Taro 兼容），不污染根 package.json。
+
+```bash
+cd miniapp
+npm install
+npm run build:weapp   # 不依赖微信开发者工具即可完成编译，产物在 miniapp/dist/
+```
+
+**三页功能**：index 商品录入（表单 + `chooseMedia` 首帧图）→ progress 任务进度（复用 `domain/pollingConfig` 轮询窗口与 pollSleep）→ result 看片（`Taro Video` 播放 + 复制链接）。
+
+**能力边界（诚实标注）**：小程序端**不做**剪映草稿导出（需桌面文件系统能力）、**不做** Mock 引擎与 GSAP 动画体系；只做「录入 → 出片 → 看片」轻链路，复制视频链接后回桌面工作台「审片交付」继续。
+
+**后端依赖**：任务经 `TARO_APP_API_BASE` 指向的后端 `/api` 反代提交；**小程序端不持有 API Key**——密钥由服务端 `WLS_KEYS` 注入（未配置 = 透传，远端显式 401）。
+
+**部署要求**：request 合法域名要求 HTTPS + ICP 备案域名（`touristappid` 仅限本地工具预览）；`web-view` 与部分高级接口需企业主体账号。详见 [miniapp/README.md](./miniapp/README.md)。
+
+---
+
 ## 📦 剪映草稿 zip 包使用说明（解压后放入剪映草稿目录）
 
 在「交付播放器」页点击 **📦 下载完整草稿 zip 包 (含素材)**，得到 `<工程名>_剪映草稿.zip`，内含：

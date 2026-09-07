@@ -1,0 +1,19 @@
+{
+  "miniprogramRoot": "dist/",
+  "projectname": "weblockshot-miniapp",
+  "description": "WEB锁镜 小程序轻端：商品录入 → 任务进度 → 看片交付",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": false,
+    "es6": false,
+    "enhance": false,
+    "postcss": false,
+    "minified": false,
+    "coverView": true,
+    "autoAudits": false,
+    "showShadowRootInWxmlPanel": true,
+    "compileHotReLoad": false
+  },
+  "compileType": "miniprogram",
+  "condition": {}
+}

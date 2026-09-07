@@ -1,0 +1,27 @@
+.page-result {
+  padding: 24rpx;
+}
+
+.result-video {
+  width: 100%;
+  height: 720rpx;
+  border-radius: 16rpx;
+  background: #000;
+}
+
+.page-result .hint {
+  display: block;
+  margin-top: 20rpx;
+}
+
+.page-result .panel {
+  margin-top: 24rpx;
+}
+
+.page-result .btn-secondary {
+  margin-top: 20rpx;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6f7ff;
+  border-radius: 16rpx;
+  min-height: 44px;
+}

@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@domain/*": ["../src/domain/*"],
+      "@api/*": ["./src/api/*"]
+    },
+    "types": ["@tarojs/taro", "webpack-env"]
+  },
+  "include": ["src", "config", "global.d.ts", "../src/domain/pollingConfig.ts"]
+}
