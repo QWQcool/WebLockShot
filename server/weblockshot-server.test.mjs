@@ -245,3 +245,98 @@ test('畸形 URL：GET /%zz 与 GET /api/sessions/%zz 不再崩溃，server 仍�
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('WLS_AUTH_TOKEN：设置后 /api/* 无头 401 / 对头 200 系；未设置行为不变', async () => {
+  const dir = tmpDist()
+  try {
+    // 1. 设置 token：鉴权生效
+    {
+      const { server, port } = await startServer({
+        port: 0,
+        dist: dir,
+        env: { WLS_AUTH_TOKEN: 'secret-token-123' },
+      })
+      const base = `http://127.0.0.1:${port}`
+      try {
+        // 无头 → 401
+        const noHeader = await fetch(`${base}/api/sessions/x`)
+        assert.equal(noHeader.status, 401)
+
+        // 错误 token → 401
+        const wrongToken = await fetch(`${base}/api/sessions/x`, {
+          headers: { 'x-wls-token': 'wrong' },
+        })
+        assert.equal(wrongToken.status, 401)
+
+        // x-wls-token 对头 → 通过鉴权（404 = 会话不存在，而非 401）
+        const okHeader = await fetch(`${base}/api/sessions/x`, {
+          headers: { 'x-wls-token': 'secret-token-123' },
+        })
+        assert.equal(okHeader.status, 404)
+
+        // Authorization Bearer 对头 → 通过鉴权
+        const okBearer = await fetch(`${base}/api/sessions/x`, {
+          headers: { Authorization: 'Bearer secret-token-123' },
+        })
+        assert.equal(okBearer.status, 404)
+
+        // healthz 保持开放（非 /api/*，便于存活探测）
+        const health = await fetch(`${base}/healthz`)
+        assert.equal(health.status, 200)
+        assert.equal((await health.json()).authMode, 'token')
+
+        // 对头正常读写
+        const put = await fetch(`${base}/api/sessions/ok`, {
+          method: 'PUT',
+          headers: { 'x-wls-token': 'secret-token-123', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: { version: 2, id: 'ok' } }),
+        })
+        assert.equal(put.status, 200)
+      } finally {
+        await close(server)
+      }
+    }
+
+    // 2. 未设置 token：行为与现状完全一致（不鉴权）
+    {
+      const { server, port } = await startServer({ port: 0, dist: dir, env: {} })
+      const base = `http://127.0.0.1:${port}`
+      try {
+        const noHeader = await fetch(`${base}/api/sessions/x`)
+        assert.equal(noHeader.status, 404, '未配置 token 时无头请求应照常通过')
+        assert.equal((await (await fetch(`${base}/healthz`)).json()).authMode, 'off')
+      } finally {
+        await close(server)
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('默认监听地址：WLS_HOST 未设置时绑定 127.0.0.1；设置后可覆盖', async () => {
+  const dir = tmpDist()
+  try {
+    const { server, port, args } = await startServer({ port: 0, dist: dir, env: {} })
+    try {
+      assert.equal(args.host, '127.0.0.1')
+      assert.equal(server.address().address, '127.0.0.1')
+    } finally {
+      await close(server)
+    }
+
+    const { server: server2, args: args2 } = await startServer({
+      port: 0,
+      dist: dir,
+      env: { WLS_HOST: '0.0.0.0' },
+    })
+    try {
+      assert.equal(args2.host, '0.0.0.0')
+      assert.equal(server2.address().address, '0.0.0.0')
+    } finally {
+      await close(server2)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

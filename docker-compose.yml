@@ -21,10 +21,23 @@ services:
     container_name: weblockshot
     restart: unless-stopped
     ports:
-      - '8080:5174'
+      # 默认仅绑定本机回环地址。公网部署需暴露时，请改为 '8080:5174'
+      # 并【强制】设置 WLS_AUTH_TOKEN（见下方 environment 注释），
+      # 或改用 caddy/nginx 反代 + HTTPS（见文件底部注释）。
+      - '127.0.0.1:8080:5174'
     environment:
       - PORT=5174
+      # 容器内必须监听 0.0.0.0，端口映射才能转发进来；
+      # 对外暴露面由上方 ports 的 127.0.0.1 前缀收敛到宿主机本机。
+      - WLS_HOST=0.0.0.0
       # ---------- 预留配置（不设置 = 本地默认模式，行为与纯前端现状一致） ----------
+      # 共享 token 鉴权：设置后所有 /api/* 请求须携带 x-wls-token 头（或 Authorization Bearer），
+      # 不匹配返回 401。公网暴露（0.0.0.0 / 端口映射去 127.0.0.1 前缀）时【必须】配置！
+      # - WLS_AUTH_TOKEN=change-me-to-a-long-random-string
+      # 监听地址：默认 127.0.0.1；公网部署须改为 0.0.0.0（且必须配合 WLS_AUTH_TOKEN）
+      # - WLS_HOST=0.0.0.0
+      # draft-zip 累计解压字节上限（MB，默认 1024 = 1GB，zip bomb 防护）
+      # - WLS_MAX_UNZIP_MB=1024
       # 会话存储：memory（默认，现状）| sqlite（持久化到 /app/data）
       # - WLS_STORAGE=sqlite
       # LLM 反代目标（设置后 /api/llm 反代到该地址；未设置 = 501）

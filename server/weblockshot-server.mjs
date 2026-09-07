@@ -17,6 +17,8 @@
  *
  * 环境变量：PORT / DIST_DIR / DRAFT_DIR / WLS_STORAGE(memory|sqlite) / WLS_SQLITE_PATH /
  *          WLS_LLM_TARGET / WLS_KEYS(JSON) / WLS_LOG_LEVEL / SENTRY_DSN（命令行参数优先）
+ *          WLS_AUTH_TOKEN（设置后所有 /api/* 需携带 x-wls-token 或 Authorization Bearer，不匹配 401）
+ *          WLS_HOST（默认 127.0.0.1；公网部署必须 0.0.0.0 且强制配置 WLS_AUTH_TOKEN）
  */
 import http from 'node:http'
 import https from 'node:https'
@@ -47,6 +49,11 @@ function parseArgs(argv, env = process.env) {
     keysRaw: env.WLS_KEYS,
     sentryDsn: env.SENTRY_DSN,
     logLevel: env.WLS_LOG_LEVEL,
+    // 共享 token 鉴权：设置后所有 /api/* 请求须带 x-wls-token 头（或 Authorization Bearer）；
+    // 未设置 = 不鉴权（本地模式现状不变）。默认监听 127.0.0.1，公网部署须显式 WLS_HOST=0.0.0.0
+    // 且强制配置 WLS_AUTH_TOKEN。
+    authToken: env.WLS_AUTH_TOKEN?.trim() || undefined,
+    host: env.WLS_HOST || '127.0.0.1',
   }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port') args.port = Number(argv[++i]) || args.port
@@ -351,13 +358,30 @@ export async function startServer(opts = {}) {
     keyMode: keys ? 'injected' : 'passthrough',
     llmProxy: llmTarget ? 'on' : 'off',
     sentry: args.sentryDsn ? 'configured' : 'off',
+    authMode: args.authToken ? 'token' : 'off',
   })
+
+  /** 校验共享 token：x-wls-token 头或 Authorization: Bearer <token> */
+  const isAuthorized = (req) => {
+    if (!args.authToken) return true
+    const headerToken = req.headers['x-wls-token']
+    if (typeof headerToken === 'string' && headerToken === args.authToken) return true
+    const auth = req.headers.authorization
+    if (typeof auth === 'string' && auth.startsWith('Bearer ') && auth.slice(7) === args.authToken) return true
+    return false
+  }
 
   const handler = (req, res) => {
     const urlPath = req.url.split('?')[0]
 
     if (urlPath === '/healthz') {
       sendJson(res, 200, healthPayload())
+      return
+    }
+
+    // 共享 token 鉴权：仅覆盖 /api/*；healthz 与静态资源保持开放（本地模式现状不变）
+    if (urlPath.startsWith('/api/') && !isAuthorized(req)) {
+      sendJson(res, 401, { error: '未授权：请携带 x-wls-token 请求头（或 Authorization Bearer）' })
       return
     }
 
@@ -416,11 +440,12 @@ export async function startServer(opts = {}) {
 
   const server = http.createServer(handler)
   const port = opts.port ?? args.port
+  const host = opts.host ?? args.host
 
   if (opts.listen !== false) {
     await new Promise((resolveListen, rejectListen) => {
       server.once('error', rejectListen)
-      server.listen(port, () => resolveListen())
+      server.listen(port, host, () => resolveListen())
     })
   }
 
@@ -431,6 +456,7 @@ export async function startServer(opts = {}) {
     storage,
     keys,
     llmTarget,
+    host,
     port: server.address()?.port ?? port,
     health: healthPayload,
   }
