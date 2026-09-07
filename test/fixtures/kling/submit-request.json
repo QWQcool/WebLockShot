@@ -1,0 +1,12 @@
+{
+  "_comment": "可灵 text2video 提交请求契约（按官方文档结构整理；字段与 src/media/providers/kling.ts 的 bodyPayload 一一对应）",
+  "endpoint": "/v1/videos/text2video",
+  "method": "POST",
+  "body": {
+    "model_name": "kling-v1",
+    "prompt": "电商产品主图缓慢环绕运镜，青色霓虹光效",
+    "negative_prompt": "low quality, blurry",
+    "duration": "5",
+    "aspect_ratio": "9:16"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "_comment": "即梦轮询契约：成功 → 前端映射 succeeded，视频地址 task_result.video_url",
+  "task_id": "jimeng-task-1",
+  "task_status": "succeed",
+  "task_result": {
+    "video_url": "https://cdn.jimeng.bytedance.com/output/jimeng-task-1.mp4"
+  }
+}

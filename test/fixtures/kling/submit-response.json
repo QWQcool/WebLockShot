@@ -1,0 +1,8 @@
+{
+  "_comment": "可灵提交成功响应契约（官方结构：code=0，data.task_id）",
+  "code": 0,
+  "message": "success",
+  "data": {
+    "task_id": "kling-task-1"
+  }
+}

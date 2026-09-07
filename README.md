@@ -29,7 +29,7 @@ npm install
 # 2. 启动本地开发服务 (默认监听 5173，自动开启 ComfyUI 反向代理)
 npm run dev
 
-# 3. 运行质量检测 (79 项自动化测试：node 68 + vitest UI 11)
+# 3. 运行质量检测 (115 项自动化测试：node 100 + vitest UI 15)
 npm test
 
 # 4. 生产打包验证
@@ -51,6 +51,38 @@ npx weblockshot          # 或: npm run build && npm run start:server
 Windows 用户可直接双击 `start-weblockshot.bat`（自动安装依赖/构建/启动）。
 
 能力：静态托管 `dist/` + `/api/kling` `/api/jimeng` `/api/comfyui` 反代（生产也能连 ComfyUI）+ `POST /api/jianying/draft-zip`（zip 直解到本地草稿目录）。
+
+预留能力（配置开关，不设置 = 本地默认模式）：`GET /healthz`（版本/存储模式/uptime）、`WLS_STORAGE=memory|sqlite` 会话存储、`/api/llm` LLM 反代（需 `WLS_LLM_TARGET`）、`WLS_KEYS` 反代密钥注入（未设置 = 透传）、`PUT/GET/DELETE /api/sessions/:id`（BackendAdapter rest 模式后端）。
+
+---
+
+## ✅ 验证层级（诚实标注）
+
+本项目的引擎/部署能力按「验证到哪一层」如实标注，不夸大：
+
+| 能力 | 验证层级 | 说明 |
+|---|---|---|
+| 可灵 JWT 签名（HS512/HS256，官方头/载荷结构） | ✅ 契约验证 | 独立参考实现（node:crypto）向量锁定 + 交叉验证，见 `src/media/__tests__/authVectors.test.ts` |
+| 即梦 V4 HMAC-SHA256 签名（火山引擎规范） | ✅ 契约验证 | 同上，完整 Authorization 串向量锁定 |
+| 请求体形状 / 响应解析 / 错误码映射 | ✅ 契约验证 | `test/fixtures/kling|jimeng/` + `src/media/__tests__/providerContract.test.ts` |
+| 可灵 / 即梦真实出片连通 | ⏳ 待真实环境 | `npm run verify:providers -- --kling-key=AK:SK --jimeng-key=AK:SK` 真实探测 |
+| Docker 镜像构建 | ✅ CI 验证 | `.github/workflows/docker-build.yml`（只 build 不 push）；本地 `docker compose up --build` 可完整跑通 |
+| 手机 PWA（安装/SW 自更新/真机相机） | ⏳ 待真机 | manifest + SW 产物已生成并有构建验证 |
+| BackendAdapter rest 模式 → 云后端 | ✅ 本地验证（对接伴生 server） / ⏳ 待真实云后端 | `/api/sessions/:id` 全流程有自动化测试 |
+
+---
+
+## 🐳 Docker 部署
+
+```bash
+# 构建并启动（前端 + 伴生 server 单容器）
+docker compose up --build
+# 访问 http://localhost:8080，健康检查: http://localhost:8080/healthz
+```
+
+- 多阶段构建：`node:22-alpine` 构建前端 → 运行层仅含 `dist/`、`server/` 与生产依赖
+- 预留配置（compose `environment`）：`WLS_STORAGE` / `WLS_LLM_TARGET` / `WLS_KEYS` / `WLS_LOG_LEVEL` / `SENTRY_DSN`
+- HTTPS：compose 内含 Caddy 反代注释模板（自动签发证书），或按注释换 nginx
 
 ---
 

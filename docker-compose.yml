@@ -1,0 +1,66 @@
+# WebLockShot 本地/生产编排
+#
+# 说明：伴生 server 同时承担「静态托管 dist/」与「/api 反代」两个职责，
+# 因此单容器即可完整运行（web + server 合一）。
+#
+# 快速启动：
+#   docker compose up --build
+#   访问 http://localhost:8080
+#
+# HTTPS 部署（生产建议）：取消注释 caddy 服务并提供 Caddyfile，
+#   Caddyfile 示例（自动签发 Let's Encrypt 证书）：
+#     your-domain.com {
+#       reverse_proxy weblockshot:5174
+#     }
+#   也可换用 nginx + certbot，反代目标同样指向 weblockshot:5174。
+
+services:
+  weblockshot:
+    build: .
+    image: weblockshot:latest
+    container_name: weblockshot
+    restart: unless-stopped
+    ports:
+      - '8080:5174'
+    environment:
+      - PORT=5174
+      # ---------- 预留配置（不设置 = 本地默认模式，行为与纯前端现状一致） ----------
+      # 会话存储：memory（默认，现状）| sqlite（持久化到 /app/data）
+      # - WLS_STORAGE=sqlite
+      # LLM 反代目标（设置后 /api/llm 反代到该地址；未设置 = 501）
+      # - WLS_LLM_TARGET=https://api.openai.com
+      # 反代密钥注入（设置后覆盖客户端 Authorization；JSON 格式）
+      # - WLS_KEYS={"llm":"Bearer sk-xxx"}
+      # 日志级别（默认 info）
+      # - WLS_LOG_LEVEL=info
+      # 错误上报（预留 no-op）
+      # - SENTRY_DSN=
+    volumes:
+      # 预留：持久化目录（sqlite 会话库 / 剪映草稿）
+      # - ./data:/app/data
+      - ./jianying-drafts:/app/jianying-drafts
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:5174/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------- 可选：HTTPS 反向代理 ----------
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: weblockshot-caddy
+  #   restart: unless-stopped
+  #   ports:
+  #     - '80:80'
+  #     - '443:443'
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - weblockshot
+
+# volumes:
+#   caddy_data:
+#   caddy_config:

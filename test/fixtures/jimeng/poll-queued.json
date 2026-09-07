@@ -1,0 +1,6 @@
+{
+  "_comment": "即梦轮询契约：排队中 → 前端映射 queued/running",
+  "task_id": "jimeng-task-1",
+  "task_status": "queued",
+  "progress": 10
+}

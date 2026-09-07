@@ -1,0 +1,8 @@
+{
+  "_comment": "可灵轮询契约：task_status=processing → 前端映射 running",
+  "code": 0,
+  "data": {
+    "task_status": "processing",
+    "task_status_msg": "视频渲染中"
+  }
+}

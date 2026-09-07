@@ -3,6 +3,7 @@ import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
 import { withRetry, isRetryableHttpStatus, isAbortError } from '../../ai/retry.ts'
 import { probeVideoBlob } from '../assetSize.ts'
 import { getEngineProxyBase } from '../../services/backend/proxyConfig.ts'
+import { signKlingJwt } from '../auth/klingJwt.ts'
 
 export type KlingConfig = {
   apiKey: string
@@ -31,6 +32,54 @@ type KlingCacheEntry = {
 
 const klingCache = new Map<string, KlingCacheEntry>()
 
+/**
+ * 错误码 → 用户可读中文（契约表见 test/fixtures/kling/error-codes.json）。
+ * 未知错误码保持历史格式「可灵返回错误 [code]: message」（现状兼容）。
+ */
+export function klingErrorMessage(code: number | string, rawMessage: string): string {
+  const table: Record<string, string> = {
+    '1000': '可灵服务内部错误，请稍后重试',
+    '1001': '请求参数不合法：请检查提示词、时长与画幅设置',
+    '1101': '内容审核未通过：请调整提示词后重试',
+    '1200': '生成内容触发安全策略，任务已终止（费用已自动退还）',
+    '4027': '触发可灵限流：请降低生成频率后重试',
+  }
+  return table[String(code)] || `可灵返回错误 [${code}]: ${rawMessage}`
+}
+
+/**
+ * 凭据形态（M2b 契约升级，默认行为不变）：
+ * - sessionStorage 存 JSON {"ak":"...","sk":"..."} → 官方 JWT 签名模式（HS512，Authorization: <JWT>）
+ * - 存裸字符串（现状）→ Bearer 直传模式，行为与历史完全一致
+ */
+type KlingCredential = { mode: 'jwt'; ak: string; sk: string } | { mode: 'bearer'; key: string }
+
+function readKlingCredential(): KlingCredential | null {
+  let raw = ''
+  try {
+    raw = sessionStorage.getItem('weblockshot.kling_key') || ''
+  } catch {
+    return null
+  }
+  if (!raw.trim()) return null
+  try {
+    const parsed = JSON.parse(raw) as { ak?: unknown; sk?: unknown }
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.ak === 'string' &&
+      typeof parsed.sk === 'string' &&
+      parsed.ak.trim() &&
+      parsed.sk.trim()
+    ) {
+      return { mode: 'jwt', ak: parsed.ak, sk: parsed.sk }
+    }
+  } catch {
+    // 非 JSON → 裸 key（现状模式）
+  }
+  return { mode: 'bearer', key: raw.trim() }
+}
+
 /** 网络类错误（fetch 抛出的 TypeError 等）可重试 */
 function isNetworkError(err: unknown): boolean {
   return err instanceof TypeError || (err instanceof Error && err.name === 'FetchError')
@@ -58,23 +107,24 @@ export class KlingVideoProvider implements VideoProvider {
         : 'https://api.klingai.com')
   }
 
-  private getAuthHeader(): string {
-    let key = ''
-    try {
-      key = sessionStorage.getItem('weblockshot.kling_key') || ''
-    } catch {}
-
-    if (!key.trim()) {
+  /** 解析鉴权头：Bearer（现状）或官方 JWT（ak/sk JSON 凭据，异步签名） */
+  private async resolveAuthHeader(): Promise<Record<string, string>> {
+    const cred = readKlingCredential()
+    if (!cred) {
       throw new Error(
         '未检测到快手可灵 API Key。请点击右上角「⚙️ API 设置」填入可灵凭证，或在设置中切换回「Mock 真实录制」模式。'
       )
     }
-
-    return key.startsWith('Bearer ') ? key : `Bearer ${key.trim()}`
+    if (cred.mode === 'bearer') {
+      const key = cred.key
+      return { Authorization: key.startsWith('Bearer ') ? key : `Bearer ${key}` }
+    }
+    const token = await signKlingJwt(cred.ak, cred.sk)
+    return { Authorization: token }
   }
 
   async submit(req: VideoGenRequest): Promise<{ taskId: string }> {
-    const auth = this.getAuthHeader()
+    const authHeaders = await this.resolveAuthHeader()
     const kind: KlingTaskKind = req.imageBase64 ? 'image2video' : 'text2video'
     const endpoint = `${this.baseUrl}/v1/videos/${kind}`
 
@@ -102,7 +152,7 @@ export class KlingVideoProvider implements VideoProvider {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: auth,
+            ...authHeaders,
           },
           body: JSON.stringify(bodyPayload),
         })
@@ -118,7 +168,7 @@ export class KlingVideoProvider implements VideoProvider {
 
     const data = await res.json()
     if (data.code !== 0 && data.code !== 200) {
-      throw new Error(`可灵返回错误 [${data.code}]: ${data.message || '未知错误'}`)
+      throw new Error(klingErrorMessage(data.code, data.message || '未知错误'))
     }
 
     const taskId = data.data?.task_id || data.task_id
@@ -137,7 +187,7 @@ export class KlingVideoProvider implements VideoProvider {
   }
 
   async poll(taskId: string): Promise<PollResult> {
-    const auth = this.getAuthHeader()
+    const authHeaders = await this.resolveAuthHeader()
     // 按任务生成模式区分查询端点：text2video / image2video
     const kind = klingCache.get(taskId)?.kind || 'text2video'
     const endpoint = `${this.baseUrl}/v1/videos/${kind}/${taskId}`
@@ -145,9 +195,7 @@ export class KlingVideoProvider implements VideoProvider {
     const res = await withRetry(
       async () => {
         const resp = await fetch(endpoint, {
-          headers: {
-            Authorization: auth,
-          },
+          headers: authHeaders,
         })
         if (!resp.ok) {
           throw new KlingHttpError(resp.status, `可灵轮询失败 HTTP ${resp.status}`)

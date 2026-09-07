@@ -2,13 +2,57 @@ import type { MediaAsset } from '../../domain/shotJob.ts'
 import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
 import { probeVideoBlob } from '../assetSize.ts'
 import { getEngineProxyBase } from '../../services/backend/proxyConfig.ts'
+import { buildJimengSignedHeaders } from '../auth/jimengAuth.ts'
 
 const jimengCache = new Map<string, { url: string; durationSec: number; shotId: string }>()
 
 /**
- * 即梦 (Jimeng) AI 视频 Provider
- * 支持文本生视频与图生视频接口调度，若无 Key 则友好拦截提示
+ * 错误码 → 用户可读中文（契约表见 test/fixtures/jimeng/error-codes.json）。
+ * 未知错误码原样透传（现状兼容）。
  */
+export function jimengErrorMessage(code: number | string, rawMessage: string): string {
+  const table: Record<string, string> = {
+    '100000': '即梦服务内部错误，请稍后重试',
+    '100008': '请求参数不合法：请检查提示词、时长与画幅设置',
+    '100018': '签名校验失败：请检查 AK/SK 配置与系统时钟',
+    '100024': '内容审核未通过：请调整提示词后重试',
+    '100029': '触发即梦限流：请降低生成频率后重试',
+  }
+  return table[String(code)] || rawMessage
+}
+
+/**
+ * 凭据形态（M2b 契约升级，默认行为不变）：
+ * - sessionStorage 存 JSON {"ak":"...","sk":"..."} → 火山引擎 V4 HMAC-SHA256 签名模式
+ * - 存裸字符串（现状）→ Bearer 直传模式，行为与历史完全一致
+ */
+type JimengCredential = { mode: 'signed'; ak: string; sk: string } | { mode: 'bearer'; key: string }
+
+function readJimengCredential(): JimengCredential | null {
+  let raw = ''
+  try {
+    raw = sessionStorage.getItem('weblockshot.jimeng_key') || ''
+  } catch {
+    return null
+  }
+  if (!raw.trim()) return null
+  try {
+    const parsed = JSON.parse(raw) as { ak?: unknown; sk?: unknown }
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.ak === 'string' &&
+      typeof parsed.sk === 'string' &&
+      parsed.ak.trim() &&
+      parsed.sk.trim()
+    ) {
+      return { mode: 'signed', ak: parsed.ak, sk: parsed.sk }
+    }
+  } catch {
+    // 非 JSON → 裸 key（现状模式）
+  }
+  return { mode: 'bearer', key: raw.trim() }
+}
 export class JimengVideoProvider implements VideoProvider {
   readonly id = 'jimeng' as const
   private baseUrl: string
@@ -22,23 +66,41 @@ export class JimengVideoProvider implements VideoProvider {
         : 'https://api.jimeng.bytedance.com')
   }
 
-  private getAuthHeader(): string {
-    let key = ''
-    try {
-      key = sessionStorage.getItem('weblockshot.jimeng_key') || ''
-    } catch {}
-
-    if (!key.trim()) {
+  /**
+   * 按请求构造鉴权头：
+   * - bearer 模式（现状）：{ Authorization: Bearer ... }
+   * - signed 模式（ak/sk JSON 凭据）：火山引擎 V4 签名（X-Date / X-Content-Sha256 / Authorization）
+   */
+  private async resolveRequestHeaders(
+    method: 'GET' | 'POST',
+    endpoint: string,
+    body?: string
+  ): Promise<Record<string, string>> {
+    const cred = readJimengCredential()
+    if (!cred) {
       throw new Error(
         '未检测到字节即梦 (Jimeng) API Key。请点击右上角「⚙️ API 设置」填入即梦凭证，或在设置中切换为「Mock 实验画布」进行免费体验。'
       )
     }
+    if (cred.mode === 'bearer') {
+      const key = cred.key
+      return { Authorization: key.startsWith('Bearer ') ? key : `Bearer ${key}` }
+    }
 
-    return key.startsWith('Bearer ') ? key : `Bearer ${key.trim()}`
+    const url = new URL(endpoint)
+    const signed = await buildJimengSignedHeaders({
+      accessKey: cred.ak,
+      secretKey: cred.sk,
+      method,
+      host: url.host,
+      path: url.pathname,
+      query: url.search ? url.search.slice(1) : '',
+      body: method === 'POST' ? (body || '') : '',
+    })
+    return { ...signed }
   }
 
   async submit(req: VideoGenRequest): Promise<{ taskId: string }> {
-    const auth = this.getAuthHeader()
     const isImage2Video = Boolean(req.imageBase64)
     const endpoint = isImage2Video
       ? `${this.baseUrl}/v1/videos/image2video`
@@ -61,19 +123,29 @@ export class JimengVideoProvider implements VideoProvider {
           aspect_ratio: '9:16',
         }
 
+    const bodyStr = JSON.stringify(bodyPayload)
+    const authHeaders = await this.resolveRequestHeaders('POST', endpoint, bodyStr)
+
     try {
       const resp = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: auth,
+          ...authHeaders,
         },
-        body: JSON.stringify(bodyPayload),
+        body: bodyStr,
       })
 
       if (!resp.ok) {
-        const errText = await resp.text().catch(() => '')
-        throw new Error(`即梦视频提交失败 (${resp.status}): ${errText || resp.statusText}`)
+        // 尽力解析业务错误码并映射为用户可读信息（契约表见 test/fixtures/jimeng/error-codes.json）
+        let errText = ''
+        try {
+          const errJson = await resp.json()
+          errText = jimengErrorMessage(errJson?.code, errJson?.message || '')
+        } catch {
+          errText = (await resp.text().catch(() => '')) || resp.statusText
+        }
+        throw new Error(`即梦视频提交失败 (${resp.status}): ${errText}`)
       }
 
       const json = await resp.json()
@@ -96,12 +168,12 @@ export class JimengVideoProvider implements VideoProvider {
   }
 
   async poll(taskId: string): Promise<PollResult> {
-    const auth = this.getAuthHeader()
     const endpoint = `${this.baseUrl}/v1/videos/tasks/${taskId}`
+    const authHeaders = await this.resolveRequestHeaders('GET', endpoint)
 
     const resp = await fetch(endpoint, {
       method: 'GET',
-      headers: { Authorization: auth },
+      headers: { ...authHeaders },
     })
 
     if (!resp.ok) {
@@ -126,7 +198,7 @@ export class JimengVideoProvider implements VideoProvider {
     if (taskStatus === 'failed') {
       return {
         status: 'failed',
-        error: json.task_status_msg || '即梦生片任务异常终止',
+        error: jimengErrorMessage(json.code, json.task_status_msg) || '即梦生片任务异常终止',
       }
     }
 

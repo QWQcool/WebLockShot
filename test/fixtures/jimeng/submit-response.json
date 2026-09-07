@@ -1,0 +1,5 @@
+{
+  "_comment": "即梦提交成功响应契约（官方结构：task_id 顶层或 data.task_id）",
+  "task_id": "jimeng-task-1",
+  "task_status": "queued"
+}

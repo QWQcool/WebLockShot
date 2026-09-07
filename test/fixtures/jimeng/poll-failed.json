@@ -1,0 +1,6 @@
+{
+  "_comment": "即梦轮询契约：失败 → 前端映射 failed，原因取 task_status_msg",
+  "task_id": "jimeng-task-1",
+  "task_status": "failed",
+  "task_status_msg": "生成内容不符合平台规范"
+}

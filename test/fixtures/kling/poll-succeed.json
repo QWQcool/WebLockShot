@@ -1,0 +1,17 @@
+{
+  "_comment": "可灵轮询契约：task_status=succeed → 前端映射 succeeded，视频位于 data.task_result.videos[0].url",
+  "code": 0,
+  "data": {
+    "task_status": "succeed",
+    "task_status_msg": "生成成功",
+    "task_result": {
+      "videos": [
+        {
+          "id": "kling-video-1",
+          "url": "https://cdn.klingai.com/output/kling-video-1.mp4",
+          "duration": "5"
+        }
+      ]
+    }
+  }
+}
