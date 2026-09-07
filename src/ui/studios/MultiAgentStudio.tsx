@@ -8,6 +8,11 @@ import { walletManager } from '../../domain/wallet.ts'
 import { circuitBreaker } from '../../domain/fsm.ts'
 import { idempotencyManager } from '../../domain/idempotency.ts'
 import {
+  getPollingWindow,
+  setPollingWindowMinutes,
+  POLL_WINDOW_PRESETS,
+} from '../../domain/pollingConfig.ts'
+import {
   resolveAsset,
   ALL_PRESET_ASSETS,
 } from '../../assets/presets/index.ts'
@@ -85,6 +90,8 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [renderStatus, setRenderStatus] = useState('')
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // 轮询窗口（分钟），与 executor 共享同一份全局配置
+  const [pollMinutes, setPollMinutes] = useState<number>(POLL_WINDOW_PRESETS[2].minutes)
 
   // ComfyUI 选中后的自动握手结果（与 kling/jimeng 的「未配置即报错」对齐）
   type ComfyPingState = {
@@ -372,14 +379,16 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
 
       const { taskId } = await provider.submit(req)
 
+      // 轮询查询渲染结果（轮询窗口可配置，默认 10 分钟）
+      const pollingWindow = getPollingWindow()
       let attempts = 0
-      const maxAttempts = 40
+      const maxAttempts = pollingWindow.maxAttempts
       const pollTimer = setInterval(async () => {
         attempts++
         try {
           const pollRes = await provider.poll(taskId)
           setRenderProgress(Math.min(95, 30 + attempts * 3))
-          setRenderStatus(`4 Agent 协同质检并监视渲染进度... (${attempts * 2}s)`)
+          setRenderStatus(`4 Agent 协同质检并监视渲染进度... (${Math.round(attempts * (pollingWindow.intervalMs / 1000))}s)`)
 
           if (pollRes.status === 'succeeded') {
             clearInterval(pollTimer)
@@ -401,18 +410,12 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             circuitBreaker.recordFailure(providerId)
             idempotencyManager.releaseLock(taskKey)
           } else if (attempts >= maxAttempts) {
+            // 轮询超时：绝不 settle、绝不取降级产物，必须全额退款
             clearInterval(pollTimer)
             setIsRendering(false)
-            const asset = await provider.getAsset(taskId)
-            if (asset) {
-              setRenderedVideoUrl(asset.url)
-              walletManager.settle(taskKey, cost, providerId, '多 Agent 协同渲染完成核销')
-              circuitBreaker.recordSuccess(providerId)
-            } else {
-              setErrorMsg('生成超时，请检查网络或 API 密钥配置。')
-              walletManager.refund(taskKey, cost, providerId, '渲染超时全额退款')
-              circuitBreaker.recordFailure(providerId)
-            }
+            setErrorMsg('生成超时，请检查网络或 API 密钥配置。已自动全额退款。')
+            walletManager.refund(taskKey, cost, providerId, '渲染超时全额退款')
+            circuitBreaker.recordFailure(providerId)
             idempotencyManager.releaseLock(taskKey)
           }
         } catch (err: any) {
@@ -423,7 +426,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
           circuitBreaker.recordFailure(providerId)
           idempotencyManager.releaseLock(taskKey)
         }
-      }, 1500)
+      }, pollingWindow.intervalMs)
     } catch (err: any) {
       setIsRendering(false)
       setErrorMsg(err.message || '派发请求失败')
@@ -509,6 +512,27 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
               />
               <span className="custom-unit">秒</span>
             </div>
+          </div>
+
+          {/* 轮询窗口：与 executor 共享配置，超时自动退款 */}
+          <div className="control-pill-group">
+            <span className="pill-label">轮询窗口:</span>
+            <select
+              className="custom-duration-input"
+              value={pollMinutes}
+              title="生成任务最长等待时间，超时将自动全额退款"
+              onChange={(e) => {
+                const minutes = Number(e.target.value)
+                setPollMinutes(minutes)
+                setPollingWindowMinutes(minutes)
+              }}
+            >
+              {POLL_WINDOW_PRESETS.map((p) => (
+                <option key={p.minutes} value={p.minutes}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <button

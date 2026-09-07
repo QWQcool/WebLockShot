@@ -22,9 +22,15 @@ test('ComfyUI 视频 Provider：离线环境 testConnection 应捕获并返回�
   assert.ok(result.error && result.error.length > 0)
 })
 
-test('ComfyUI 视频 Provider：getAsset 应返回有效 view 接口 URL', async () => {
+test('ComfyUI 视频 Provider：getAsset 未就绪必须抛错，绝不伪造 output_*.mp4', async () => {
   const provider = new ComfyUIVideoProvider({ baseUrl: 'http://127.0.0.1:8188' })
-  const asset = await provider.getAsset('fake-task-id')
-  assert.ok(asset.url.includes('/view?filename='))
-  assert.equal(typeof asset.durationSec, 'number')
+  await assert.rejects(
+    async () => {
+      await provider.getAsset('never-submitted-task-id')
+    },
+    (err: any) => {
+      return err instanceof Error && err.message.includes('尚未就绪')
+    },
+    '任务不存在或未就绪时不得伪造输出资产 URL'
+  )
 })

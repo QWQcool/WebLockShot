@@ -3,7 +3,11 @@ import assert from 'node:assert/strict'
 import { computeTaskKey } from '../../domain/shotJob.ts'
 import type { VisualPlan } from '../../domain/sellVisual.ts'
 import { ExecutorEngine } from '../nodes/executorNode.ts'
+import { setPollingWindow } from '../../domain/pollingConfig.ts'
 import type { VideoGenRequest, VideoProvider, PollResult } from '../../media/types.ts'
+
+// 测试用极小轮询窗口，避免真实等待
+setPollingWindow({ intervalMs: 20, maxAttempts: 50 })
 
 const testVisualPlans: VisualPlan[] = [
   {
@@ -89,7 +93,7 @@ test('ExecutorEngine：单镜重试机制', async () => {
   await engine.enqueueShots(testVisualPlans, 'mock')
 
   // 等待队列执行一轮并失败
-  await new Promise((r) => setTimeout(r, 700))
+  await new Promise((r) => setTimeout(r, 300))
 
   const jobs = engine.getJobs()
   const s1 = jobs.find((j) => j.shotId === 's1')
@@ -102,4 +106,54 @@ test('ExecutorEngine：单镜重试机制', async () => {
   const s1Retried = retriedJobs.find((j) => j.shotId === 's1')
   assert.ok(s1Retried, '重试后 s1 依然存在')
   assert.ok(s1Retried.attempt > 0, 'attempt 次数应递增')
+})
+
+test('ExecutorEngine：处理中 retry 不丢任务（竞态回归测试）', async () => {
+  // s1 快速失败；s2 先 running 若干轮再成功，用于占据处理窗口
+  const s2PollCounts = new Map<string, number>()
+  const failingProvider: VideoProvider = {
+    id: 'mock',
+    async submit(req: VideoGenRequest) {
+      return { taskId: `task_${req.shotId}` }
+    },
+    async poll(taskId: string): Promise<PollResult> {
+      if (taskId.includes('s2')) {
+        const count = (s2PollCounts.get(taskId) || 0) + 1
+        s2PollCounts.set(taskId, count)
+        // 前 12 轮 (~250ms+) 保持 running，确保重试落在处理窗口内
+        if (count <= 12) {
+          return { status: 'running', progress: 50 }
+        }
+        return { status: 'succeeded', progress: 100 }
+      }
+      return { status: 'failed', error: 's1 立即失败' }
+    },
+    async getAsset(taskId: string) {
+      return { shotId: taskId, url: `https://asset.local/${taskId}.webm`, durationSec: 3 }
+    },
+    estimateCost() {
+      return '¥0'
+    },
+  }
+
+  const engine = new ExecutorEngine(failingProvider)
+  await engine.enqueueShots(testVisualPlans, 'mock')
+
+  // 等待 s1 首轮失败（轮询间隔 20ms，留足余量）
+  await new Promise((r) => setTimeout(r, 200))
+  let s1 = engine.getJobs().find((j) => j.shotId === 's1')
+  assert.ok(s1, '应存在 s1 任务')
+  assert.equal(s1?.status, 'failed', 's1 应在首轮失败')
+
+  // 关键：在 s2 仍在处理中时对 s1 发起重试。
+  // 旧实现（fire-and-forget + isProcessing 早退）会让 s1 永久卡在 queued。
+  await engine.retryJob('s1', testVisualPlans)
+
+  // 等待 s2 处理完毕、调度循环再次拾起 s1 并执行完毕
+  await new Promise((r) => setTimeout(r, 600))
+  s1 = engine.getJobs().find((j) => j.shotId === 's1')
+  assert.ok(s1, '重试后 s1 依然存在')
+  assert.notEqual(s1?.status, 'queued', '处理中发起的重试不得永久卡在 queued（竞态修复）')
+  assert.equal(s1?.status, 'failed', 's1 重试后应再次执行并失败（provider 恒定失败）')
+  assert.ok((s1?.attempt ?? 0) >= 1, `重试的 attempt 应递增到 >= 1，实际: ${s1?.attempt}`)
 })

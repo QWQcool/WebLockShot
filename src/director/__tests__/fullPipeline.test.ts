@@ -7,8 +7,12 @@ import { critiqueScript } from '../../ai/agents/scriptCritic.ts'
 import { scriptToStory } from '../nodes/storyboardNode.ts'
 import { compileVisualPlans } from '../nodes/visualizerNode.ts'
 import { ExecutorEngine } from '../nodes/executorNode.ts'
+import { setPollingWindow } from '../../domain/pollingConfig.ts'
 import { buildJianyingDraft } from '../../export/jianyingDraft.ts'
 import type { VideoProvider, VideoGenRequest, PollResult } from '../../media/types.ts'
+
+// 测试用极小轮询窗口，避免真实等待
+setPollingWindow({ intervalMs: 20, maxAttempts: 50 })
 
 test('全量电商链路端到端自动化测试：从商品导入、AI剧本、分镜编译、渲染调度到剪映草稿导出与重置', async () => {
   // 1. 商品定义

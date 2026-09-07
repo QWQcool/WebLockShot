@@ -323,12 +323,8 @@ export class ComfyUIVideoProvider implements VideoProvider {
   async getAsset(taskId: string): Promise<MediaAsset> {
     const task = comfyTasks.get(taskId)
     if (!task || !task.assetUrl) {
-      const base = this.getBaseUrl().replace(/\/$/, '')
-      return {
-        shotId: task?.shotId || 's1',
-        url: `${base}/view?filename=output_${taskId}.mp4&type=output`,
-        durationSec: task?.durationSec || 5,
-      }
+      // 绝不伪造资产：任务未就绪必须抛错，由上层走 failed -> refund 流程
+      throw new Error(`ComfyUI 视频尚未就绪 (taskId: ${taskId})，不能伪造输出资产。`)
     }
 
     return {

@@ -12,6 +12,11 @@ import type { VideoGenRequest, VideoProvider } from '../../media/types.ts'
 import { walletManager } from '../../domain/wallet.ts'
 import { circuitBreaker } from '../../domain/fsm.ts'
 import { idempotencyManager } from '../../domain/idempotency.ts'
+import {
+  getPollingWindow,
+  setPollingWindowMinutes,
+  POLL_WINDOW_PRESETS,
+} from '../../domain/pollingConfig.ts'
 import { TOKEN_STORAGE_KEY, type TokenConfig } from '../../types.ts'
 import {
   resolveAsset,
@@ -136,6 +141,8 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
   const [generationStatus, setGenerationStatus] = useState<string>('')
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // 轮询窗口（分钟），与 executor 共享同一份全局配置
+  const [pollMinutes, setPollMinutes] = useState<number>(POLL_WINDOW_PRESETS[2].minutes)
 
   // ComfyUI 选中后的自动握手结果（与 kling/jimeng 的「未配置即报错」对齐）
   type ComfyPingState = {
@@ -364,15 +371,16 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
 
       const { taskId } = await provider.submit(req)
 
-      // 轮询查询视频渲染结果
+      // 轮询查询视频渲染结果（轮询窗口可配置，默认 10 分钟）
+      const pollingWindow = getPollingWindow()
       let attempts = 0
-      const maxAttempts = 40
+      const maxAttempts = pollingWindow.maxAttempts
       const pollTimer = setInterval(async () => {
         attempts++
         try {
           const pollRes = await provider.poll(taskId)
           setGenerationProgress(Math.min(95, 25 + attempts * 3))
-          setGenerationStatus(`模型神经渲染中... (${attempts * 2}s)`)
+          setGenerationStatus(`模型神经渲染中... (${Math.round(attempts * (pollingWindow.intervalMs / 1000))}s)`)
 
           if (pollRes.status === 'succeeded') {
             clearInterval(pollTimer)
@@ -396,19 +404,12 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
             circuitBreaker.recordFailure(providerId)
             idempotencyManager.releaseLock(taskKey)
           } else if (attempts >= maxAttempts) {
+            // 轮询超时：绝不 settle、绝不取降级产物，必须全额退款
             clearInterval(pollTimer)
             setIsGenerating(false)
-            // 若超时但本地有降级
-            const asset = await provider.getAsset(taskId)
-            if (asset) {
-              setGeneratedVideoUrl(asset.url)
-              walletManager.settle(taskKey, cost, providerId, '单 Agent 视频完成核销')
-              circuitBreaker.recordSuccess(providerId)
-            } else {
-              setErrorMsg('生成超时，请检查网络或 API 余额。')
-              walletManager.refund(taskKey, cost, providerId, '生成超时全额退款')
-              circuitBreaker.recordFailure(providerId)
-            }
+            setErrorMsg('生成超时，请检查网络或 API 余额。已自动全额退款。')
+            walletManager.refund(taskKey, cost, providerId, '生成超时全额退款')
+            circuitBreaker.recordFailure(providerId)
             idempotencyManager.releaseLock(taskKey)
           }
         } catch (err: any) {
@@ -419,7 +420,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
           circuitBreaker.recordFailure(providerId)
           idempotencyManager.releaseLock(taskKey)
         }
-      }, 1500)
+      }, pollingWindow.intervalMs)
     } catch (err: any) {
       setIsGenerating(false)
       setErrorMsg(err.message || '提交生片请求失败')
@@ -519,6 +520,27 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
               />
               <span className="custom-unit">秒</span>
             </div>
+          </div>
+
+          {/* 轮询窗口：与 executor 共享配置，超时自动退款 */}
+          <div className="control-pill-group">
+            <span className="pill-label">轮询窗口:</span>
+            <select
+              className="custom-duration-input"
+              value={pollMinutes}
+              title="生成任务最长等待时间，超时将自动全额退款"
+              onChange={(e) => {
+                const minutes = Number(e.target.value)
+                setPollMinutes(minutes)
+                setPollingWindowMinutes(minutes)
+              }}
+            >
+              {POLL_WINDOW_PRESETS.map((p) => (
+                <option key={p.minutes} value={p.minutes}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <button

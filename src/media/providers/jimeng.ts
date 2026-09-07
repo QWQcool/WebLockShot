@@ -83,25 +83,15 @@ export class JimengVideoProvider implements VideoProvider {
       return { taskId }
     } catch (err: any) {
       if (err.message?.includes('未检测到字节即梦')) throw err
-      console.warn('[JimengProvider] 网络请求失败，降级为演示模式:', err)
-      const mockTaskId = `jimeng-sim-${Date.now()}`
-      jimengCache.set(mockTaskId, {
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        durationSec: req.durationSec || 5,
-        shotId: req.shotId,
-      })
-      return { taskId: mockTaskId }
+      // 绝不静默降级：网络/服务异常必须显式抛错，由上层走 failed -> refund 退款流程
+      console.warn('[JimengProvider] 网络请求失败，任务显式失败:', err)
+      throw new Error(
+        `即梦视频提交失败: ${err.message || '网络异常'}。请检查网络与 API Key 配置，或切换为 Mock / ComfyUI 模式。`
+      )
     }
   }
 
   async poll(taskId: string): Promise<PollResult> {
-    if (taskId.startsWith('jimeng-sim-')) {
-      return {
-        status: 'succeeded',
-        progress: 100,
-      }
-    }
-
     const auth = this.getAuthHeader()
     const endpoint = `${this.baseUrl}/v1/videos/tasks/${taskId}`
 

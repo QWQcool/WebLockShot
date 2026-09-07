@@ -33,6 +33,8 @@ export const VALID_TRANSITIONS: Record<JobState, JobState[]> = {
 }
 
 export function canTransition(from: JobState, to: JobState): boolean {
+  // 终态锁定：succeeded / refunded 是不可逆终态，连自迁移（from === to）也必须拒绝
+  if (from === 'succeeded' || from === 'refunded') return false
   if (from === to) return true
   const allowed = VALID_TRANSITIONS[from]
   return allowed ? allowed.includes(to) : false
@@ -42,6 +44,34 @@ export function assertTransition(from: JobState, to: JobState, context = ''): vo
   if (!canTransition(from, to)) {
     throw new Error(
       `[FSM Violation] 非法状态迁移: 无法从 "${from}" 跳转至 "${to}"。${context ? `上下文: ${context}` : ''}`
+    )
+  }
+}
+
+/**
+ * ShotJob.status（queued/running/succeeded/failed）与 FSM 的对接转移表。
+ * 任何针对 ShotJob.status 的写入都必须经过 canTransitionJobStatus / assertJobStatusTransition，
+ * 非法转移（含终态自迁移、succeeded 后再变更）直接抛错，堵住状态被随手覆盖的漏洞。
+ */
+export const JOB_STATUS_TRANSITIONS: Record<string, string[]> = {
+  queued: ['running', 'failed'],
+  running: ['succeeded', 'failed'],
+  succeeded: [], // 终态，不可变
+  failed: ['queued'], // 仅允许重试重新入队
+}
+
+export function canTransitionJobStatus(from: string, to: string): boolean {
+  // 终态锁定：succeeded 绝不允许再发生任何转移（含自迁移）
+  if (from === 'succeeded') return false
+  if (from === to) return true
+  const allowed = JOB_STATUS_TRANSITIONS[from]
+  return allowed ? allowed.includes(to) : false
+}
+
+export function assertJobStatusTransition(from: string, to: string, context = ''): void {
+  if (!canTransitionJobStatus(from, to)) {
+    throw new Error(
+      `[FSM Violation] 非法任务状态迁移: 无法从 "${from}" 跳转至 "${to}"。${context ? `上下文: ${context}` : ''}`
     )
   }
 }

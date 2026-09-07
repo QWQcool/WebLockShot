@@ -42,9 +42,37 @@ export const PROVIDER_UNIT_COSTS: Record<string, number> = {
 
 class WalletManager {
   private state: WalletState
+  /**
+   * per-refId 冻结账本：refId -> 冻结金额。
+   * settle / refund 必须能在此账本中找到对应 freeze 记录，否则拒绝执行，
+   * 防止无冻结凭据的虚假核销/退款。settle 消费后移除记录（重复 settle 幂等拒绝）。
+   */
+  private frozenRefs = new Map<string, number>()
 
   constructor() {
     this.state = this.loadFromStorage()
+    this.rebuildFrozenRefs()
+  }
+
+  /**
+   * 从持久化流水中重建冻结账本（进程/页面重启后恢复一致性）：
+   * freeze 累加，settle 与 refund 消耗。
+   */
+  private rebuildFrozenRefs() {
+    this.frozenRefs.clear()
+    for (const tx of this.state.transactions) {
+      if (tx.type === 'freeze' && tx.refId) {
+        this.frozenRefs.set(tx.refId, (this.frozenRefs.get(tx.refId) || 0) + Math.abs(tx.amount))
+      } else if ((tx.type === 'settle' || tx.type === 'refund') && tx.refId) {
+        const current = this.frozenRefs.get(tx.refId) || 0
+        const consumed = Math.abs(tx.amount)
+        if (consumed >= current) {
+          this.frozenRefs.delete(tx.refId)
+        } else {
+          this.frozenRefs.set(tx.refId, current - consumed)
+        }
+      }
+    }
   }
 
   private loadFromStorage(): WalletState {
@@ -139,15 +167,24 @@ class WalletManager {
       frozen: nextFrozen,
       transactions: [...this.state.transactions, tx],
     })
+    this.frozenRefs.set(refId, (this.frozenRefs.get(refId) || 0) + amount)
     return true
   }
 
   /**
    * 阶段 2A：成功履约结算 (Settle)
-   * 从 frozen 中正式核销
+   * 从 frozen 中正式核销。必须有对应 freeze 记录，否则拒绝；
+   * 同一 refId 重复 settle 幂等（不再重复扣款），返回 false。
    */
-  public settle(refId: string, amount: number, providerId: string, description: string): void {
-    if (amount <= 0) return
+  public settle(refId: string, amount: number, providerId: string, description: string): boolean {
+    if (amount <= 0) return true
+    if (!this.frozenRefs.has(refId)) {
+      console.warn(
+        `[Wallet] 拒绝 settle：refId [${refId}] 没有对应的 freeze 冻结记录，疑似虚假核销。`
+      )
+      return false
+    }
+
     const actualDeductFromFrozen = Math.min(this.state.frozen, amount)
     const nextFrozen = Math.max(0, this.state.frozen - actualDeductFromFrozen)
     const tx: WalletTransaction = {
@@ -167,14 +204,23 @@ class WalletManager {
       frozen: nextFrozen,
       transactions: [...this.state.transactions, tx],
     })
+    this.frozenRefs.delete(refId)
+    return true
   }
 
   /**
    * 阶段 2B：失败回滚解冻 (Refund)
-   * 将 frozen 款项原路退回 balance
+   * 将 frozen 款项原路退回 balance。必须有对应 freeze 记录，否则拒绝。
    */
-  public refund(refId: string, amount: number, providerId: string, reason: string): void {
-    if (amount <= 0) return
+  public refund(refId: string, amount: number, providerId: string, reason: string): boolean {
+    if (amount <= 0) return true
+    if (!this.frozenRefs.has(refId)) {
+      console.warn(
+        `[Wallet] 拒绝 refund：refId [${refId}] 没有对应的 freeze 冻结记录，拒绝无凭据退款。`
+      )
+      return false
+    }
+
     const actualRefund = Math.min(this.state.frozen, amount)
     const nextFrozen = Math.max(0, this.state.frozen - actualRefund)
     const nextBalance = this.state.balance + actualRefund
@@ -196,6 +242,8 @@ class WalletManager {
       frozen: nextFrozen,
       transactions: [...this.state.transactions, tx],
     })
+    this.frozenRefs.delete(refId)
+    return true
   }
 
   /**
@@ -241,6 +289,7 @@ class WalletManager {
       ],
     }
     this.persist(initial)
+    this.frozenRefs.clear()
   }
 }
 
