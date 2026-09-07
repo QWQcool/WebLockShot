@@ -242,7 +242,7 @@ WebLockShot 导出的 `draft_content.json` 是标准的 CapCut/剪映工程格�
 
 在「✨ 审片交付」页点击 **「📦 下载完整草稿 zip 包 (含素材)」**：
 
-![剪映草稿 zip 包下载按钮](./screenshots/12_jianying_zip_export.png)
+![剪映草稿 zip 包下载按钮](./screenshots/13_jianying_zip_export.png)
 
 zip 包内容：
 - `draft_content.json` / `draft_meta_info.json`：剪映标准草稿工程（包内素材路径已改写为相对路径 `assets/...`）；
@@ -273,7 +273,7 @@ WebLockShot 内置「投放 → 回流 → 加权 → 再生成」的数据闭�
 
 ### 回流看板使用步骤
 
-![回流看板：数据录入与胜率看板](./screenshots/13_feedback_dashboard.png)
+![回流看板：数据录入与胜率看板](./screenshots/12_reflow_board.png)
 
 1. 点击顶部导航 **「📊 回流看板」**；
 2. 在录入表单填写：视频标题、命中的结构模板与钩子（下拉选择）、商品种类、平台的 **3 秒完播率 / 完播率 / 转化数**；
