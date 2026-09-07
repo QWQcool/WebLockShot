@@ -102,13 +102,15 @@ describe('useVideoPipeline 共享管线冒烟测试', () => {
   })
 
   it('连击防护：同一任务执行中重复提交被幂等锁拦截', async () => {
-    // 让 poll 悬挂一段时间以占据执行窗口
+    // 让 poll 悬挂以占据执行窗口。
+    // 注意：releasePoll 必须在 mock 设置时就绪（闩锁模式）。
+    // 若在 poll 被调用的瞬间才赋值，CI 慢时序下「释放时 poll 尚未挂起」会导致 firstRun 永久悬挂。
     let releasePoll: (() => void) | null = null
-    mockPoll.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          releasePoll = () => resolve({ status: 'succeeded' as const, progress: 100 })
-        })
+    const pollGate = new Promise<void>((resolveGate) => {
+      releasePoll = resolveGate
+    })
+    mockPoll.mockImplementation(() =>
+      pollGate.then(() => ({ status: 'succeeded' as const, progress: 100 }))
     )
 
     const { result } = renderHook(() => useVideoPipeline())
@@ -126,7 +128,8 @@ describe('useVideoPipeline 共享管线冒烟测试', () => {
 
     expect(mockSubmit).toHaveBeenCalledTimes(1)
 
-    // 释放悬挂的 poll，让首轮完成
+    // 释放悬挂的 poll，让首轮完成（先确认 poll 确已挂起，防 CI 慢时序下 gate 未挂上）
+    await waitFor(() => expect(mockPoll).toHaveBeenCalledTimes(1))
     await act(async () => {
       releasePoll?.()
       await firstRun
