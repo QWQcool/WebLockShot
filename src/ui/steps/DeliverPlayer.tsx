@@ -108,7 +108,15 @@ export const DeliverPlayer: React.FC<Props> = ({
         {/* 左侧：9:16 视频播放器 */}
         <div className="player-column">
           <div className="video-9-16-wrapper">
-            {activeJob?.asset?.url ? (
+            {activeJob?.asset?.urlExpired ? (
+              <div className="player-placeholder">
+                ⚠️ 素材已失效
+                <br />
+                <span style={{ fontSize: '0.8em', opacity: 0.7 }}>
+                  页面刷新后本地缓存丢失，请返回上一步重新生成此镜
+                </span>
+              </div>
+            ) : activeJob?.asset?.url ? (
               <video
                 ref={videoRef}
                 src={activeJob.asset.url}

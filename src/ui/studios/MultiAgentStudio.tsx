@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 import { useVideoPipeline } from '../../hooks/useVideoPipeline.ts'
+import { useRevocableObjectUrl } from '../../hooks/useRevocableObjectUrl.ts'
 import {
   setPollingWindowMinutes,
   POLL_WINDOW_PRESETS,
@@ -10,6 +11,7 @@ import {
   ALL_PRESET_ASSETS,
 } from '../../assets/presets/index.ts'
 import { ImageLightboxModal } from '../components/ImageLightboxModal.tsx'
+import { EngineStatusBadge } from '../components/EngineStatusBadge.tsx'
 
 export type AgentRole = 'director' | 'camera' | 'critic' | 'dispatcher'
 
@@ -91,6 +93,9 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
 
   // 轮询窗口（分钟），与 executor 共享同一份全局配置
   const [pollMinutes, setPollMinutes] = useState<number>(POLL_WINDOW_PRESETS[2].minutes)
+
+  // 参考视频 objectURL 统一登记与回收，防内存泄漏
+  const { revoke: revokeRefVideo, replace: replaceRefVideo } = useRevocableObjectUrl()
 
   // ComfyUI 选中后的自动握手结果（与 kling/jimeng 的「未配置即报错」对齐）
   type ComfyPingState = {
@@ -333,6 +338,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
           <span className="studio-subtext">
             编导 + 运镜 + 质检 + 调度四智体共创 · 动态推演 · 电影级精细控制
           </span>
+          <EngineStatusBadge providerId={providerId} />
         </div>
         <div className="topbar-controls">
           <div className="control-pill-group">
@@ -631,6 +637,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
                       type="button"
                       className="btn-clear-ref"
                       onClick={() => {
+                        revokeRefVideo(referenceVideo)
                         setReferenceVideo(null)
                         setReferenceVideoName('')
                       }}
@@ -656,7 +663,7 @@ export const MultiAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
                       onChange={(e) => {
                         const file = e.target.files?.[0]
                         if (file) {
-                          const url = URL.createObjectURL(file)
+                          const url = replaceRefVideo(referenceVideo, () => URL.createObjectURL(file))
                           setReferenceVideo(url)
                           setReferenceVideoName(file.name)
                         }

@@ -1,4 +1,4 @@
-import { parseStoryJson, type ParseResult } from './ai/schema'
+import { parseStoryJson, type ParseResult } from './ai/schema.ts'
 import type { Story } from './types'
 
 export function serializeStory(story: Story): string {

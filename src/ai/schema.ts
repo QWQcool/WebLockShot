@@ -11,7 +11,7 @@ import {
   type Story,
   type StoryEnvelope,
   type StoryInput,
-} from '../types'
+} from '../types.ts'
 
 export type ParseOk<T> = { ok: true; value: T }
 export type ParseErr = { ok: false; error: string }

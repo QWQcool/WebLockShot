@@ -6,7 +6,7 @@ import {
   redoShotUserPrompt,
   reviseShotUserPrompt,
 } from './ai/prompts'
-import { parseModelText, parseShotJson } from './ai/schema'
+import { parseModelText, parseShotJson } from './ai/schema.ts'
 import { buildPromptPack } from './export/buildPromptPack'
 import { defaultPresetId, loadPreset, PRESETS } from './presets/load'
 import { downloadStoryJson, parseStoryFile } from './storyFile'

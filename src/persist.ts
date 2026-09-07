@@ -1,5 +1,5 @@
-import { parseShotJson, parseStoryEnvelope, parseStoryJson } from './ai/schema'
-import type { Shot, Story, StoryEnvelope, StoryInput } from './types'
+import { parseShotJson, parseStoryEnvelope, parseStoryJson } from './ai/schema.ts'
+import type { Shot, Story, StoryEnvelope, StoryInput } from './types.ts'
 
 export const GENERATE_SESSION_KEY = 'weblockshot.generateSession'
 export const LAST_GOOD_STORY_KEY = 'weblockshot.lastGoodStory'

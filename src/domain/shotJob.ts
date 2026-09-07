@@ -7,6 +7,8 @@ export const MediaAssetSchema = z.object({
   coverUrl: z.string().optional(),
   durationSec: z.number(),
   sizeBytes: z.number().optional(),
+  /** blob: 资产在进程重启后必失效；标记后 UI 显示失效占位而非死链播放器 */
+  urlExpired: z.boolean().optional(),
 })
 
 export type MediaAsset = z.infer<typeof MediaAssetSchema>

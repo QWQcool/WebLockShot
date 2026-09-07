@@ -28,6 +28,7 @@ import { ScriptStep } from './steps/ScriptStep.tsx'
 import { StoryboardStep } from './steps/StoryboardStep.tsx'
 import { VisualStep } from './steps/VisualStep.tsx'
 import { GenerateBoard } from './steps/GenerateBoard.tsx'
+import { loadAndHydratePipelineSession } from '../persistV2.ts'
 import { DeliverPlayer } from './steps/DeliverPlayer.tsx'
 import { SingleAgentStudio } from './studios/SingleAgentStudio.tsx'
 import { MultiAgentStudio } from './studios/MultiAgentStudio.tsx'
@@ -113,6 +114,22 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
     return () => {
       unsub()
     }
+  }, [])
+
+  // 异步水合：IndexedDB 中的 base64 资产恢复为 objectURL，blob: 死链标记 expired
+  useEffect(() => {
+    if (!initialSession) return
+    let cancelled = false
+    void loadAndHydratePipelineSession().then((hydrated) => {
+      if (cancelled || !hydrated) return
+      if (hydrated.productInput) setProductInput(hydrated.productInput)
+      if (hydrated.visualPlans && hydrated.visualPlans.length > 0) setVisualPlans(hydrated.visualPlans)
+      if (hydrated.jobs && hydrated.jobs.length > 0) setJobs(hydrated.jobs)
+    })
+    return () => {
+      cancelled = true
+    }
+    // oxlint-disable-next-line set-state-in-effect -- 异步水合 IDB 资产，非同步 setState
   }, [])
 
   // 状态自动持久化存盘

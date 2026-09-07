@@ -1,7 +1,7 @@
 import floorThirteen from '../../presets/floor-thirteen/story.json' with { type: 'json' }
 import hookAtTheDoor from '../../presets/hook-at-the-door/story.json' with { type: 'json' }
 import unreadVoice from '../../presets/unread-voice/story.json' with { type: 'json' }
-import { parseStoryJson } from '../ai/schema'
+import { parseStoryJson } from '../ai/schema.ts'
 import type { Story } from '../types'
 
 export type PresetMeta = { id: string; title: string; theme: string }

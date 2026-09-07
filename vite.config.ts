@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -22,5 +23,10 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/comfyui/, ''),
       },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    include: ['src/**/*.ui.test.tsx', 'src/**/*.ui.test.ts'],
   },
 })

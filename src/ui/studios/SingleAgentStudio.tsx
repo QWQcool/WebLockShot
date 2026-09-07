@@ -6,6 +6,7 @@ import {
 } from '../../ai/agents/promptPolisher.ts'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 import { useVideoPipeline } from '../../hooks/useVideoPipeline.ts'
+import { useRevocableObjectUrl } from '../../hooks/useRevocableObjectUrl.ts'
 import {
   setPollingWindowMinutes,
   POLL_WINDOW_PRESETS,
@@ -16,6 +17,7 @@ import {
   ALL_PRESET_ASSETS,
 } from '../../assets/presets/index.ts'
 import { ImageLightboxModal } from '../components/ImageLightboxModal.tsx'
+import { EngineStatusBadge } from '../components/EngineStatusBadge.tsx'
 
 export type SinglePromptPreset = {
   id: string
@@ -142,6 +144,9 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
 
   // 轮询窗口（分钟），与 executor 共享同一份全局配置
   const [pollMinutes, setPollMinutes] = useState<number>(POLL_WINDOW_PRESETS[2].minutes)
+
+  // 参考视频 objectURL 统一登记与回收，防内存泄漏
+  const { revoke: revokeRefVideo, replace: replaceRefVideo } = useRevocableObjectUrl()
 
   // ComfyUI 选中后的自动握手结果（与 kling/jimeng 的「未配置即报错」对齐）
   type ComfyPingState = {
@@ -318,6 +323,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
         <div className="topbar-left">
           <span className="studio-badge">⚡ 单 Agent 极速直出模式</span>
           <span className="studio-subtext">支持文本直调即梦 / 可灵 API · 内置 AI 运镜润色扩写</span>
+          <EngineStatusBadge providerId={providerId} />
         </div>
         <div className="topbar-controls">
           {/* Provider 选择 */}
@@ -610,6 +616,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
                       type="button"
                       className="btn-clear-ref"
                       onClick={() => {
+                        revokeRefVideo(referenceVideo)
                         setReferenceVideo(null)
                         setReferenceVideoName('')
                       }}
@@ -635,7 +642,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
                       onChange={(e) => {
                         const file = e.target.files?.[0]
                         if (file) {
-                          const url = URL.createObjectURL(file)
+                          const url = replaceRefVideo(referenceVideo, () => URL.createObjectURL(file))
                           setReferenceVideo(url)
                           setReferenceVideoName(file.name)
                         }
@@ -810,7 +817,7 @@ export const SingleAgentStudio: React.FC<Props> = ({ onOpenSettings }) => {
               >
                 {isGenerating
                   ? '🚀 视频渲染管线运转中...'
-                  : `🚀 立即直调 ${providerId === 'kling' ? '可灵 API' : providerId === 'jimeng' ? '即梦 API' : 'Mock 画布'} 生成视频`}
+                  : `🚀 立即直调 ${providerId === 'kling' ? '可灵 API' : providerId === 'jimeng' ? '即梦 API' : providerId === 'comfyui' ? 'ComfyUI 私有算力' : 'Mock 画布'} 生成视频`}
               </button>
             </div>
           </div>
