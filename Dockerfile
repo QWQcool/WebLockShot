@@ -2,8 +2,15 @@
 # 阶段 1：构建前端（React 19 + Vite 8）；阶段 2：伴生 server 运行层（静态托管 + /api 反代）
 
 # ---------- 阶段 1：前端构建 ----------
-FROM node:22-alpine AS build
+# 用 glibc 基础镜像：better-sqlite3（devDependency，仅测试用，前端构建并不需要它）
+# 在 alpine/musl 下无预编译二进制，会触发 node-gyp 源码编译且缺 Python 而失败；
+# glibc 下优先下载预编译产物，工具链仅作源码编译兜底，保证 npm ci 永不因原生模块失败
+FROM node:22-slim AS build
 WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ \
+ && rm -rf /var/lib/apt/lists/*
 
 # 先装依赖，最大化层缓存
 COPY package.json package-lock.json ./
