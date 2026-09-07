@@ -24,6 +24,7 @@ type Props = {
   onStudioModeChange?: (mode: StudioMode) => void
   onOpenSettings?: () => void
   onOpenWallet?: () => void
+  onOpenFeedback?: () => void
   hasToken?: boolean
 }
 
@@ -37,6 +38,7 @@ export const WorkbenchHeader: React.FC<Props> = ({
   onStudioModeChange,
   onOpenSettings,
   onOpenWallet,
+  onOpenFeedback,
   hasToken,
 }) => {
   return (
@@ -77,6 +79,17 @@ export const WorkbenchHeader: React.FC<Props> = ({
               title="打开虚拟钱包与资金明细"
             >
               💰 虚拟钱包
+            </button>
+          )}
+
+          {onOpenFeedback && (
+            <button
+              type="button"
+              className="btn-feedback-trigger"
+              onClick={onOpenFeedback}
+              title="录入平台回流数据并查看钩子/结构/品类胜率看板"
+            >
+              📊 回流看板
             </button>
           )}
 

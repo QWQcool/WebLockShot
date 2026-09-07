@@ -37,6 +37,22 @@ npm run build
 
 ---
 
+## 🖥️ 本地伴生服务（npx 形态，可选）
+
+需要「生产构建直连 ComfyUI / 视频平台 API」或「剪映草稿 zip 一键落盘」时，可启动零依赖伴生服务：
+
+```bash
+# 一行命令（先 npm run build 构建，再启动服务）
+npx weblockshot          # 或: npm run build && npm run start:server
+# 自定义: node server/weblockshot-server.mjs --port 8080 --dist ./dist --draft-dir ./jianying-drafts
+```
+
+Windows 用户可直接双击 `start-weblockshot.bat`（自动安装依赖/构建/启动）。
+
+能力：静态托管 `dist/` + `/api/kling` `/api/jimeng` `/api/comfyui` 反代（生产也能连 ComfyUI）+ `POST /api/jianying/draft-zip`（zip 直解到本地草稿目录）。
+
+---
+
 ## 📦 剪映草稿 zip 包使用说明（解压后放入剪映草稿目录）
 
 在「交付播放器」页点击 **📦 下载完整草稿 zip 包 (含素材)**，得到 `<工程名>_剪映草稿.zip`，内含：

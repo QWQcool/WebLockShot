@@ -2,7 +2,10 @@ import type { Script, ScriptBeat } from '../../domain/script.ts'
 import { ScriptSchema } from '../../domain/script.ts'
 import {
   STRUCTURE_TEMPLATES,
+  pickTemplateId,
+  weightedSampleHook,
   type StructureTemplate,
+  type WinRateLookup,
 } from '../../prompts/library/structures.ts'
 import type { TokenConfig } from '../../types.ts'
 
@@ -10,6 +13,8 @@ export type ScriptWriterInput = {
   productTitle: string
   sellingPoints: string[]
   templateId?: string
+  /** 商品种类（如 美妆护肤/数码潮玩），用于按元数据路由结构模板 */
+  category?: string
   tokenConfig?: TokenConfig | null
   platform?: string
 }
@@ -20,15 +25,17 @@ export type ScriptWriterInput = {
 export function generateLocalScript(
   productTitle: string,
   sellingPoints: string[],
-  template: StructureTemplate
+  template: StructureTemplate,
+  hookWinRateLookup?: WinRateLookup
 ): Script {
   const pName = productTitle.trim() || '本命好物'
   const sp1 = sellingPoints[0] || '核心黑科技，瞬间见效'
   const sp2 = sellingPoints[1] || '食品级安全材质，温和不刺激'
   const sp3 = sellingPoints[2] || '高颜值便携设计，随时随地可用'
 
+  // 胜率加权采样钩子（有回流数据时按真实胜率路由，否则用先验均匀分布）
   const hookSample =
-    template.hookSamples[Math.floor(Math.random() * template.hookSamples.length)] ||
+    weightedSampleHook(template, hookWinRateLookup).text ||
     `别再瞎买了！关于【${pName}】，这几个真相你必须知道！`
 
   const beats: ScriptBeat[] = [
@@ -157,16 +164,28 @@ export function parseLLMScript(raw: string): Script | null {
  * ScriptWriter Agent 主入口：支持 LLM 智能扩写与 Local Fallback
  */
 export async function writeScript(input: ScriptWriterInput): Promise<Script> {
+  // 结构路由优先级：显式 templateId > 品类元数据路由 > 默认第一套
+  const routedTemplateId = input.templateId || pickTemplateId(input.category)
   const selectedTemplate =
-    STRUCTURE_TEMPLATES.find((t) => t.id === input.templateId) ||
+    STRUCTURE_TEMPLATES.find((t) => t.id === routedTemplateId) ||
     STRUCTURE_TEMPLATES[0]
+
+  // 回流胜率查询器（IndexedDB 不可用时优雅降级为均匀先验）
+  let hookWinRateLookup: WinRateLookup | undefined
+  try {
+    const { getWinRateLookup } = await import('../../domain/feedback.ts')
+    hookWinRateLookup = await getWinRateLookup()
+  } catch {
+    // 测试/非浏览器环境：忽略
+  }
 
   // 如果没有配 key，走纯前端高质量规则扩写器（0 key 演示模式）
   if (!input.tokenConfig?.apiKey) {
     return generateLocalScript(
       input.productTitle,
       input.sellingPoints,
-      selectedTemplate
+      selectedTemplate,
+      hookWinRateLookup
     )
   }
 
@@ -211,6 +230,7 @@ export async function writeScript(input: ScriptWriterInput): Promise<Script> {
   return generateLocalScript(
     input.productTitle,
     input.sellingPoints,
-    selectedTemplate
+    selectedTemplate,
+    hookWinRateLookup
   )
 }

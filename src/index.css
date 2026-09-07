@@ -4450,3 +4450,88 @@ textarea:focus-visible {
   background: rgba(251, 191, 36, 0.12);
   border-color: rgba(251, 191, 36, 0.35);
 }
+
+/* ===== 回流看板 (FeedbackDashboard) ===== */
+.btn-feedback-trigger {
+  border: none;
+  cursor: pointer;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(57, 197, 187, 0.12);
+  color: #39c5bb;
+  border: 1px solid rgba(57, 197, 187, 0.35);
+}
+.btn-feedback-trigger:hover { background: rgba(57, 197, 187, 0.22); }
+
+.fb-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+.fb-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.78rem; }
+.fb-field-wide { grid-column: span 2; }
+.fb-field input, .fb-field select {
+  padding: 0.4rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--wls-border, rgba(255,255,255,0.15));
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  font-size: 0.8rem;
+}
+.fb-alert { padding: 0.5rem 0.8rem; border-radius: 6px; font-size: 0.8rem; margin-bottom: 0.6rem; }
+.fb-alert.error { background: rgba(248,113,113,0.12); color: #f87171; }
+.fb-alert.ok { background: rgba(52,211,153,0.12); color: #34d399; }
+.fb-submit-btn {
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  background: linear-gradient(135deg, #39c5bb, #2b8a85);
+  color: #04121a;
+  margin-bottom: 1rem;
+}
+.fb-board-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.fb-board-section {
+  border: 1px solid var(--wls-border, rgba(255,255,255,0.12));
+  border-radius: 10px;
+  padding: 0.8rem;
+}
+.fb-board-section h4 { margin: 0 0 0.6rem; font-size: 0.85rem; }
+.fb-bar-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.45rem; }
+.fb-bar-label {
+  width: 96px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fb-bar-track { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.fb-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #39c5bb, #7ec8e3); transition: width 0.4s ease; }
+.fb-bar-value { font-size: 0.72rem; white-space: nowrap; }
+.fb-bar-value small { opacity: 0.55; margin-left: 0.2rem; }
+.fb-empty { font-size: 0.75rem; opacity: 0.5; }
+.fb-recent { margin-top: 1rem; }
+.fb-recent h4 { margin: 0 0 0.5rem; font-size: 0.85rem; }
+.fb-recent-list { list-style: none; margin: 0; padding: 0; }
+.fb-recent-list li {
+  display: flex; justify-content: space-between; gap: 1rem;
+  font-size: 0.75rem; padding: 0.3rem 0;
+  border-bottom: 1px dashed var(--wls-border, rgba(255,255,255,0.08));
+}
+.fb-recent-meta { opacity: 0.6; white-space: nowrap; }
+
+/* ===== 演示动画模式徽章（诚实标注） ===== */
+.qa-badge.demo-badge {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}

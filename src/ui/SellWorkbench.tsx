@@ -29,6 +29,7 @@ import { StoryboardStep } from './steps/StoryboardStep.tsx'
 import { VisualStep } from './steps/VisualStep.tsx'
 import { GenerateBoard } from './steps/GenerateBoard.tsx'
 import { loadAndHydratePipelineSession } from '../persistV2.ts'
+import { FeedbackDashboard } from './components/FeedbackDashboard.tsx'
 import { DeliverPlayer } from './steps/DeliverPlayer.tsx'
 import { SingleAgentStudio } from './studios/SingleAgentStudio.tsx'
 import { MultiAgentStudio } from './studios/MultiAgentStudio.tsx'
@@ -97,6 +98,7 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
   const [isExpanding, setIsExpanding] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(urlParams?.get('settings') === 'open')
   const [isWalletOpen, setIsWalletOpen] = useState(urlParams?.get('wallet') === 'open')
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
   const [hasToken, setHasToken] = useState<boolean>(() => {
     try {
       const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)
@@ -354,8 +356,11 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
         onStudioModeChange={setStudioMode}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenWallet={() => setIsWalletOpen(true)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
         hasToken={hasToken}
       />
+
+      <FeedbackDashboard isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
 
       <TokenSettingsModal
         isOpen={isSettingsOpen}

@@ -3,14 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "weblockshot": "server/weblockshot-server.mjs"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --experimental-strip-types --test src/ai/retry.test.ts src/director/__tests__/executor.test.ts src/prompts/library/__tests__/structures.test.ts src/media/__tests__/audio.test.ts src/media/__tests__/kling.test.ts src/media/__tests__/jimeng.test.ts src/media/__tests__/comfyui.test.ts src/ai/agents/__tests__/promptPolisher.test.ts src/export/__tests__/jianyingDraft.test.ts src/export/__tests__/zip.test.ts src/domain/__tests__/wallet.test.ts src/domain/__tests__/fsm.test.ts src/domain/__tests__/persistV2.test.ts src/director/__tests__/fullPipeline.test.ts && vitest run",
+    "test": "node --experimental-strip-types --test src/ai/retry.test.ts src/director/__tests__/executor.test.ts src/prompts/library/__tests__/structures.test.ts src/prompts/library/__tests__/hookRouting.test.ts src/media/__tests__/audio.test.ts src/media/__tests__/kling.test.ts src/media/__tests__/jimeng.test.ts src/media/__tests__/comfyui.test.ts src/ai/agents/__tests__/promptPolisher.test.ts src/export/__tests__/jianyingDraft.test.ts src/export/__tests__/zip.test.ts src/domain/__tests__/wallet.test.ts src/domain/__tests__/fsm.test.ts src/domain/__tests__/persistV2.test.ts src/director/__tests__/fullPipeline.test.ts server/zip-extract.test.mjs && vitest run",
     "test:node": "node --experimental-strip-types --test src/ai/retry.test.ts src/director/__tests__/executor.test.ts src/prompts/library/__tests__/structures.test.ts src/media/__tests__/audio.test.ts src/media/__tests__/kling.test.ts src/media/__tests__/jimeng.test.ts src/media/__tests__/comfyui.test.ts src/ai/agents/__tests__/promptPolisher.test.ts src/export/__tests__/jianyingDraft.test.ts src/export/__tests__/zip.test.ts src/domain/__tests__/wallet.test.ts src/domain/__tests__/fsm.test.ts src/domain/__tests__/persistV2.test.ts src/director/__tests__/fullPipeline.test.ts",
     "test:ui": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start:server": "node server/weblockshot-server.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
