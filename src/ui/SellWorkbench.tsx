@@ -185,7 +185,12 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
       const review = await critiqueScript(generated, token?.apiKey ? token : null)
       setScript(generated)
       setCriticResult(review)
+      setPipelineErrorMsg(null)
       advanceToStep(2)
+    } catch (err) {
+      setPipelineErrorMsg(
+        `剧本生成失败：${err instanceof Error ? err.message : '未知错误'}。请检查网络与 API Key 配置后重试，或切换为 Mock 免费模式。`
+      )
     } finally {
       setIsExpanding(false)
     }
@@ -473,9 +478,16 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
                 onChange={setScript}
                 onNext={handleScriptToStoryboard}
                 onReCritique={async () => {
-                  const token = readToken()
-                  const res = await critiqueScript(script, token?.apiKey ? token : null)
-                  setCriticResult(res)
+                  try {
+                    const token = readToken()
+                    const res = await critiqueScript(script, token?.apiKey ? token : null)
+                    setCriticResult(res)
+                    setPipelineErrorMsg(null)
+                  } catch (err) {
+                    setPipelineErrorMsg(
+                      `剧本评审失败：${err instanceof Error ? err.message : '未知错误'}。请检查网络与 API Key 配置后重试。`
+                    )
+                  }
                 }}
               />
             )}

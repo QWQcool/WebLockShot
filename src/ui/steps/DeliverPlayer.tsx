@@ -24,6 +24,7 @@ export const DeliverPlayer: React.FC<Props> = ({
   const [isPlaying, setIsPlaying] = useState(false)
   const [ttsEnabled, setTtsEnabled] = useState(isTtsSupported())
   const [zipExporting, setZipExporting] = useState(false)
+  const [zipExportError, setZipExportError] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const activeJob = jobs[currentShotIndex] || jobs[0]
@@ -264,6 +265,7 @@ export const DeliverPlayer: React.FC<Props> = ({
               style={{ marginLeft: '0.6rem' }}
               onClick={async () => {
                 setZipExporting(true)
+                setZipExportError(null)
                 try {
                   const result = await downloadJianyingDraftZip({
                     story,
@@ -274,6 +276,10 @@ export const DeliverPlayer: React.FC<Props> = ({
                   if (result.missingAssets.length > 0) {
                     console.warn('[WebLockShot] 剪映 zip 导出存在缺失素材:', result.missingAssets)
                   }
+                } catch (err) {
+                  setZipExportError(
+                    `zip 导出失败：${err instanceof Error ? err.message : '未知错误'}。请重试或改用上方「draft_content.json」导出。`
+                  )
                 } finally {
                   setZipExporting(false)
                 }
@@ -283,6 +289,23 @@ export const DeliverPlayer: React.FC<Props> = ({
             >
               {zipExporting ? '📦 素材打包中...' : '📦 下载完整草稿 zip 包 (含素材)'}
             </button>
+            {zipExportError && (
+              <div className="studio-error-banner" style={{ marginTop: '0.6rem' }} role="alert">
+                <div className="alert-content">
+                  <span className="alert-icon">⚠️</span>
+                  <span className="alert-text">{zipExportError}</span>
+                </div>
+                <div className="alert-actions">
+                  <button
+                    type="button"
+                    className="btn-alert-dismiss"
+                    onClick={() => setZipExportError(null)}
+                  >
+                    ✕ 关闭提示
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 新一轮生成入口 */}
