@@ -3,7 +3,8 @@ import type { ShotJob } from '../../domain/shotJob.ts'
 import type { VisualPlan } from '../../domain/sellVisual.ts'
 import type { Story } from '../../types.ts'
 import { voiceoverEngine, isTtsSupported } from '../../media/audio.ts'
-import { downloadJianyingDraft, downloadJianyingDraftZip } from '../../export/jianyingDraft.ts'
+import { downloadJianyingDraft, downloadJianyingDraftZip, buildJianyingZipPackage } from '../../export/jianyingDraft.ts'
+import { probeCompanion, sendDraftZipToCompanion, type CompanionProbeResult } from '../../services/companion/companionClient.ts'
 
 type Props = {
   jobs: ShotJob[]
@@ -25,7 +26,23 @@ export const DeliverPlayer: React.FC<Props> = ({
   const [ttsEnabled, setTtsEnabled] = useState(isTtsSupported())
   const [zipExporting, setZipExporting] = useState(false)
   const [zipExportError, setZipExportError] = useState<string | null>(null)
+  // 伴生服务能力探测（P1-3）：null = 探测中；available=false = 纯前端模式（不显示落盘按钮）
+  const [companion, setCompanion] = useState<CompanionProbeResult | null>(null)
+  const [serverSaving, setServerSaving] = useState(false)
+  const [serverSaveMsg, setServerSaveMsg] = useState<string | null>(null)
+  const [serverSaveError, setServerSaveError] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+
+  // 挂载后探测伴生服务（失败 = 本地纯前端模式，与现状行为一致）
+  useEffect(() => {
+    let cancelled = false
+    probeCompanion().then((caps) => {
+      if (!cancelled) setCompanion(caps)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const activeJob = jobs[currentShotIndex] || jobs[0]
   const activePlan = visualPlans[currentShotIndex] || visualPlans[0]
@@ -304,6 +321,70 @@ export const DeliverPlayer: React.FC<Props> = ({
                     ✕ 关闭提示
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* 伴生服务落盘（P1-3）：仅当 /healthz 探测到伴生服务时显示 */}
+            {companion?.draftZip && (
+              <div style={{ marginTop: '0.6rem' }}>
+                <button
+                  type="button"
+                  className="btn-export-jianying"
+                  data-testid="companion-draft-zip-btn"
+                  onClick={async () => {
+                    setServerSaving(true)
+                    setServerSaveMsg(null)
+                    setServerSaveError(null)
+                    try {
+                      const pkg = await buildJianyingZipPackage({
+                        story,
+                        visualPlans,
+                        jobs,
+                        projectTitle: story.title || 'WebLockShot_带货工程',
+                      })
+                      const result = await sendDraftZipToCompanion(pkg.bytes)
+                      if (result.ok) {
+                        setServerSaveMsg(
+                          `✅ 已落盘到伴生服务：${result.savedPath}（${result.files.length} 个文件），打开剪映草稿目录即可导入`
+                        )
+                      } else {
+                        setServerSaveError(`落盘失败：${result.error}。可改用上方「下载 zip 包」手动解压。`)
+                      }
+                    } catch (err) {
+                      setServerSaveError(
+                        `落盘失败：${err instanceof Error ? err.message : '未知错误'}。可改用上方「下载 zip 包」手动解压。`
+                      )
+                    } finally {
+                      setServerSaving(false)
+                    }
+                  }}
+                  disabled={serverSaving}
+                  title="把完整草稿 zip 直接发送到本地伴生服务解压落盘，省去手动下载解压"
+                >
+                  {serverSaving ? '📤 正在发送到伴生服务...' : '📤 发送到伴生服务落盘'}
+                </button>
+                {serverSaveMsg && (
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.85em', color: '#2e7d32' }} role="status">
+                    {serverSaveMsg}
+                  </div>
+                )}
+                {serverSaveError && (
+                  <div className="studio-error-banner" style={{ marginTop: '0.5rem' }} role="alert">
+                    <div className="alert-content">
+                      <span className="alert-icon">⚠️</span>
+                      <span className="alert-text">{serverSaveError}</span>
+                    </div>
+                    <div className="alert-actions">
+                      <button
+                        type="button"
+                        className="btn-alert-dismiss"
+                        onClick={() => setServerSaveError(null)}
+                      >
+                        ✕ 关闭提示
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

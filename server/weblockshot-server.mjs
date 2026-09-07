@@ -203,7 +203,7 @@ async function handleDraftZip(req, res, args, logger) {
 
       logger.info({ files: written.length, dir: targetDir }, '[draft-zip] 已解压')
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify({ ok: true, dir: targetDir, files: written }))
+      res.end(JSON.stringify({ ok: true, dir: targetDir, savedPath: targetDir, files: written }))
     } catch (err) {
       const isQuota = err instanceof Error && err.code === 'WLS_UNZIP_QUOTA'
       res.writeHead(isQuota ? 413 : 400, { 'Content-Type': 'application/json; charset=utf-8' })
