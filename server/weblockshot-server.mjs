@@ -20,6 +20,8 @@
  *          WLS_AUTH_TOKEN（设置后所有 /api/* 需携带 x-wls-token 或 Authorization Bearer，不匹配 401）
  *          WLS_HOST（默认 127.0.0.1；公网部署必须 0.0.0.0 且强制配置 WLS_AUTH_TOKEN）
  *          WLS_MAX_UNZIP_MB（draft-zip 累计解压字节上限，默认 1024MB）
+ *          WLS_TTS（=off 关闭 Edge-TTS 语音合成，/api/tts 返回 501；默认 on）
+ *          TTS_DIR（mp3 落盘目录，默认 data/tts）
  */
 import http from 'node:http'
 import https from 'node:https'
@@ -29,6 +31,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { extractZip, safeEntryName } from './zip-extract.mjs'
 import { createLogger } from './logger.mjs'
 import { createStorage } from './storage.mjs'
+import { createTtsHandler, createTtsFileHandler } from './tts.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const STARTED_AT = Date.now()
@@ -56,6 +59,9 @@ function parseArgs(argv, env = process.env) {
     authToken: env.WLS_AUTH_TOKEN?.trim() || undefined,
     host: env.WLS_HOST || '127.0.0.1',
     maxUnzipMb: Number(env.WLS_MAX_UNZIP_MB) || 1024,
+    // Edge-TTS 语音合成开关（P1-1）：'off' 关闭（/api/tts 返回 501），默认 on
+    tts: env.WLS_TTS === 'off' ? 'off' : 'on',
+    ttsDir: env.TTS_DIR,
   }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port') args.port = Number(argv[++i]) || args.port
@@ -64,6 +70,7 @@ function parseArgs(argv, env = process.env) {
   }
   args.dist = resolve(args.dist || join(ROOT, 'dist'))
   args.draftDir = resolve(args.draftDir || join(ROOT, 'jianying-drafts'))
+  args.ttsDir = resolve(args.ttsDir || join(ROOT, 'data', 'tts'))
   return args
 }
 
@@ -353,6 +360,12 @@ export async function startServer(opts = {}) {
     proxyRoutes.push({ name: 'llm', prefix: '/api/llm', target: llmTarget })
   }
 
+  // Edge-TTS 能力（P1-1）：synth 可注入 mock 供协议层单测（不依赖网络）
+  const ttsEnabled = opts.tts !== undefined ? opts.tts : args.tts === 'on'
+  const ttsDir = opts.ttsDir !== undefined ? opts.ttsDir : args.ttsDir
+  const ttsHandler = createTtsHandler({ enabled: ttsEnabled, ttsDir, logger, synth: opts.ttsSynth })
+  const ttsFileHandler = createTtsFileHandler({ ttsDir })
+
   const healthPayload = () => ({
     ok: true,
     version: PKG_VERSION,
@@ -363,6 +376,8 @@ export async function startServer(opts = {}) {
     llmProxy: llmTarget ? 'on' : 'off',
     sentry: args.sentryDsn ? 'configured' : 'off',
     authMode: args.authToken ? 'token' : 'off',
+    // 能力位（P1 前端探测后才显示新按钮）
+    tts: args.tts,
   })
 
   /** 校验共享 token：x-wls-token 头或 Authorization: Bearer <token> */
@@ -422,6 +437,19 @@ export async function startServer(opts = {}) {
       return
     }
 
+    // Edge-TTS 语音合成（P1-1）
+    if (urlPath === '/api/tts') {
+      ttsHandler(req, res, urlPath).catch((err) => {
+        logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, 'tts 处理异常')
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: 'tts 内部错误' })
+        } else {
+          res.end()
+        }
+      })
+      return
+    }
+
     if (urlPath.startsWith('/api/jianying/draft-zip')) {
       handleDraftZip(req, res, args, logger).catch((err) => {
         logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, 'draft-zip 处理异常')
@@ -436,6 +464,12 @@ export async function startServer(opts = {}) {
 
     if (urlPath.startsWith('/api/')) {
       sendJson(res, 404, { error: '未知 API 路由' })
+      return
+    }
+
+    // TTS 音频静态服务（P1-1）：/files/tts/<name>.mp3，先于 dist 静态托管
+    if (urlPath.startsWith('/files/tts/')) {
+      ttsFileHandler(req, res, urlPath)
       return
     }
 
@@ -489,7 +523,9 @@ if (isDirectRun()) {
           storage: storage.mode,
           keyMode: keys ? 'injected' : 'passthrough',
           llmProxy: llmTarget ? 'on' : 'off',
+          tts: ttsEnabled ? 'on' : 'off',
           draftEndpoint: 'POST /api/jianying/draft-zip',
+          ttsEndpoint: 'POST /api/tts',
         },
         `WebLockShot 伴生服务已启动 http://localhost:${port}`
       )
