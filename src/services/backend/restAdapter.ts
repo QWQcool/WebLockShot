@@ -42,10 +42,17 @@ export function createRestAdapter(baseUrl: string, deps: RestAdapterDeps = {}): 
   const isNetworkFailure = (err: unknown): boolean =>
     err instanceof TypeError || (err instanceof Error && err.name === 'FetchError')
 
+  // 会话键一致性：load/clear 必须与 save 使用同一个会话 id。
+  // rest 模式下 save 以 session.id 为键（PUT /api/sessions/:id），因此 load/clear
+  // 跟踪最近一次 save 的 id（local adapter 语义对齐：当前会话 id 由 savePipelineSession
+  // 产生，SellWorkbench 每次存盘都带同一 id）；从未 save 过则回退 'default'。
+  let lastSavedSessionId: string | null = null
+
   return {
     mode: 'rest',
 
     async saveSession(session: PipelineSessionV2): Promise<void> {
+      lastSavedSessionId = session.id || 'default'
       if (degraded) return fallback.saveSession(session)
       try {
         const resp = await fetchImpl(sessionUrl(session.id), {
@@ -67,7 +74,7 @@ export function createRestAdapter(baseUrl: string, deps: RestAdapterDeps = {}): 
     async loadSession(): Promise<PipelineSessionV2 | null> {
       if (degraded) return fallback.loadSession()
       try {
-        const resp = await fetchImpl(sessionUrl('default'), { method: 'GET' })
+        const resp = await fetchImpl(sessionUrl(lastSavedSessionId ?? 'default'), { method: 'GET' })
         if (resp.status === 404) return null
         if (resp.status >= 500) throw new TypeError(`server ${resp.status}`)
         if (!resp.ok) return null
@@ -87,7 +94,7 @@ export function createRestAdapter(baseUrl: string, deps: RestAdapterDeps = {}): 
     async clearSession(): Promise<void> {
       if (degraded) return fallback.clearSession()
       try {
-        const resp = await fetchImpl(sessionUrl('default'), { method: 'DELETE' })
+        const resp = await fetchImpl(sessionUrl(lastSavedSessionId ?? 'default'), { method: 'DELETE' })
         if (resp.status >= 500) throw new TypeError(`server ${resp.status}`)
       } catch (err) {
         if (isNetworkFailure(err)) warnDegrade(err instanceof Error ? err.message : 'network')

@@ -184,3 +184,86 @@ test('restAdapter：5xx 视为网络失败触发降级，4xx 不降级', async (
   assert.equal(degradeReasons403.length, 0)
   assert.equal(fallbackCalls403, 0)
 })
+
+test('restAdapter：save→load→clear roundtrip 走同一会话键（修复读写断裂）', async () => {
+  // mock 后端：按 id 存取的内存 Map，模拟真实 server 行为
+  const remote = new Map<string, PipelineSessionV2>()
+  const capturedUrls: string[] = []
+  const fetchImpl = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    const u = String(url)
+    capturedUrls.push(`${init?.method || 'GET'} ${u}`)
+    const id = decodeURIComponent(u.split('/api/sessions/')[1] || '')
+    const method = init?.method || 'GET'
+    if (method === 'PUT') {
+      remote.set(id, (JSON.parse(String(init?.body)) as { data: PipelineSessionV2 }).data)
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    }
+    if (method === 'GET') {
+      return remote.has(id)
+        ? new Response(JSON.stringify({ id, data: remote.get(id) }), { status: 200 })
+        : new Response(JSON.stringify({ error: '会话不存在' }), { status: 404 })
+    }
+    if (method === 'DELETE') {
+      remote.delete(id)
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    }
+    return new Response('nf', { status: 404 })
+  }) as unknown as typeof fetch
+
+  const adapter = createRestAdapter('http://backend.test', { fetchImpl })
+
+  // 未 save 前首次 load 回退 'default'（向后兼容），404 → null
+  assert.equal(await adapter.loadSession(), null)
+  assert.ok(capturedUrls[0].endsWith('/api/sessions/default'))
+
+  // save 以 session.id 为键
+  const session = makeSession('s-abc')
+  await adapter.saveSession(session)
+  assert.ok(capturedUrls[1].endsWith('/api/sessions/s-abc'))
+  assert.ok(remote.has('s-abc'))
+
+  // load 使用与 save 相同的 id（而非写死 'default'）→ 返回一致数据
+  const loaded = await adapter.loadSession()
+  assert.ok(loaded, 'load 应命中 save 写入的会话（同键）')
+  assert.equal(loaded?.id, 's-abc')
+  assert.equal(loaded?.productInput?.title, '测试商品')
+
+  // loadHydratedSession 同样命中
+  assert.equal((await adapter.loadHydratedSession())?.id, 's-abc')
+
+  // clear 使用同一 id 删除
+  await adapter.clearSession()
+  assert.ok(capturedUrls[capturedUrls.length - 1].endsWith('/api/sessions/s-abc'))
+  assert.equal(remote.has('s-abc'), false)
+
+  // clear 后 load 为空
+  assert.equal(await adapter.loadSession(), null)
+})
+
+test('restAdapter：连续 save 不同 id 时 load/clear 跟随最近一次 save 的 id', async () => {
+  const remote = new Map<string, PipelineSessionV2>()
+  const fetchImpl = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    const u = String(url)
+    const id = decodeURIComponent(u.split('/api/sessions/')[1] || '')
+    const method = init?.method || 'GET'
+    if (method === 'PUT') {
+      remote.set(id, (JSON.parse(String(init?.body)) as { data: PipelineSessionV2 }).data)
+      return new Response('{"ok":true}', { status: 200 })
+    }
+    if (method === 'DELETE') {
+      remote.delete(id)
+      return new Response('{"ok":true}', { status: 200 })
+    }
+    return remote.has(id)
+      ? new Response(JSON.stringify({ id, data: remote.get(id) }), { status: 200 })
+      : new Response('nf', { status: 404 })
+  }) as unknown as typeof fetch
+
+  const adapter = createRestAdapter('http://backend.test', { fetchImpl })
+  await adapter.saveSession(makeSession('s-old'))
+  await adapter.saveSession(makeSession('s-new'))
+  assert.equal((await adapter.loadSession())?.id, 's-new')
+  await adapter.clearSession()
+  assert.equal(remote.has('s-new'), false)
+  assert.equal(remote.has('s-old'), true, 'clear 只删最近 save 的键，不影响其他会话')
+})
