@@ -19,6 +19,7 @@
  *          WLS_LLM_TARGET / WLS_KEYS(JSON) / WLS_LOG_LEVEL / SENTRY_DSN（命令行参数优先）
  *          WLS_AUTH_TOKEN（设置后所有 /api/* 需携带 x-wls-token 或 Authorization Bearer，不匹配 401）
  *          WLS_HOST（默认 127.0.0.1；公网部署必须 0.0.0.0 且强制配置 WLS_AUTH_TOKEN）
+ *          WLS_MAX_UNZIP_MB（draft-zip 累计解压字节上限，默认 1024MB）
  */
 import http from 'node:http'
 import https from 'node:https'
@@ -54,6 +55,7 @@ function parseArgs(argv, env = process.env) {
     // 且强制配置 WLS_AUTH_TOKEN。
     authToken: env.WLS_AUTH_TOKEN?.trim() || undefined,
     host: env.WLS_HOST || '127.0.0.1',
+    maxUnzipMb: Number(env.WLS_MAX_UNZIP_MB) || 1024,
   }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port') args.port = Number(argv[++i]) || args.port
@@ -167,7 +169,8 @@ async function handleDraftZip(req, res, args, logger) {
 
     try {
       const buf = Buffer.concat(chunks)
-      const entries = extractZip(buf)
+      // zip bomb 防护：累计解压字节配额（WLS_MAX_UNZIP_MB，默认 1GB），超限中止
+      const entries = extractZip(buf, { maxBytes: args.maxUnzipMb * 1024 * 1024 })
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const targetDir = join(args.draftDir, `draft_${stamp}`)
       mkdirSync(targetDir, { recursive: true })
@@ -186,7 +189,8 @@ async function handleDraftZip(req, res, args, logger) {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ ok: true, dir: targetDir, files: written }))
     } catch (err) {
-      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' })
+      const isQuota = err instanceof Error && err.code === 'WLS_UNZIP_QUOTA'
+      res.writeHead(isQuota ? 413 : 400, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ error: `zip 解压失败: ${err instanceof Error ? err.message : String(err)}` }))
     }
   })

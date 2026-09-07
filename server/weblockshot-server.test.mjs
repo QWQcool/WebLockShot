@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { deflateRawSync } from 'node:zlib'
 import http from 'node:http'
 import { startServer, parseWlsKeys } from './weblockshot-server.mjs'
 import { createStorage } from './storage.mjs'
+import { extractZip } from './zip-extract.mjs'
 
 function tmpDist() {
   const dir = mkdtempSync(join(tmpdir(), 'wls-server-test-'))
@@ -14,6 +16,56 @@ function tmpDist() {
 
 async function close(server) {
   await new Promise((resolve) => server.close(resolve))
+}
+
+/**
+ * 构造 deflate(8) 压缩 zip（零依赖，用于 zip bomb 配额测试）。
+ * uncompressedSize 由调用方指定（可与真实数据不符，模拟伪造声明）。
+ */
+function buildDeflateZip(name, raw, declaredUncompressedSize = raw.length) {
+  const compressed = deflateRawSync(raw)
+  const nameBuf = Buffer.from(name, 'utf8')
+
+  const local = Buffer.alloc(30)
+  local.writeUInt32LE(0x04034b50, 0)
+  local.writeUInt16LE(20, 4) // version
+  local.writeUInt16LE(0, 6) // flags
+  local.writeUInt16LE(8, 8) // method = deflate
+  local.writeUInt16LE(0, 10) // time
+  local.writeUInt16LE(0, 12) // date
+  local.writeUInt32LE(0, 14) // crc（extractZip 不校验）
+  local.writeUInt32LE(compressed.length, 18)
+  local.writeUInt32LE(declaredUncompressedSize, 22)
+  local.writeUInt16LE(nameBuf.length, 26)
+  local.writeUInt16LE(0, 28) // extra len
+
+  const central = Buffer.alloc(46)
+  central.writeUInt32LE(0x02014b50, 0)
+  central.writeUInt16LE(20, 4) // version made by
+  central.writeUInt16LE(20, 6) // version needed
+  central.writeUInt16LE(0, 8) // flags
+  central.writeUInt16LE(8, 10) // method = deflate
+  central.writeUInt16LE(0, 12) // time
+  central.writeUInt16LE(0, 14) // date
+  central.writeUInt32LE(0, 16) // crc
+  central.writeUInt32LE(compressed.length, 20)
+  central.writeUInt32LE(declaredUncompressedSize, 24)
+  central.writeUInt16LE(nameBuf.length, 28)
+  central.writeUInt16LE(0, 30) // extra len
+  central.writeUInt16LE(0, 32) // comment len
+  central.writeUInt16LE(0, 34) // disk start
+  central.writeUInt16LE(0, 36) // internal attrs
+  central.writeUInt32LE(0, 38) // external attrs
+  central.writeUInt32LE(0, 42) // local header offset
+
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0)
+  eocd.writeUInt16LE(1, 8) // entries this disk
+  eocd.writeUInt16LE(1, 10) // total entries
+  eocd.writeUInt32LE(46 + nameBuf.length, 12) // cd size
+  eocd.writeUInt32LE(30 + nameBuf.length + compressed.length, 16) // cd offset
+
+  return Buffer.concat([local, nameBuf, compressed, central, nameBuf, eocd])
 }
 
 test('parseWlsKeys：合法 JSON → 密钥表；非法输入 → null（透传）', () => {
@@ -335,6 +387,67 @@ test('默认监听地址：WLS_HOST 未设置时绑定 127.0.0.1；设置后可�
       assert.equal(server2.address().address, '0.0.0.0')
     } finally {
       await close(server2)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('extractZip：高压缩比 zip bomb 触发配额拒绝（声明超限在 inflate 前中止）', () => {
+  // 8MB 全零 → deflate 后约 8KB（高压缩比），声明解压后 8MB
+  const bombRaw = Buffer.alloc(8 * 1024 * 1024, 0)
+  const bombZip = buildDeflateZip('bomb.bin', bombRaw)
+  assert.ok(bombZip.length < 100 * 1024, `zip 应远小于原数据（实际 ${bombZip.length} 字节）`)
+
+  // 配额 1MB < 声明 8MB → 解压前直接拒绝，不进入 inflate
+  assert.throws(
+    () => extractZip(bombZip, { maxBytes: 1024 * 1024 }),
+    (err) => {
+      assert.equal(err.code, 'WLS_UNZIP_QUOTA')
+      assert.ok(err.message.includes('配额'))
+      return true
+    }
+  )
+
+  // 配额充足（16MB）→ 正常解压还原
+  const ok = extractZip(bombZip, { maxBytes: 16 * 1024 * 1024 })
+  assert.equal(ok.length, 1)
+  assert.equal(ok[0].data.length, 8 * 1024 * 1024)
+})
+
+test('extractZip：伪造小声明但实际解压超限 → maxOutputLength 兜底中止', () => {
+  // 实际解压 8MB，但头部声明 uncompressedSize=100（伪造）
+  const raw = Buffer.alloc(8 * 1024 * 1024, 0)
+  const forged = buildDeflateZip('forged.bin', raw, 100)
+
+  // 声明 100 < 配额 1KB 通过前置检查；实际 inflate 输出 8MB 超限 → zlib 中止
+  assert.throws(() => extractZip(forged, { maxBytes: 1024 }), /too large|too big|ERR_BUFFER_TOO_LARGE/i)
+})
+
+test('POST /api/jianying/draft-zip：zip bomb 触发 413，server 不 OOM 不崩溃', async () => {
+  const dir = tmpDist()
+  try {
+    const { server, port } = await startServer({
+      port: 0,
+      dist: dir,
+      env: { WLS_MAX_UNZIP_MB: '1' },
+    })
+    const base = `http://127.0.0.1:${port}`
+    try {
+      const bombZip = buildDeflateZip('bomb.bin', Buffer.alloc(8 * 1024 * 1024, 0))
+      const res = await fetch(`${base}/api/jianying/draft-zip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: bombZip,
+      })
+      assert.equal(res.status, 413)
+      const body = await res.json()
+      assert.ok(body.error.includes('zip 解压失败'))
+
+      // 关键：server 仍存活
+      assert.equal((await fetch(`${base}/healthz`)).status, 200)
+    } finally {
+      await close(server)
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })

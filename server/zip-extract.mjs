@@ -17,8 +17,16 @@ function findEocd(buf) {
 
 /**
  * 解析 zip 字节流，返回 [{ name, data: Buffer }]
+ *
+ * @param {Buffer|Uint8Array} buf zip 原始字节流
+ * @param {{ maxBytes?: number }} [opts] 解压配额：所有条目累计解压字节数上限
+ *   （zip bomb 防护；默认 Infinity 不限制，伴生服务按 WLS_MAX_UNZIP_MB 注入）。
+ *   超限时抛出 err.code === 'WLS_UNZIP_QUOTA' 的错误，且中止后续条目解压。
  */
-export function extractZip(buf) {
+export function extractZip(buf, opts = {}) {
+  const maxBytes = Number.isFinite(opts.maxBytes) && opts.maxBytes > 0 ? opts.maxBytes : Infinity
+  let usedBytes = 0
+
   const eocd = findEocd(buf)
   if (eocd < 0) throw new Error('不是有效的 zip 文件（未找到 EOCD）')
 
@@ -34,6 +42,7 @@ export function extractZip(buf) {
     }
     const method = dv.getUint16(offset + 10, true)
     const compressedSize = dv.getUint32(offset + 20, true)
+    const uncompressedSize = dv.getUint32(offset + 24, true)
     const nameLen = dv.getUint16(offset + 28, true)
     const extraLen = dv.getUint16(offset + 30, true)
     const commentLen = dv.getUint16(offset + 32, true)
@@ -47,14 +56,26 @@ export function extractZip(buf) {
       const dataStart = localOffset + 30 + localNameLen + localExtraLen
       const raw = buf.subarray(dataStart, dataStart + compressedSize)
 
+      // 单文件解压前校验声明大小：超配额直接拒绝，不进入 inflate（防内存膨胀）
+      if (uncompressedSize > maxBytes - usedBytes) {
+        const err = new Error(
+          `zip 解压超过配额上限（累计已用 ${usedBytes} 字节，条目「${name}」声明解压后 ${uncompressedSize} 字节）`
+        )
+        err.code = 'WLS_UNZIP_QUOTA'
+        throw err
+      }
+
       let data
       if (method === 0) {
         data = Buffer.from(raw)
       } else if (method === 8) {
-        data = inflateRawSync(raw)
+        // maxOutputLength：即使声明大小被伪造，实际解压字节超限也会立即中止
+        data = inflateRawSync(raw, { maxOutputLength: maxBytes - usedBytes })
       } else {
         throw new Error(`不支持的压缩方法 ${method}（文件: ${name}）`)
       }
+
+      usedBytes += data.length
       entries.push({ name, data })
     }
 
