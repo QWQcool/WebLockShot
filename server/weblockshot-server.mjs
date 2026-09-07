@@ -212,9 +212,27 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload))
 }
 
+/**
+ * 容错 URI 解码：畸形转义序列（如 GET /%zz）会让 decodeURIComponent 抛 URIError。
+ * 静态路径回退原始字符串；会话 API 等严格场景由调用方根据 needsValid 语义返回 400。
+ */
+function safeDecodeUriComponent(raw) {
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return null
+  }
+}
+
+/** 解码失败时回退原始字符串（用于静态路径等宽松场景） */
+function decodeUrlLenient(raw) {
+  return safeDecodeUriComponent(raw) ?? raw
+}
+
 async function handleSessionApi(req, res, urlPath, storage) {
-  const id = decodeURIComponent(urlPath.slice('/api/sessions/'.length))
+  const id = safeDecodeUriComponent(urlPath.slice('/api/sessions/'.length))
   if (!id || id.includes('/')) {
+    // 畸形转义序列（%zz 等）解码失败 → 明确 400，而非 URIError 崩溃
     sendJson(res, 400, { error: '无效的会话 id' })
     return
   }
@@ -277,7 +295,7 @@ const MIME = {
 }
 
 function serveStatic(req, res, distDir) {
-  let filePath = join(distDir, decodeURIComponent(req.url.split('?')[0]))
+  let filePath = join(distDir, decodeUrlLenient(req.url.split('?')[0]))
   if (req.url === '/' || !filePath.startsWith(distDir)) {
     filePath = join(distDir, 'index.html')
   }
@@ -344,7 +362,15 @@ export async function startServer(opts = {}) {
     }
 
     if (urlPath.startsWith('/api/sessions/')) {
-      void handleSessionApi(req, res, urlPath, storage)
+      handleSessionApi(req, res, urlPath, storage).catch((err) => {
+        // 兜底：未预期的 rejection 不再裸 void 丢弃（原先会变成 unhandled rejection）
+        logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, '会话 API 处理异常')
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: '会话 API 内部错误' })
+        } else {
+          res.end()
+        }
+      })
       return
     }
 
@@ -369,7 +395,14 @@ export async function startServer(opts = {}) {
     }
 
     if (urlPath.startsWith('/api/jianying/draft-zip')) {
-      void handleDraftZip(req, res, args, logger)
+      handleDraftZip(req, res, args, logger).catch((err) => {
+        logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, 'draft-zip 处理异常')
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: 'draft-zip 内部错误' })
+        } else {
+          res.end()
+        }
+      })
       return
     }
 

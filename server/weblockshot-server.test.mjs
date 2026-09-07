@@ -210,3 +210,38 @@ test('WLS_KEYS + WLS_LLM_TARGET：反代注入密钥头；未设置 keys 时透�
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('畸形 URL：GET /%zz 与 GET /api/sessions/%zz 不再崩溃，server 仍存活', async () => {
+  const dir = tmpDist()
+  try {
+    const { server, port } = await startServer({ port: 0, dist: dir, env: {} })
+    const base = `http://127.0.0.1:${port}`
+    try {
+      // 静态路径：畸形转义 → 不抛 URIError（404 或 SPA 回退均可，只要不崩）
+      const badStatic = await fetch(`${base}/%zz`)
+      assert.ok(badStatic.status < 500, `畸形静态路径应正常响应，实际 ${badStatic.status}`)
+
+      // 会话 API：畸形转义 id → 明确 400
+      const badSession = await fetch(`${base}/api/sessions/%zz`)
+      assert.equal(badSession.status, 400)
+      const body = await badSession.json()
+      assert.ok(body.error.includes('无效'))
+
+      // 关键：server 进程仍存活，继续响应正常请求
+      const health = await fetch(`${base}/healthz`)
+      assert.equal(health.status, 200)
+
+      // 会话 API 正常路径不受影响
+      const put = await fetch(`${base}/api/sessions/ok`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { version: 2, id: 'ok' } }),
+      })
+      assert.equal(put.status, 200)
+    } finally {
+      await close(server)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
