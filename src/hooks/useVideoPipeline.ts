@@ -4,7 +4,7 @@ import { resolveVideoProvider } from '../director/nodes/executorNode.ts'
 import { walletManager } from '../domain/wallet.ts'
 import { circuitBreaker } from '../domain/fsm.ts'
 import { idempotencyManager } from '../domain/idempotency.ts'
-import { getPollingWindow } from '../domain/pollingConfig.ts'
+import { getPollingWindow, pollSleep } from '../domain/pollingConfig.ts'
 
 /**
  * 共享视频生成管线 Hook (Video Pipeline)
@@ -149,13 +149,8 @@ export function useVideoPipeline() {
           return
         }
 
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, pollingWindow.intervalMs)
-          signal.addEventListener('abort', () => {
-            clearTimeout(timer)
-            resolve()
-          }, { once: true })
-        })
+        // 统一轮询睡眠：切后台回来立即刷新一次状态（pollSleep 统一实现）
+        await pollSleep(pollingWindow.intervalMs, signal)
 
         if (signal.aborted || !mountedRef.current) {
           idempotencyManager.releaseLock(taskKey)

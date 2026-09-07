@@ -10,6 +10,15 @@ type Props = {
   onNext: () => void
 }
 
+/**
+ * 仅移动端（触屏粗指针）调起后置相机拍摄（M1d 触控适配）；
+ * 桌面 / 测试环境为 undefined，不影响现状行为。
+ */
+const IS_COARSE_POINTER =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(pointer: coarse)').matches
+
 const PRESET_PRODUCTS: {
   title: string
   points: string[]
@@ -213,6 +222,7 @@ export const ProductStep: React.FC<Props> = ({
                 <input
                   type="file"
                   accept="image/*"
+                  capture={IS_COARSE_POINTER ? 'environment' : undefined}
                   onChange={handleImageUpload}
                   className="file-input-hidden"
                   id="img-upload-input"

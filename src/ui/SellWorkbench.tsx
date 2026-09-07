@@ -20,6 +20,7 @@ import {
 } from '../persistV2.ts'
 
 import { WorkbenchHeader, type WorkbenchStep, type StudioMode } from './components/WorkbenchHeader.tsx'
+import { PipelineEngineBar } from './components/PipelineEngineBar.tsx'
 import { TokenSettingsModal } from './components/TokenSettingsModal.tsx'
 import { WalletModal } from './components/WalletModal.tsx'
 import { ProductStep } from './steps/ProductStep.tsx'
@@ -396,40 +397,8 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
 
         {studioMode === 'pipeline' && (
           <>
-            {/* 全链路常驻引擎条：7 步全程可见，选择与设置弹窗双向同步 */}
-            <div className="pipeline-engine-bar">
-              <div className="control-pill-group">
-                <span className="pill-label">模型引擎:</span>
-                <button
-                  type="button"
-                  className={`pill-btn ${pipelineProvider === 'mock' ? 'active' : ''}`}
-                  onClick={() => handleSelectPipelineProvider('mock')}
-                >
-                  Mock 实验画布 (免费)
-                </button>
-                <button
-                  type="button"
-                  className={`pill-btn ${pipelineProvider === 'kling' ? 'active' : ''}`}
-                  onClick={() => handleSelectPipelineProvider('kling')}
-                >
-                  快手可灵 (Kling)
-                </button>
-                <button
-                  type="button"
-                  className={`pill-btn ${pipelineProvider === 'jimeng' ? 'active' : ''}`}
-                  onClick={() => handleSelectPipelineProvider('jimeng')}
-                >
-                  字节即梦 (Jimeng)
-                </button>
-                <button
-                  type="button"
-                  className={`pill-btn comfyui-btn ${pipelineProvider === 'comfyui' ? 'active' : ''}`}
-                  onClick={() => handleSelectPipelineProvider('comfyui')}
-                >
-                  🔥 ComfyUI 私有算力
-                </button>
-              </div>
-            </div>
+            {/* 全链路常驻引擎条：7 步全程可见，选择与设置弹窗双向同步；<768px 可折叠（M1d 手机适配） */}
+            <PipelineEngineBar providerId={pipelineProvider} onSelectProvider={handleSelectPipelineProvider} />
 
             {/* ComfyUI 选中后的 Ping 状态条 */}
             {pipelineProvider === 'comfyui' && comfyPing.status !== 'idle' && (

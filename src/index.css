@@ -4535,3 +4535,119 @@ textarea:focus-visible {
   font-size: 0.72rem;
   font-weight: 700;
 }
+
+/* ==========================================================================
+   M1d 手机适配 (Mobile Responsive)
+   断点：≥1024 现状不变 / 768~1024 侧栏压缩 / <768 单栏堆叠 + 触控 44px
+   ========================================================================== */
+
+/* 引擎条折叠（PipelineEngineBar 组件） */
+.engine-bar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.35rem 0.7rem;
+  background: transparent;
+  border: 1px solid var(--wls-border, rgba(255, 255, 255, 0.12));
+  border-radius: 999px;
+  color: var(--wls-text, inherit);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.engine-bar-toggle:hover { border-color: #22d3ee; }
+.pipeline-engine-bar.collapsed { justify-content: flex-start; }
+.engine-bar-toggle-text { white-space: nowrap; }
+
+/* PWA 自更新提示条 */
+.pwa-update-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  background: rgba(11, 15, 20, 0.95);
+  border: 1px solid #22d3ee;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  color: var(--wls-text, #e6f7ff);
+  font-size: 0.85rem;
+}
+.pwa-update-btn { flex-shrink: 0; }
+
+/* ---------- 中屏 768~1023：侧栏/横条压缩 ---------- */
+@media (max-width: 1023px) {
+  .brand-tagline { display: none; }
+  .zone-desc { display: none; }
+  .workbench-three-zones-bar { gap: 0.5rem; }
+  .workflow-zone-card { padding: 0.55rem 0.75rem; }
+  .workbench-main-content { padding: 1rem; width: 98%; }
+  .header-controls-group { flex-wrap: wrap; gap: 0.4rem; }
+}
+
+/* ---------- 小屏 <768：单栏堆叠 + 紧凑步骤指示器 ---------- */
+@media (max-width: 767px) {
+  .workbench-header { padding: 0.7rem 0.8rem; }
+  .header-brand { flex-wrap: wrap; gap: 0.5rem; }
+  .brand-logo { display: none; }
+  .workbench-main-content { padding: 0.75rem; width: 100%; }
+
+  /* 三区横条 → 纵向堆叠 */
+  .workbench-three-zones-bar { flex-direction: column; gap: 0.5rem; }
+  .zone-pipeline, .zone-single, .zone-multi { min-width: 100%; }
+
+  /* 六步横条 → 紧凑步骤指示器：仅图标+当前步可读 */
+  .header-steps { gap: 0.15rem; }
+  .step-nav-item { padding: 0.3rem 0.45rem; }
+  .step-label { font-size: 0.68rem; max-width: 4.5em; overflow: hidden; text-overflow: ellipsis; }
+  .step-divider { display: none; }
+  .step-nav-item:not(.active) .step-label { display: none; }
+
+  /* 引擎条：按钮可换行 */
+  .pipeline-engine-bar { flex-wrap: wrap; gap: 0.5rem; }
+  .control-pill-group { flex-wrap: wrap; }
+
+  /* 双栏工作区 → 纵向单栏（统一兜底既有网格类） */
+  .studio-layout,
+  .stage-workspace-grid,
+  .player-workspace-grid,
+  .reference-media-grid,
+  .desk-body { grid-template-columns: 1fr; }
+
+  /* 表格 → 可横滑的卡片化容器（避免挤压爆版） */
+  .panel-card { overflow-x: auto; }
+  .panel-card table { min-width: 34rem; }
+
+  /* 模式切换按钮压缩 */
+  .mode-toggle { flex-direction: column; width: 100%; }
+  .mode-btn { width: 100%; }
+}
+
+/* ---------- 触控适配：可点击区 ≥44px + hover 的 tap 等价 ---------- */
+@media (pointer: coarse) {
+  .pill-btn,
+  .step-nav-item,
+  .mode-btn,
+  .btn-wallet-trigger,
+  .btn-feedback-trigger,
+  .btn-settings-trigger,
+  .btn-alert-action,
+  .btn-alert-dismiss,
+  .engine-bar-toggle,
+  .preset-chip-card,
+  .dropzone-label {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* hover 依赖的卡片补 :active tap 等价反馈 */
+  .workflow-zone-card:active,
+  .preset-chip-card:active,
+  .pill-btn:active { filter: brightness(1.25); }
+}

@@ -7,7 +7,7 @@ import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 import { walletManager } from '../../domain/wallet.ts'
 import { circuitBreaker, assertJobStatusTransition } from '../../domain/fsm.ts'
-import { getPollingWindow } from '../../domain/pollingConfig.ts'
+import { getPollingWindow, pollSleep } from '../../domain/pollingConfig.ts'
 import { idempotencyManager } from '../../domain/idempotency.ts'
 
 export type JobUpdateListener = (jobs: ShotJob[]) => void
@@ -246,7 +246,8 @@ export class ExecutorEngine {
       let finished = false
       let pollAttempts = 0
       while (!finished && pollAttempts < pollingWindow.maxAttempts) {
-        await new Promise((r) => setTimeout(r, pollingWindow.intervalMs))
+        // 统一轮询睡眠：切后台回来立即刷新一次状态（pollSleep 统一实现）
+        await pollSleep(pollingWindow.intervalMs)
         pollAttempts++
 
         const result = await provider.poll(taskId)

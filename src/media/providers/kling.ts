@@ -2,6 +2,7 @@ import type { MediaAsset } from '../../domain/shotJob.ts'
 import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
 import { withRetry, isRetryableHttpStatus, isAbortError } from '../../ai/retry.ts'
 import { probeVideoBlob } from '../assetSize.ts'
+import { getEngineProxyBase } from '../../services/backend/proxyConfig.ts'
 
 export type KlingConfig = {
   apiKey: string
@@ -49,11 +50,11 @@ export class KlingVideoProvider implements VideoProvider {
   private baseUrl: string
 
   constructor(baseUrl?: string) {
-    // 开发环境走 Vite 代理解决浏览器跨域，生产走官方域名
+    // 开发环境走 Vite 代理解决浏览器跨域，生产走官方域名；代理前缀可经 VITE_API_PROXY_BASE 配置（默认 '/api'）
     this.baseUrl =
       baseUrl ||
       (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? '/api/kling'
+        ? getEngineProxyBase('kling')
         : 'https://api.klingai.com')
   }
 

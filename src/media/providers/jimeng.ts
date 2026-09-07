@@ -1,6 +1,7 @@
 import type { MediaAsset } from '../../domain/shotJob.ts'
 import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
 import { probeVideoBlob } from '../assetSize.ts'
+import { getEngineProxyBase } from '../../services/backend/proxyConfig.ts'
 
 const jimengCache = new Map<string, { url: string; durationSec: number; shotId: string }>()
 
@@ -13,10 +14,11 @@ export class JimengVideoProvider implements VideoProvider {
   private baseUrl: string
 
   constructor(baseUrl?: string) {
+    // localhost 走反代解决跨域；前缀可经 VITE_API_PROXY_BASE 配置（默认 '/api'，现状不变）
     this.baseUrl =
       baseUrl ||
       (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? '/api/jimeng'
+        ? getEngineProxyBase('jimeng')
         : 'https://api.jimeng.bytedance.com')
   }
 

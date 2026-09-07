@@ -18,6 +18,7 @@ import {
   type ShotHistory,
 } from './shotHistory'
 import { ShotStage } from './stage/ShotStage'
+import { shouldReduceTimelineMotion } from './stage/animationBudget'
 import { useShotTimeline } from './stage/useShotTimeline'
 import type {
   EditorMode,
@@ -80,8 +81,9 @@ export function DramaEditor({ onSwitchToSell }: { onSwitchToSell: () => void }) 
   const shot = story.shots[timeline.shotIndex] ?? story.shots[0]
 
   useEffect(() => {
+    // 移动/低端设备同样降级分镜动画（M1d animationBudget），与系统减动效取并集
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const sync = () => setReducedMotion(mq.matches)
+    const sync = () => setReducedMotion(mq.matches || shouldReduceTimelineMotion())
     sync()
     mq.addEventListener('change', sync)
     return () => mq.removeEventListener('change', sync)

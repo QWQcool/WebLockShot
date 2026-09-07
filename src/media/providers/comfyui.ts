@@ -1,5 +1,6 @@
 import type { MediaAsset } from '../../domain/shotJob.ts'
 import type { PollResult, VideoGenRequest, VideoProvider } from '../types.ts'
+import { getEngineProxyBase } from '../../services/backend/proxyConfig.ts'
 
 export type ComfyUIWorkflowPreset = 'wan2.1-i2v' | 'cogvideox-5b' | 'svd-xt' | 'custom'
 
@@ -117,7 +118,7 @@ export class ComfyUIVideoProvider implements VideoProvider {
       try {
         const stored = sessionStorage.getItem(COMFY_URL_STORAGE_KEY)
         if (stored && stored.trim()) return stored.trim()
-        if (window.location.hostname === 'localhost') return '/api/comfyui'
+        if (window.location.hostname === 'localhost') return getEngineProxyBase('comfyui')
       } catch {}
     }
     return 'http://127.0.0.1:8188'

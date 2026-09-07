@@ -43,3 +43,59 @@ export function setPollingWindowMinutes(minutes: number): PollingWindow {
 export function setPollingWindow(window: PollingWindow): void {
   pollingWindow = { ...window }
 }
+
+/**
+ * 轮询等待（M1d 手机正确性）：轮询间隔睡眠 + 「回到前台立即唤醒」。
+ *
+ * 所有轮询循环（useVideoPipeline / executorNode / 后续新增）统一使用本函数：
+ * 用户把页面切到后台再切回来时，立即触发下一次轮询（状态即时刷新），
+ * 而不是傻等剩余间隔。页面一直在前台时行为与普通 setTimeout 完全一致。
+ *
+ * Node 环境（无 document）自动退化为纯 setTimeout，测试无需 mock 浏览器。
+ */
+export function pollSleep(intervalMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (intervalMs <= 0) {
+      resolve()
+      return
+    }
+
+    let done = false
+    let sawHidden = false
+    let cleanup: () => void = () => {}
+
+    const finish = () => {
+      if (done) return
+      done = true
+      cleanup()
+      resolve()
+    }
+
+    const timer = setTimeout(finish, intervalMs)
+
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      sawHidden = document.visibilityState === 'hidden'
+      const onVisibility = () => {
+        if (document.visibilityState === 'hidden') {
+          sawHidden = true
+          return
+        }
+        // 只有期间确实切过后台，回来才立刻唤醒；全程前台保持原节奏
+        if (sawHidden) finish()
+      }
+      const onAbort = () => finish()
+      document.addEventListener('visibilitychange', onVisibility)
+      signal?.addEventListener('abort', onAbort, { once: true })
+      cleanup = () => {
+        clearTimeout(timer)
+        document.removeEventListener('visibilitychange', onVisibility)
+        signal?.removeEventListener('abort', onAbort)
+      }
+    } else {
+      cleanup = () => {
+        clearTimeout(timer)
+      }
+      signal?.addEventListener('abort', () => finish(), { once: true })
+    }
+  })
+}
