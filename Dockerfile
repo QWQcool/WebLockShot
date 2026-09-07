@@ -21,6 +21,8 @@ COPY src ./src
 COPY public ./public
 # src/presets/load.ts 以相对路径引用仓库根 presets/ 下的剧情 JSON，构建必需
 COPY presets ./presets
+# src/ai/prompts.ts 以 ?raw 引用 .cursor/skills/shot-stage/SKILL.md，构建必需
+COPY .cursor ./.cursor
 
 # 产物输出到 /app/dist
 RUN npm run build
