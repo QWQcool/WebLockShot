@@ -152,8 +152,14 @@ a { color: #4f46e5; }
 <li><a href="#2-字节即梦-jimeng-api-直连">2. 字节即梦 (Jimeng) API 直连</a></li>
 <li><a href="#3-comfyui-本地局域网私有-gpu-算力集群wan-21--cogvideox">3. ComfyUI 本地/局域网私有 GPU 算力集群（Wan 2.1 / CogVideoX）</a></li>
 <li><a href="#五剪映--capcut-电脑版草稿工程导入与声画自动对齐实操">（五）剪映 / CapCut 电脑版草稿工程导入与声画自动对齐实操</a></li>
-<li><a href="#六工业级可靠性体系幂等防抖状态机与两阶段钱包闭环">（六）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</a></li>
-<li><a href="#七常见问题与避坑指南faq">（七）常见问题与避坑指南（FAQ）</a></li>
+<li><a href="#剪映草稿-zip-包导入实操推荐">剪映草稿 zip 包导入实操（推荐）</a></li>
+<li><a href="#六数据反馈闭环回流看板与钩子胜率加权">（六）数据反馈闭环：回流看板与钩子胜率加权</a></li>
+<li><a href="#七本地伴生服务部署与剪映草稿一键落盘">（七）本地伴生服务部署与剪映草稿一键落盘</a></li>
+<li><a href="#八工业级可靠性体系幂等防抖状态机与两阶段钱包闭环">（八）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</a></li>
+<li><a href="#九常见问题与避坑指南faq">（九）常见问题与避坑指南（FAQ）</a></li>
+<li><a href="#十手机端使用pwa-添加到主屏幕">（十）手机端使用：PWA 添加到主屏幕</a></li>
+<li><a href="#十一docker-生产部署">（十一）Docker 生产部署</a></li>
+<li><a href="#十二小程序版轻端">（十二）小程序版轻端</a></li>
 </ul>
 </nav>
 <h2 id="_2">（序）介绍与定位</h2>
@@ -288,7 +294,8 @@ npm run dev
 <ul>
 <li>6 镜视频无缝连播审片播放器，支持全屏预览与单镜头逐一审阅；</li>
 <li><strong>智能 TTS 配音</strong>：内置语速自适应算法，自动根据镜头秒数缩放台词语速，确保台词在镜头结束前精准收尾；</li>
-<li><strong>剪映草稿工程直出</strong>：一键导出对齐好的 <code>draft_content.json</code>。</li>
+<li><strong>剪映草稿工程直出</strong>：一键导出对齐好的 <code>draft_content.json</code>，或直接下载含全部素材的完整 zip 包（详见「（五）剪映草稿 zip 包导入实操」）；</li>
+<li>素材失效时（页面刷新导致本地缓存丢失）会显示明确的失效占位提示，而非死链播放器。</li>
 </ul>
 <hr />
 <h2 id="_4">（三）双独立工作室模式</h2>
@@ -305,12 +312,15 @@ npm run dev
 <h3 id="b-agent">模式 B：多 Agent 协同编导研讨室</h3>
 <figure><img alt="模式 B 多 Agent 协同编导研讨室" src="./screenshots/09_multi_agent_studio.png" /><figcaption>模式 B 多 Agent 协同编导研讨室</figcaption></figure>
 <p>适合高定短片与复杂多镜头影视级创作：
-- <strong>4 Agent 协同共创推演</strong>：
-  1. 🎬 <strong>导演 Agent (Director)</strong>：负责整体视觉调性、节奏节奏把控与场景构建；
-  2. 🎥 <strong>运镜 Agent (Cinematographer)</strong>：设计精妙机位走位、焦段切换（85mm/100mm微距）与动态打光；
-  3. ⚖️ <strong>质检 Agent (Critic)</strong>：严查画质连贯性、商品特征变形与过饱和瑕疵；
-  4. ⚡ <strong>调度 Agent (Dispatcher)</strong>：综合 3 方评审意见，合成终极提示词并派发至渲染引擎。
-- 动态推演过程全可视，支持多轮协商打磨。</p>
+- <strong>两种推演模式（诚实标注，绝不伪装）</strong>：
+  - <strong>真实推演</strong>：在「⚙️ API 设置」配置大模型 Key 后，四智体由真实 LLM 结构化推演——编导 → 运镜 → 质检 → 调度依次产出，质检评分为真实差异化评分（0~100）；
+  - <strong>演示动画模式</strong>：未配置 Key 时，时间线首条消息与工程单徽章会明确标注「🧪 演示动画模式 · 评分非真实」，推演内容为预编排脚本，绝不伪造质检评分。
+- <strong>真实推演角色分工</strong>：
+  1. 🎬 <strong>导演 Agent (Director)</strong>：负责整体视觉调性、叙事弧线与核心抓手；
+  2. 🎥 <strong>运镜 Agent (Cinematographer)</strong>：设计机位走位、焦段切换与动态打光；
+  3. ⚖️ <strong>质检 Agent (Critic)</strong>：审输出风险并给出带扣分理由的真实评分；
+  4. ⚡ <strong>调度 Agent (Dispatcher)</strong>：综合三方成果合成终极提示词并派发至渲染引擎。
+- <strong>轮询窗口可调</strong>：顶部「轮询窗口」下拉（2/5/10/20 分钟），超时自动全额退款。</p>
 <hr />
 <h2 id="comfyui">（四）视频供应商配置与 ComfyUI 自建私有算力指南</h2>
 <figure><img alt="API 配置与 ComfyUI 私有算力 GPU 探测" src="./screenshots/10_token_settings_comfyui.png" /><figcaption>API 配置与 ComfyUI 私有算力 GPU 探测</figcaption></figure>
@@ -319,11 +329,17 @@ npm run dev
 <ul>
 <li>申请快手可灵官方开发者平台 API 密钥（Access Key ID 与 Secret Key）；</li>
 <li>填入对应输入框并选择首选生片时长；</li>
+<li><strong>两种鉴权形态</strong>（M2 契约升级）：</li>
+<li>填入裸 Key 字符串 → Bearer 直传模式（历史行为）；</li>
+<li>填入 JSON <code>{"ak":"你的AK","sk":"你的SK"}</code> → 客户端按官方文档自动签发 JWT（HS512，<code>iss/exp/nbf</code> 载荷，请求头直接携带 token，无需 Bearer 前缀），签名实现已按官方向量做契约测试锁定；</li>
 <li>生成计费：在虚拟钱包中约 10 灵感币/镜头。</li>
 </ul>
 <h3 id="2-jimeng-api">2. 字节即梦 (Jimeng) API 直连</h3>
 <ul>
 <li>填入即梦开放平台 API Key 与端点地址；</li>
+<li><strong>两种鉴权形态</strong>（M2 契约升级）：</li>
+<li>填入裸 Key 字符串 → Bearer 直传模式（历史行为）；</li>
+<li>填入 JSON <code>{"ak":"你的AK","sk":"你的SK"}</code> → 客户端按火山引擎 V4 规范逐请求计算 HMAC-SHA256 签名（<code>X-Date</code> / <code>X-Content-Sha256</code> / <code>Authorization</code> 三头），签名实现已按官方向量做契约测试锁定；</li>
 <li>生成计费：在虚拟钱包中约 8 灵感币/镜头。</li>
 </ul>
 <h3 id="3-comfyui-gpu-wan-21-cogvideox">3. ComfyUI 本地/局域网私有 GPU 算力集群（Wan 2.1 / CogVideoX）</h3>
@@ -366,30 +382,135 @@ npm run dev
 <li>进入对应工程名字的文件夹，将 WebLockShot 下载的 <code>draft_content.json</code> 替换原有文件；</li>
 <li>重新在剪映中打开该项目，所有分镜视频、配音解说与爆款字幕已在时间线上精确对齐就绪，直接导出高清成片！</li>
 </ol>
+<h3 id="zip">剪映草稿 zip 包导入实操（推荐）</h3>
+<blockquote>
+<p>推荐优先使用 zip 包方式：一次拿到「工程文件 + 全部已生成视频素材 + 使用说明」，无需手动逐个下载素材。</p>
+</blockquote>
+<p>在「✨ 审片交付」页点击 <strong>「📦 下载完整草稿 zip 包 (含素材)」</strong>：</p>
+<figure><img alt="剪映草稿 zip 包下载按钮" src="./screenshots/13_jianying_zip_export.png" /><figcaption>剪映草稿 zip 包下载按钮</figcaption></figure>
+<p>zip 包内容：
+- <code>draft_content.json</code> / <code>draft_meta_info.json</code>：剪映标准草稿工程（包内素材路径已改写为相对路径 <code>assets/...</code>）；
+- <code>assets/</code>：已生成的分镜视频素材（<code>Shot_N_&lt;镜号&gt;.mp4/webm</code>）与可选旁白音频（<code>voice_&lt;镜号&gt;.mp3</code>）；
+- <code>README-使用说明.txt</code>：本包专属素材清单（含缺失素材如实列出）与导入步骤。</p>
+<p>导入步骤：
+1. 解压 <code>&lt;工程名&gt;_剪映草稿.zip</code>；
+2. 打开剪映电脑版，新建一个空草稿（如 <code>吹风机带货</code>），然后关闭剪映；
+3. 进入剪映草稿目录（Windows 默认 <code>%LOCALAPPDATA%\JianyingPro\User Data\Projects\com.lveditor.draft\&lt;草稿名&gt;\</code>）；
+4. 将解压出的 <code>draft_content.json</code>、<code>draft_meta_info.json</code> 与 <code>assets/</code> 文件夹复制进该目录（同名文件覆盖）；
+5. 重新打开剪映，三轨对齐的完整工程即可就绪。</p>
+<blockquote>
+<p>注：浏览器 Web Speech TTS 无法导出音频文件。若包内缺 <code>assets/voice_*.mp3</code>，可自行录制同名旁白放入 assets/，或在剪映中删除空音频片段。</p>
+</blockquote>
 <hr />
-<h2 id="_7">（六）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</h2>
-<p>为了支撑商业生产环境的稳定性，WebLockShot 构筑了三重安全防护网：</p>
+<h2 id="_7">（六）数据反馈闭环：回流看板与钩子胜率加权</h2>
+<p>WebLockShot 内置「投放 → 回流 → 加权 → 再生成」的数据闭环，让钩子选择从经验主义走向数据驱动。</p>
+<h3 id="_8">钩子库与元数据路由</h3>
+<p>5 套爆款结构（痛点提问 / 效果反差 / 沉浸开箱 / 短剧反转 / 价格锚点）连同钩子句式库，被抽取为 <strong>JSON 数据资产</strong>（<code>src/assets/hooks/structures.data.json</code>），每套结构带三类元数据：
+- <strong>适用品类（categories）</strong>：如 美妆护肤 / 数码潮玩 / 平替好物——ScriptWriter 按商品种类自动路由最匹配的结构模板；
+- <strong>情绪轴（emotionArc）</strong>：6 拍各自的情绪锚点（如 焦虑→共鸣→惊喜→专注→信任→紧迫）；
+- <strong>历史胜率（baselineWinRate / hookWinRates）</strong>：先验权重，回流数据可实时覆盖。</p>
+<h3 id="_9">回流看板使用步骤</h3>
+<figure><img alt="回流看板：数据录入与胜率看板" src="./screenshots/12_reflow_board.png" /><figcaption>回流看板：数据录入与胜率看板</figcaption></figure>
+<ol>
+<li>点击顶部导航 <strong>「📊 回流看板」</strong>；</li>
+<li>在录入表单填写：视频标题、命中的结构模板与钩子（下拉选择）、商品种类、平台的 <strong>3 秒完播率 / 完播率 / 转化数</strong>；</li>
+<li>点击 <strong>「📥 录入回流数据」</strong>，数据存入本地 IndexedDB；</li>
+<li>下方看板自动按 <strong>结构 / 钩子 / 品类</strong> 三个维度聚合胜率（纯 CSS 条形图，从高到低排序）；</li>
+<li>胜率采用 <strong>Laplace 平滑</strong>：<code>(胜出次数 + 1) / (样本数 + 2)</code>，其中 3 秒完播率 ≥ 30% 记为一次「胜出」，避免小样本过拟合；</li>
+<li>之后每次生成脚本，ScriptWriter 的钩子采样会按真实胜率加权——高胜率钩子被优先选中。</li>
+</ol>
+<blockquote>
+<p>数据仅存本地浏览器 IndexedDB，不上传任何服务器。</p>
+</blockquote>
+<hr />
+<h2 id="_10">（七）本地伴生服务部署与剪映草稿一键落盘</h2>
+<p>纯前端版在 GitHub Pages 上无法直连 ComfyUI 与视频平台 API（跨域限制），也无法替你把草稿写进本地磁盘。<strong>伴生服务</strong>（纯 Node，运行时仅依赖 pino 日志库）解决这两件事，并提供一系列「预留开关」能力（不设置任何 <code>WLS_*</code> 环境变量 = 与纯前端现状完全一致的本地默认模式）：</p>
+<figure><img alt="伴生服务启动与剪映落盘" src="./screenshots/14_companion_server.png" /><figcaption>伴生服务启动与剪映落盘</figcaption></figure>
+<h3 id="_11">一行命令启动</h3>
+<pre><code class="language-bash">npm run build &amp;&amp; npm run start:server    # 默认 http://localhost:5174
+# 等价 npx 形态：npx weblockshot
+# 自定义参数：node server/weblockshot-server.mjs --port 8080 --dist ./dist --draft-dir ./jianying-drafts
+</code></pre>
+<p>Windows 用户可直接双击根目录 <strong><code>start-weblockshot.bat</code></strong>（自动安装依赖 → 构建 → 启动）。</p>
+<h3 id="_12">能力清单</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">能力</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">静态托管</td>
+<td style="text-align: left;">托管 <code>dist/</code> 生产构建，打开 <code>http://localhost:5174</code> 即用</td>
+</tr>
+<tr>
+<td style="text-align: left;">API 反代</td>
+<td style="text-align: left;"><code>/api/kling</code>、<code>/api/jimeng</code>、<code>/api/comfyui</code> 三个前缀反向代理，生产环境也能直连 ComfyUI 与视频平台</td>
+</tr>
+<tr>
+<td style="text-align: left;">剪映草稿落盘</td>
+<td style="text-align: left;"><code>POST /api/jianying/draft-zip</code>（body 为 zip 二进制），自动解压到 <code>--draft-dir</code> 指定目录，免去手动解压复制</td>
+</tr>
+<tr>
+<td style="text-align: left;">健康检查（预留）</td>
+<td style="text-align: left;"><code>GET /healthz</code> 返回版本 / 存储模式 / uptime / 密钥注入模式等 JSON 自观测</td>
+</tr>
+<tr>
+<td style="text-align: left;">会话存储 API（预留）</td>
+<td style="text-align: left;"><code>PUT/GET/DELETE /api/sessions/:id</code>，配合前端 <code>VITE_BACKEND_URL</code> 的服务端模式；<code>WLS_STORAGE=sqlite</code> 时落盘持久化</td>
+</tr>
+<tr>
+<td style="text-align: left;">LLM 反代（预留）</td>
+<td style="text-align: left;">设置 <code>WLS_LLM_TARGET</code> 后 <code>/api/llm</code> 反代至目标 LLM API；未设置返回 501</td>
+</tr>
+<tr>
+<td style="text-align: left;">密钥注入（预留）</td>
+<td style="text-align: left;">设置 <code>WLS_KEYS</code>（JSON）后反代注入真实密钥头，小程序/无密钥客户端也能出片；未设置 = 透传模式</td>
+</tr>
+<tr>
+<td style="text-align: left;">结构化日志</td>
+<td style="text-align: left;">pino JSON 行输出，级别经 <code>WLS_LOG_LEVEL</code> 控制</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>全部预留开关的环境变量表见主仓 README「🚀 生产部署」章节；本指南末尾「（十一）Docker 生产部署」有一键部署实操。</p>
+</blockquote>
+<h3 id="_13">剪映草稿一键落盘实操</h3>
+<ol>
+<li>按上文启动伴生服务（记下启动日志中的「草稿落盘」目录）；</li>
+<li>用任意 HTTP 客户端（或 curl）将「📦 下载完整草稿 zip 包」得到的 zip 原样 POST 到 <code>http://localhost:5174/api/jianying/draft-zip</code>；</li>
+<li>服务返回 <code>{ ok: true, dir: "...", files: [...] }</code>，按返回的 <code>dir</code> 路径把内容挪进剪映草稿目录（或直接将 <code>--draft-dir</code> 指向剪映草稿目录），打开剪映即可。</li>
+</ol>
+<hr />
+<h2 id="_14">（八）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</h2>
+<p>为了支撑商业生产环境的稳定性，WebLockShot 构筑了多重安全防护网：</p>
 <h3 id="1-idempotency-debounce">1. 任务幂等性与防连击锁 (Idempotency &amp; Debounce)</h3>
 <ul>
-<li><strong>SHA-256 结构化意图签名</strong>：根据 <code>(intent, provider, prompt, duration, shotId)</code> 计算唯一幂等指纹；</li>
-<li><strong>In-flight 互斥锁</strong>：任务在后台处理期间，拦截一切重复连击，并在界面给出倒计时提示，防止并发风暴。</li>
+<li><strong>结构化意图签名</strong>：根据规范化 <code>(intent, shotId, provider, prompt, duration, ratio)</code> 计算唯一幂等指纹；</li>
+<li><strong>In-flight 互斥锁</strong>：任务在后台处理期间，拦截一切重复连击，防止并发风暴。</li>
 </ul>
 <h3 id="2-fsm-circuit-breaker">2. 状态机流转与边界容错 (FSM &amp; Circuit Breaker)</h3>
 <ul>
-<li><strong>状态转移守卫</strong>：任务严格按照 <code>IDLE</code> → <code>VALIDATING</code> → <code>FROZEN</code> → <code>SUBMITTING</code> → <code>RUNNING</code> → <code>SUCCEEDED / FAILED / REFUNDED</code> 流转，阻断非法状态篡改；</li>
-<li><strong>自动熔断器 (Circuit Breaker)</strong>：若某一云端 API 连续出现 3 次 5xx 或网络异常，熔断器自动跳闸保护，暂时阻断同渠道任务并建议切换至 ComfyUI / Mock 模式，30 秒后自动半开探测。</li>
+<li><strong>ShotJob 状态机管控</strong>：任务状态严格按 <code>queued → running → succeeded/failed</code>（失败后允许 <code>failed → queued</code> 重试）流转，由 <code>JOB_STATUS_TRANSITIONS</code> 转移表守卫；非法迁移（含 <code>succeeded</code> 终态自迁移、越级迁移）直接抛错拦截；</li>
+<li><strong>自动熔断器 (Circuit Breaker)</strong>：若某一云端 API 连续出现 3 次失败，熔断器自动跳闸保护并阻断同渠道任务，30 秒后自动半开探测；工作室顶栏徽章实时显示「正常 / 熔断保护中 / 半开探测中」（Mock 与 ComfyUI 自建算力免熔断）。</li>
 </ul>
 <h3 id="3-two-phase-commit-wallet">3. 虚拟钱包两阶段提交事务 (Two-Phase Commit Wallet)</h3>
 <figure><img alt="工业级虚拟钱包两阶段结算与审计流水中心" src="./screenshots/11_virtual_wallet.png" /><figcaption>工业级虚拟钱包两阶段结算与审计流水中心</figcaption></figure>
 <ul>
-<li>顶部导航常驻 <strong>「💰 虚拟钱包」</strong>；</li>
+<li>顶部导航常驻 <strong>「💰 虚拟钱包」</strong>，钱包采用 <strong>per-refId 冻结账本</strong>（记录每笔冻结的金额/供应商/时间）；</li>
 <li><strong>阶段 1：预冻结 (Freeze)</strong>：点击生成时，若余额充足，将预估费用移入「任务冻结中」，锁定资金防并发超支；</li>
 <li><strong>阶段 2A：成功核销 (Settle)</strong>：出片成功后正式划扣冻结款项；</li>
-<li><strong>阶段 2B：失败回滚 (Refund)</strong>：一旦发生网络中断、接口超时、生成异常或用户取消，<strong>冻结款项 100% 毫秒级全额退回可用余额</strong>；</li>
+<li><strong>阶段 2B：失败回滚 (Refund)</strong>：一旦发生网络中断、接口超时或生成异常，冻结款项全额退回可用余额；</li>
+<li><strong>凭据安全</strong>：无冻结凭据的核销/退款一律拒绝；同一任务重复结算幂等（不重复扣款）；已核销任务不可再退款；</li>
+<li><strong>孤儿冻结回收</strong>：页面意外重启后无人认领的冻结款，30 分钟后自动原路退回；</li>
+<li><strong>多标签页同步</strong>：多开标签页时钱包余额与流水实时一致；</li>
 <li>具备完整的资金交易收支流水审计明细，支持一键模拟充值与重置体验金。</li>
 </ul>
 <hr />
-<h2 id="faq">（七）常见问题与避坑指南（FAQ）</h2>
+<h2 id="faq">（九）常见问题与避坑指南（FAQ）</h2>
 <h4 id="q1-comfyui">Q1：调用本地 ComfyUI 时提示网络错误或连接超时？</h4>
 <ul>
 <li><strong>排查 A</strong>：请确认启动 ComfyUI 时是否添加了 <code>--listen</code> 参数（必须为 <code>python main.py --listen 127.0.0.1 --port 8188</code>）；</li>
@@ -406,6 +527,78 @@ npm run dev
 <h4 id="q4">Q4：导出的剪映草稿打开后素材显示离线？</h4>
 <ul>
 <li>剪映草稿中记录了各视频素材的本地路径或网络 URL。若为本地录制的 Blob URL，请将下载的视频素材文件保存在剪映草稿同级目录下，剪映将自动完成重链接。</li>
+</ul>
+<hr />
+<h2 id="pwa">（十）手机端使用：PWA 添加到主屏幕</h2>
+<p>WebLockShot 已支持 PWA（Progressive Web App），手机浏览器即可安装为「类原生应用」：</p>
+<h3 id="_15">添加到主屏幕步骤</h3>
+<ol>
+<li>手机浏览器（iOS Safari / Android Chrome）访问你的部署地址（在线版或自建域名均可）；</li>
+<li><strong>iOS Safari</strong>：点击底部「分享」按钮 → 选择「添加到主屏幕」→ 确认，桌面出现 WLS 图标；</li>
+<li><strong>Android Chrome</strong>：地址栏右侧「⋮」菜单 → 「添加到主屏幕 / 安装应用」→ 确认；</li>
+<li>从主屏幕图标打开后即为 <strong>standalone 独立全屏窗口</strong>（无浏览器地址栏），主题色为 WebLockShot 青（#22d3ee）。</li>
+</ol>
+<h3 id="_16">使用要点</h3>
+<ul>
+<li><strong>版本自更新</strong>：发布新版本后，应用内会弹出「🚀 发现新版本，刷新即可更新」底部提示条，点击「刷新」即完成更新（prompt 模式不会打断进行中的生成任务，可等任务出片后再更新）；</li>
+<li><strong>密钥与数据</strong>：与桌面端一致，API Key 仅存于浏览器 <code>sessionStorage</code>，会话数据存 IndexedDB，均不上传第三方服务器；</li>
+<li><strong>响应式布局</strong>：&lt;768px 自动切换单栏堆叠（六步横条变紧凑步骤指示器、引擎条可折叠、表格横向滑动），≥768px 与桌面体验一致；</li>
+<li><strong>触控适配</strong>：触屏设备所有可点击区域 ≥44px，商品录入页直接调起后置相机拍摄商品图（<code>capture="environment"</code>，仅触屏生效）；</li>
+<li><strong>后台正确性</strong>：生成任务切后台再回前台，轮询状态会立即刷新一次，不傻等剩余间隔。</li>
+</ul>
+<hr />
+<h2 id="docker">（十一）Docker 生产部署</h2>
+<p>适合服务器部署 / 团队内网共享 / 私有化交付场景。</p>
+<h3 id="_17">一键启动</h3>
+<pre><code class="language-bash">git clone https://github.com/QWQcool/WebLockShot.git
+cd WebLockShot
+docker compose up --build      # 首次构建约 2~4 分钟
+</code></pre>
+<p>启动成功后：</p>
+<ul>
+<li>应用地址：<code>http://localhost:8080</code>（端口在 <code>docker-compose.yml</code> 的 <code>ports</code> 中调整）</li>
+<li>健康检查：<code>http://localhost:8080/healthz</code>，返回版本 / 存储模式 / uptime 等自观测 JSON</li>
+<li>compose 已内置 healthcheck（30s 间隔探测 <code>/healthz</code>），异常自动重启</li>
+</ul>
+<h3 id="compose-environment">预留开关配置（compose environment）</h3>
+<p>所有 <code>WLS_*</code> 环境变量均为「预留接口做好不用」原则的实现——<strong>不设置任何变量 = 本地默认模式，行为与纯前端现状完全一致</strong>。常用配置：</p>
+<pre><code class="language-yaml">environment:
+  - PORT=5174
+  # 会话持久化（预留）：sqlite 落盘到容器 /app/data 卷
+  - WLS_STORAGE=sqlite
+  # LLM 反代（预留）：设置后 /api/llm 反代到目标
+  - WLS_LLM_TARGET=https://api.openai.com
+  # 密钥注入（预留）：服务端持有真实密钥，客户端免配 Key（小程序轻端依赖此机制）
+  - WLS_KEYS={&quot;kling&quot;:&quot;Bearer ak-xxx&quot;,&quot;llm&quot;:&quot;Bearer sk-xxx&quot;}
+</code></pre>
+<h3 id="https">HTTPS 上线</h3>
+<p>compose 内含 Caddy 反代注释模板：取消注释、编写 <code>Caddyfile</code>（<code>your-domain.com { reverse_proxy weblockshot:5174 }</code>），Caddy 将自动签发并续期 Let's Encrypt 证书；也可按同思路换 nginx + certbot。</p>
+<h3 id="_18">镜像结构</h3>
+<p>多阶段构建：阶段 1（node:22-alpine）<code>npm ci</code> + <code>tsc -b &amp;&amp; vite build</code> 产出 <code>dist/</code>；阶段 2 运行层仅含 <code>dist/</code>、<code>server/</code> 与生产依赖（不含任何 devDependency）。CI 每次 push 均执行「只 build 不 push」的镜像构建验证 job。</p>
+<hr />
+<h2 id="_19">（十二）小程序版轻端</h2>
+<p><code>miniapp/</code> 目录提供微信小程序（weapp）轻端（Taro 4 + React 18，主分支目录而非独立分支），覆盖「录入商品 → 任务进度 → 看片交付」轻链路。</p>
+<h3 id="_20">能力边界（诚实标注）</h3>
+<p>小程序端<strong>不做</strong>剪映草稿导出（需桌面文件系统能力）、<strong>不做</strong> Mock 引擎与 GSAP 动画体系；看片后复制视频链接，回桌面工作台「审片交付」继续完成剪映交付。完整边界说明见 <a href="../miniapp/README.md">miniapp/README.md</a>。</p>
+<h3 id="_21">与桌面端的复用关系</h3>
+<ul>
+<li>通过 <code>@domain</code> 别名直接复用主仓 <code>src/domain</code> 零依赖领域模块（轮询窗口 <code>pollingConfig</code> 等），主仓 src 层面零改动；</li>
+<li>依赖完全独立（miniapp 自有 package.json，React 锁 18.3.1 保证 Taro 兼容），不污染根 package.json。</li>
+</ul>
+<h3 id="_22">后端依赖与密钥安全</h3>
+<ul>
+<li>所有任务请求经 <code>TARO_APP_API_BASE</code> 指向的后端 <code>/api</code> 反代提交（伴生 server 或云端网关）；</li>
+<li><strong>小程序端不持有任何 API Key</strong>——密钥由服务端 <code>WLS_KEYS</code> 注入（见上文 Docker 部署）；未配置 <code>WLS_KEYS</code> 时为透传模式，远端将显式返回 401。</li>
+</ul>
+<h3 id="_23">构建与部署要求</h3>
+<pre><code class="language-bash">cd miniapp
+npm install
+npm run build:weapp    # 不依赖微信开发者工具即可完成编译，产物在 miniapp/dist/
+</code></pre>
+<ul>
+<li><strong>request 合法域名</strong>：小程序后台需将后端域名加入 request 合法域名列表（要求 <strong>HTTPS + ICP 备案域名</strong>）；</li>
+<li><strong>账号主体</strong>：<code>touristappid</code>（游客模式）仅限本地开发者工具预览；<code>web-view</code> 与部分高级接口需<strong>企业主体</strong>账号；</li>
+<li>构建产物结构：<code>dist/app.json</code> 三页注册 + 每页 js/json/wxml/wxss 四件套（无需微信开发者工具即可校验）。</li>
 </ul>
 <hr />
 <p><em>WebLockShot 致力于为每一位电商创作者打造顺滑、可信、低成本的 AI 短视频工业化流水线。</em></p>
