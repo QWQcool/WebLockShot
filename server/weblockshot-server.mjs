@@ -22,6 +22,9 @@
  *          WLS_MAX_UNZIP_MB（draft-zip 累计解压字节上限，默认 1024MB）
  *          WLS_TTS（=off 关闭 Edge-TTS 语音合成，/api/tts 返回 501；默认 on）
  *          TTS_DIR（mp3 落盘目录，默认 data/tts）
+ *          WLS_FFMPEG（=off 关闭成片合成，/api/render 返回 501；默认 auto 探测 ffmpeg）
+ *          RENDER_DIR（成片落盘目录，默认 data/render）
+ *          WLS_RENDER_TIMEOUT_SEC（单渲染任务超时秒数，默认 600）
  */
 import http from 'node:http'
 import https from 'node:https'
@@ -32,6 +35,7 @@ import { extractZip, safeEntryName } from './zip-extract.mjs'
 import { createLogger } from './logger.mjs'
 import { createStorage } from './storage.mjs'
 import { createTtsHandler, createTtsFileHandler } from './tts.mjs'
+import { createRenderHandler, createRenderFileHandler, detectFfmpeg, RENDER_DEFAULT_TIMEOUT_SEC } from './render.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const STARTED_AT = Date.now()
@@ -62,6 +66,10 @@ function parseArgs(argv, env = process.env) {
     // Edge-TTS 语音合成开关（P1-1）：'off' 关闭（/api/tts 返回 501），默认 on
     tts: env.WLS_TTS === 'off' ? 'off' : 'on',
     ttsDir: env.TTS_DIR,
+    // ffmpeg 成片合成开关（P1-2）：auto（默认，探测二进制）| off（/api/render 返回 501）
+    ffmpeg: env.WLS_FFMPEG === 'off' ? 'off' : 'auto',
+    renderDir: env.RENDER_DIR,
+    renderTimeoutSec: Number(env.WLS_RENDER_TIMEOUT_SEC) || RENDER_DEFAULT_TIMEOUT_SEC,
   }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port') args.port = Number(argv[++i]) || args.port
@@ -71,6 +79,7 @@ function parseArgs(argv, env = process.env) {
   args.dist = resolve(args.dist || join(ROOT, 'dist'))
   args.draftDir = resolve(args.draftDir || join(ROOT, 'jianying-drafts'))
   args.ttsDir = resolve(args.ttsDir || join(ROOT, 'data', 'tts'))
+  args.renderDir = resolve(args.renderDir || join(ROOT, 'data', 'render'))
   return args
 }
 
@@ -366,6 +375,22 @@ export async function startServer(opts = {}) {
   const ttsHandler = createTtsHandler({ enabled: ttsEnabled, ttsDir, logger, synth: opts.ttsSynth })
   const ttsFileHandler = createTtsFileHandler({ ttsDir })
 
+  // ffmpeg 成片合成能力（P1-2）：启动时探测一次二进制；ffmpegPath 可注入供单测
+  const ffmpegEnabled = opts.ffmpeg !== undefined ? opts.ffmpeg : args.ffmpeg === 'auto'
+  const ffmpegPath = ffmpegEnabled ? (opts.ffmpegPath !== undefined ? opts.ffmpegPath : detectFfmpeg()) : null
+  const renderDir = opts.renderDir !== undefined ? opts.renderDir : args.renderDir
+  const renderHandler = createRenderHandler({
+    enabled: ffmpegEnabled,
+    ffmpegPath,
+    renderDir,
+    ttsDir,
+    timeoutSec: args.renderTimeoutSec,
+    logger,
+    fetchImpl: opts.renderFetchImpl,
+    spawnImpl: opts.renderSpawnImpl,
+  })
+  const renderFileHandler = createRenderFileHandler({ renderDir })
+
   const healthPayload = () => ({
     ok: true,
     version: PKG_VERSION,
@@ -378,6 +403,7 @@ export async function startServer(opts = {}) {
     authMode: args.authToken ? 'token' : 'off',
     // 能力位（P1 前端探测后才显示新按钮）
     tts: args.tts,
+    ffmpeg: ffmpegEnabled && ffmpegPath ? 'on' : 'off',
   })
 
   /** 校验共享 token：x-wls-token 头或 Authorization: Bearer <token> */
@@ -450,6 +476,12 @@ export async function startServer(opts = {}) {
       return
     }
 
+    // ffmpeg 成片合成（P1-2）
+    if (urlPath === '/api/render') {
+      renderHandler(req, res, urlPath)
+      return
+    }
+
     if (urlPath.startsWith('/api/jianying/draft-zip')) {
       handleDraftZip(req, res, args, logger).catch((err) => {
         logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, 'draft-zip 处理异常')
@@ -470,6 +502,12 @@ export async function startServer(opts = {}) {
     // TTS 音频静态服务（P1-1）：/files/tts/<name>.mp3，先于 dist 静态托管
     if (urlPath.startsWith('/files/tts/')) {
       ttsFileHandler(req, res, urlPath)
+      return
+    }
+
+    // 成片静态服务（P1-2）：/files/render/<name>.mp4
+    if (urlPath.startsWith('/files/render/')) {
+      renderFileHandler(req, res, urlPath)
       return
     }
 
