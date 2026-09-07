@@ -19,6 +19,8 @@ RUN npm ci
 COPY tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts index.html ./
 COPY src ./src
 COPY public ./public
+# src/presets/load.ts 以相对路径引用仓库根 presets/ 下的剧情 JSON，构建必需
+COPY presets ./presets
 
 # 产物输出到 /app/dist
 RUN npm run build
