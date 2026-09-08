@@ -44,6 +44,31 @@ export function setPollingWindow(window: PollingWindow): void {
   pollingWindow = { ...window }
 }
 
+/** O9：轮询连续失败容忍上限（默认 3 次），网络抖动不再一次失败即判死 */
+export const POLL_FAILURE_TOLERANCE = 3
+
+/**
+ * O9：轮询连续失败容忍器（纯函数状态机，主仓与 miniapp 共用）。
+ * 连续失败未达上限 → 继续轮询（不判死）；中途任何一次成功 → 计数清零恢复。
+ */
+export function createPollFailureTolerance(maxFailures: number = POLL_FAILURE_TOLERANCE) {
+  let consecutive = 0
+  return {
+    /** 记录一次成功：清零连续失败计数 */
+    onSuccess(): void {
+      consecutive = 0
+    },
+    /** 记录一次失败；返回 true 表示连续失败已达上限，应停止轮询并判定异常 */
+    onFailure(): boolean {
+      consecutive += 1
+      return consecutive >= maxFailures
+    },
+    get consecutiveFailures(): number {
+      return consecutive
+    },
+  }
+}
+
 /**
  * 轮询等待（M1d 手机正确性）：轮询间隔睡眠 + 「回到前台立即唤醒」。
  *

@@ -29,6 +29,8 @@ export const ShotJobSchema = z.object({
   error: z.string().optional(),
   asset: MediaAssetSchema.optional(),
   progress: z.number().min(0).max(100).default(0),
+  /** R4：任务因刷新中断被受控恢复（requeue）过，UI 显示「已恢复，可继续」 */
+  requeued: z.boolean().optional(),
 })
 
 export type ShotJob = z.infer<typeof ShotJobSchema>

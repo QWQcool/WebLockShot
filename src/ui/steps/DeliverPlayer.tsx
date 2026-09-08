@@ -5,6 +5,7 @@ import type { Story } from '../../types.ts'
 import { voiceoverEngine, isTtsSupported } from '../../media/audio.ts'
 import { downloadJianyingDraft, downloadJianyingDraftZip, buildJianyingZipPackage } from '../../export/jianyingDraft.ts'
 import { probeCompanion, sendDraftZipToCompanion, type CompanionProbeResult } from '../../services/companion/companionClient.ts'
+import { walletManager } from '../../domain/wallet.ts'
 
 type Props = {
   jobs: ShotJob[]
@@ -47,6 +48,10 @@ export const DeliverPlayer: React.FC<Props> = ({
   const activeJob = jobs[currentShotIndex] || jobs[0]
   const activePlan = visualPlans[currentShotIndex] || visualPlans[0]
   const activeShot = story.shots[currentShotIndex] || story.shots[0]
+  // O2 门控：仅 succeeded 且该镜计费凭据已 settle 完毕（无残留冻结款）时允许重生成，
+  // 避免对 running/failed 任务触发非法 FSM 迁移或在冻结款未清算时重复冻结
+  const canRegenerateActive =
+    activeJob?.status === 'succeeded' && !walletManager.hasFrozenRef(activeJob.shotId)
 
   useEffect(() => {
     voiceoverEngine.enabled = ttsEnabled
@@ -243,6 +248,12 @@ export const DeliverPlayer: React.FC<Props> = ({
                 type="button"
                 className="btn-secondary"
                 onClick={() => onRegenerateSingleShot(activeShot.id)}
+                disabled={!canRegenerateActive}
+                title={
+                  canRegenerateActive
+                    ? undefined
+                    : '仅在该镜出片成功且计费已结算（无冻结款）时可重新生成'
+                }
               >
                 🔄 重新生成此镜 ({activeShot?.id.toUpperCase()})
               </button>

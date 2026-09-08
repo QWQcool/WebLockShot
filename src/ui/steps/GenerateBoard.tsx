@@ -72,6 +72,13 @@ export const GenerateBoard: React.FC<Props> = ({
                 </span>
               </div>
 
+              {/* R4：刷新中断后被受控恢复的任务，明确告知可继续 */}
+              {job.requeued && job.status === 'queued' && (
+                <div className="job-error-box" role="status">
+                  <p>🔁 已恢复，可继续（页面刷新中断的任务已自动重新排队）</p>
+                </div>
+              )}
+
               <div className="job-body">
                 <div className="job-meta-row">
                   <span className="meta-label">Provider：</span>

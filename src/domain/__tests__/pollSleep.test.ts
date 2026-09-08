@@ -1,8 +1,39 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { pollSleep } from '../pollingConfig.ts'
+import { pollSleep, createPollFailureTolerance, POLL_FAILURE_TOLERANCE } from '../pollingConfig.ts'
 
 /** 无 document 的 Node 环境：pollSleep 应退化为纯 setTimeout 语义 */
+
+// ---------------- O9：轮询连续失败容忍器（miniapp 与主仓共用纯函数） ----------------
+
+test('O9 pollFailureTolerance：连续失败达上限才判死，中途成功即恢复', () => {
+  assert.equal(POLL_FAILURE_TOLERANCE, 3)
+  const t = createPollFailureTolerance()
+
+  // 前两次失败：不判死，继续轮询
+  assert.equal(t.onFailure(), false)
+  assert.equal(t.onFailure(), false)
+  assert.equal(t.consecutiveFailures, 2)
+
+  // 中途成功：计数清零恢复
+  t.onSuccess()
+  assert.equal(t.consecutiveFailures, 0)
+  assert.equal(t.onFailure(), false, '成功后重新计数')
+
+  // 连续 3 次失败：判死
+  assert.equal(t.onFailure(), false)
+  assert.equal(t.onFailure(), true, '第 3 次连续失败应判死')
+  assert.equal(t.onFailure(), true, '判死后继续失败仍返回 true')
+})
+
+test('O9 pollFailureTolerance：容忍上限可注入', () => {
+  const t = createPollFailureTolerance(1)
+  assert.equal(t.onFailure(), true, '上限 1 → 首次失败即判死')
+
+  const t5 = createPollFailureTolerance(5)
+  for (let i = 0; i < 4; i++) assert.equal(t5.onFailure(), false)
+  assert.equal(t5.onFailure(), true)
+})
 
 test('pollSleep：正常等待后 resolve', async () => {
   const start = Date.now()

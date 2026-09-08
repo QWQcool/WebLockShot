@@ -32,6 +32,44 @@ type KlingCacheEntry = {
 
 const klingCache = new Map<string, KlingCacheEntry>()
 
+/** O10：kind 持久化键（localStorage 映射 providerTaskId → kind，刷新后 poll 端点不丢） */
+const KLING_KIND_STORE_KEY = 'weblockshot.kling.task_kind_map'
+
+/** 记录 task kind：内存缓存 + localStorage 双写（无 localStorage 环境仅内存，行为不变） */
+export function recordKlingTaskKind(taskId: string, kind: KlingTaskKind): void {
+  try {
+    const storage = (globalThis as { localStorage?: Storage }).localStorage
+    if (!storage) return
+    const map = loadKlingKindMap()
+    map[taskId] = kind
+    storage.setItem(KLING_KIND_STORE_KEY, JSON.stringify(map))
+  } catch {
+    // storage 受限不致命：内存缓存仍在
+  }
+}
+
+function loadKlingKindMap(): Record<string, KlingTaskKind> {
+  try {
+    const storage = (globalThis as { localStorage?: Storage }).localStorage
+    const raw = storage?.getItem(KLING_KIND_STORE_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, KlingTaskKind>) : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * 解析任务 kind（O10 修复）：内存缓存命中 → localStorage 持久化映射 → 默认 text2video。
+ * 此前仅依赖内存 Map，页面刷新后 image2video 任务会错误地用 text2video 端点轮询。
+ */
+export function resolveKlingTaskKind(taskId: string): KlingTaskKind {
+  const cached = klingCache.get(taskId)?.kind
+  if (cached) return cached
+  const persisted = loadKlingKindMap()[taskId]
+  if (persisted === 'text2video' || persisted === 'image2video') return persisted
+  return 'text2video'
+}
+
 /**
  * 错误码 → 用户可读中文（契约表见 test/fixtures/kling/error-codes.json）。
  * 未知错误码保持历史格式「可灵返回错误 [code]: message」（现状兼容）。
@@ -182,14 +220,16 @@ export class KlingVideoProvider implements VideoProvider {
       shotId: req.shotId,
       kind,
     })
+    // O10：kind 双写持久化，刷新后 poll 端点可恢复
+    recordKlingTaskKind(taskId, kind)
 
     return { taskId }
   }
 
   async poll(taskId: string): Promise<PollResult> {
     const authHeaders = await this.resolveAuthHeader()
-    // 按任务生成模式区分查询端点：text2video / image2video
-    const kind = klingCache.get(taskId)?.kind || 'text2video'
+    // 按任务生成模式区分查询端点：text2video / image2video（O10：刷新后经持久化映射恢复）
+    const kind = resolveKlingTaskKind(taskId)
     const endpoint = `${this.baseUrl}/v1/videos/${kind}/${taskId}`
 
     const res = await withRetry(

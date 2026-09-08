@@ -144,6 +144,19 @@ class WalletManager {
   }
 
   /**
+   * 查询某 refId 是否仍存在冻结凭据（R4/O2：任务 requeue/重生成前检查旧冻结款。
+   * 仍在 → 原路退回避免双重冻结；已被孤儿回收 → 直接按正常流程重新 freeze）
+   */
+  public hasFrozenRef(refId: string): boolean {
+    return this.frozenRefs.has(refId)
+  }
+
+  /** 读取冻结凭据详情（无记录返回 null） */
+  public getFrozenRef(refId: string): { amount: number; providerId: string; frozenAt: number } | null {
+    return this.frozenRefs.get(refId) ?? null
+  }
+
+  /**
    * 孤儿冻结回收：冻结记录超过 TTL 仍无主（无任务会 settle/refund，例如进程重启后丢失的会话），
    * 自动原路退回可用余额。返回回收的笔数。
    */

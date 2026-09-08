@@ -6,7 +6,7 @@ import { klingVideoProvider } from '../../media/providers/kling.ts'
 import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
 import { walletManager } from '../../domain/wallet.ts'
-import { circuitBreaker, assertJobStatusTransition } from '../../domain/fsm.ts'
+import { circuitBreaker, assertJobStatusTransition, assertJobRequeue } from '../../domain/fsm.ts'
 import { getPollingWindow, pollSleep } from '../../domain/pollingConfig.ts'
 import { idempotencyManager } from '../../domain/idempotency.ts'
 
@@ -152,6 +152,78 @@ export class ExecutorEngine {
   }
 
   /**
+   * R4/O2：释放该任务遗留的旧冻结凭据。
+   * 冻结款仍在（settle/refund 尚未发生，如刷新中断）→ 原路退回，避免重跑时双重冻结双倍占用；
+   * 已被孤儿回收 → 无操作，重跑时按正常流程重新 freeze。
+   */
+  private releaseStaleFreeze(job: ShotJob, reason: string) {
+    if (!walletManager.hasFrozenRef(job.shotId)) return
+    const info = walletManager.getFrozenRef(job.shotId)
+    if (!info) return
+    walletManager.refund(job.shotId, info.amount, info.providerId, reason)
+  }
+
+  /**
+   * R4：刷新后僵尸任务恢复（水合入口）。
+   * 引擎内存态（provider 提交句柄、轮询循环）随页面刷新丢失，持久化快照中的
+   * queued/running 任务既不能续跑也无法重试（FSM 禁止 running→queued / succeeded→queued）。
+   * 水合时一次性降级为可重入 queued 并重新入队 executor：
+   * - 旧冻结凭据仍在 → 原路退回（重跑时重新冻结，不双倍计费）
+   * - 已被孤儿回收 → 直接按正常流程重新冻结
+   */
+  async resumeJobs(jobs: ShotJob[], visualPlans: VisualPlan[]): Promise<ShotJob[]> {
+    this.loadJobs(jobs)
+    for (const plan of visualPlans) {
+      this.pendingPlans.set(plan.shotId, plan)
+    }
+    for (const job of this.jobs.values()) {
+      if (job.status === 'running' || job.status === 'queued') {
+        // running → queued 是受控迁移（requeue 语义，FSM 专项放行）；
+        // queued 本就是可重入状态，仅需补标记（引擎内存态已随刷新丢失）
+        if (job.status === 'running') {
+          assertJobRequeue(job.status, `resumeJobs(${job.shotId})`)
+          this.releaseStaleFreeze(job, `页面刷新任务恢复：释放中断前遗留冻结款 (${job.shotId})`)
+        }
+        job.status = 'queued'
+        job.requeued = true
+        job.progress = 0
+        job.error = '检测到页面刷新导致任务中断，已自动恢复排队，可继续等待或手动重试。'
+      }
+    }
+    this.notify()
+    this.scheduleProcessing()
+    return this.getJobs()
+  }
+
+  /**
+   * O2：succeeded 单镜受控重生成（交付页「重新生成此镜」）。
+   * 前置条件：该任务凭据已 settle 完毕无冻结（succeeded 正常路径如此；异常残留由
+   * releaseStaleFreeze 兜底释放）。重生成走正常流程重新 freeze，不产生双倍计费。
+   */
+  async requeueJob(shotId: string, visualPlans: VisualPlan[], reason = 'regenerate') {
+    const job = this.jobs.get(shotId)
+    if (!job) return
+
+    // FSM 受控迁移：仅 running/succeeded 可 requeue；其它状态走 retryJob（failed→queued）
+    assertJobRequeue(job.status, `requeueJob(${shotId}, ${reason})`)
+    this.releaseStaleFreeze(job, `任务重生成：释放旧冻结款 (${reason})`)
+    job.status = 'queued'
+    job.requeued = false
+    job.error = undefined
+    job.progress = 0
+    job.asset = undefined
+    job.providerTaskId = undefined
+    job.attempt += 1
+
+    for (const plan of visualPlans) {
+      this.pendingPlans.set(plan.shotId, plan)
+    }
+
+    this.notify()
+    this.scheduleProcessing()
+  }
+
+  /**
    * 浏览器单机串行队列调度器（如实注明单机并发，不夸大为分布式）
    *
    * 竞态修复：不再使用 fire-and-forget + isProcessing 早退（会导致处理期间
@@ -219,6 +291,9 @@ export class ExecutorEngine {
     }
 
     this.setJobStatus(job, 'running', 'submit to provider')
+    // 恢复/重生成任务重新开跑：清除恢复提示与标记
+    job.requeued = false
+    job.error = undefined
     job.progress = 10
     this.notify()
 

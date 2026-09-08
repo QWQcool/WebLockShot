@@ -131,7 +131,12 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
       // 否则水合的陈旧快照会覆盖 executorEngine.subscribe 推送的实时状态，
       // 导致渲染页卡在「排队中」而引擎内部早已出片成功。
       if (hydrated.jobs && hydrated.jobs.length > 0 && executorEngine.getJobs().length === 0) {
-        setJobs(hydrated.jobs)
+        // R4 修复：刷新后引擎内存态丢失，持久化快照中的 queued/running 任务是「僵尸」——
+        // 既不续跑也无法重试（FSM 禁止回退）。经 resumeJobs 受控降级为可重入 queued
+        // 并重新入队 executor（旧冻结款释放，不双倍计费），UI 显示「已恢复，可继续」。
+        void executorEngine.resumeJobs(hydrated.jobs, visualPlans).then((resumed) => {
+          setJobs([...resumed])
+        })
       }
     })
     return () => {
@@ -327,7 +332,15 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
 
   // 交付播放器单镜重新生成
   const handleRegenerateSingleShot = (shotId: string) => {
-    executorEngine.retryJob(shotId, visualPlans)
+    // O2 修复：succeeded 是终态，retryJob（failed→queued 路径）会抛 FSM Violation。
+    // 已成功的镜走受控 requeueJob（succeeded→queued 专项放行，旧凭据释放后重新冻结）；
+    // 其余状态（failed 等）保持原 retryJob 语义。
+    const job = jobs.find((j) => j.shotId === shotId)
+    if (job?.status === 'succeeded' || job?.status === 'running') {
+      void executorEngine.requeueJob(shotId, visualPlans, 'regenerate')
+    } else {
+      void executorEngine.retryJob(shotId, visualPlans)
+    }
     setCurrentStep(5)
   }
 

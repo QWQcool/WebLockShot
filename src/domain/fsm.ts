@@ -77,6 +77,27 @@ export function assertJobStatusTransition(from: string, to: string, context = ''
 }
 
 /**
+ * 受控重入队 API（R4/O2）：
+ * running 与 succeeded 在常规转移表中均不可回退 queued（防状态随手覆盖），
+ * 但「生成中刷新页面导致引擎内存态丢失」与「交付页单镜重新生成」是两个合法的重入队场景。
+ * 专门提供 requeue 语义入口：仅允许从 running / succeeded 发起，调用方必须
+ * 先处理旧冻结凭据（wallet 凭据检查/释放），重跑时按正常流程重新 freeze。
+ */
+export const REQUEUE_ALLOWED_FROM: readonly string[] = ['running', 'succeeded']
+
+export function canRequeueJobStatus(from: string): boolean {
+  return REQUEUE_ALLOWED_FROM.includes(from)
+}
+
+export function assertJobRequeue(from: string, context = ''): void {
+  if (!canRequeueJobStatus(from)) {
+    throw new Error(
+      `[FSM Violation] 非法任务重入队: 仅 running/succeeded 可受控 requeue，当前状态 "${from}"。${context ? `上下文: ${context}` : ''}`
+    )
+  }
+}
+
+/**
  * 供应商熔断器 (Circuit Breaker)
  * 针对某一 API 供应商（如 Kling 或 Jimeng）在短时间内连续失败 3 次时切入熔断状态，
  * 避免无意义的重试轰炸与用户资金持续冻结。
