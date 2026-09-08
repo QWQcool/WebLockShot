@@ -19,7 +19,9 @@ import {
   initialNodeY,
   nodeIdToShapeId,
   readAssetMetaPayload,
+  readDeliverMetaPayload,
   readGenerateMetaPayload,
+  readProductMetaPayload,
   readScriptMetaPayload,
   readStoryboardMetaPayload,
   scriptDigest,
@@ -29,7 +31,9 @@ import {
   validateCanvasDoc,
   validateEdgeKind,
   writeAssetMetaPayload,
+  writeDeliverMetaPayload,
   writeGenerateMetaPayload,
+  writeProductMetaPayload,
   writeScriptMetaPayload,
   writeStoryboardMetaPayload,
   type CanvasDoc,
@@ -610,6 +614,81 @@ test('B4 initialNodeY：默认居中；侵入对话栏避让带时上移；jitte
   // jitter 不会越过避让带
   assert.ok(initialNodeY(360, 560, 720, 150, 30) <= 570 - 560)
   assert.equal(initialNodeY(360, 160, 720, 150, 30), 310)
+})
+
+/* ---------------- B5：product / deliver 契约 ---------------- */
+
+test('B5 契约：asset type 扩展 image；image 产物卡合法（idbref）', () => {
+  const ok = readAssetMetaPayload({
+    type: 'image',
+    url: 'idbref://canvas-asset-import-abc',
+    shotId: 'import-abc',
+    createdAt: 1000,
+    title: '商品图',
+  })
+  assert.ok(ok)
+  assert.equal(ok.type, 'image')
+  // audio 仍拒绝
+  assert.equal(readAssetMetaPayload({ type: 'audio', url: 'idbref://x', shotId: 's', createdAt: 1 }), null)
+})
+
+test('B5 边兼容：product→deliver 不合法（拓扑：product 走 script/image）', () => {
+  assert.equal(validateEdgeKind('product', 'deliver').ok, false)
+  assert.deepEqual(validateEdgeKind('asset', 'deliver'), { ok: true })
+  assert.deepEqual(validateEdgeKind('generate', 'deliver'), { ok: true })
+})
+
+test('B5 product meta：合法载荷往返（含 link/image/video-frame 三类导入）', () => {
+  const payload = {
+    title: '钛合金机械手表',
+    upstreamText: '钛合金机械手表，超长续航',
+    imports: [
+      { kind: 'image' as const, url: 'idbref://img1', name: '主图', createdAt: 1 },
+      { kind: 'link' as const, url: 'https://item.taobao.com/item.htm?id=1', createdAt: 2 },
+      { kind: 'video-frame' as const, url: 'idbref://frame1', name: '抽帧', createdAt: 3 },
+    ],
+  }
+  const merged = writeProductMetaPayload({ text: 'x' }, payload)
+  assert.ok(merged)
+  const back = readProductMetaPayload(merged)
+  assert.ok(back)
+  assert.equal(back.imports.length, 3)
+  assert.equal(back.imports[0].kind, 'image')
+  assert.equal(back.imports[1].kind, 'link')
+
+  // 非法：blob url / kind 非法 / 缺 title
+  assert.equal(
+    readProductMetaPayload({
+      title: 't',
+      upstreamText: 'u',
+      imports: [{ kind: 'image', url: 'blob:https://x/1', createdAt: 1 }],
+    }),
+    null
+  )
+  assert.equal(
+    readProductMetaPayload({
+      title: 't',
+      upstreamText: 'u',
+      imports: [{ kind: 'audio', url: 'idbref://x', createdAt: 1 }],
+    }),
+    null
+  )
+  assert.equal(readProductMetaPayload({ upstreamText: 'u', imports: [] }), null)
+  assert.equal(readProductMetaPayload(null), null)
+})
+
+test('B5 deliver meta：打包痕迹往返（imageSkipped 如实记录），非法拒读', () => {
+  const payload = { lastPackagedAt: 1000, videoCount: 6, imageSkipped: 2 }
+  const merged = writeDeliverMetaPayload({}, payload)
+  assert.ok(merged)
+  const back = readDeliverMetaPayload(merged)
+  assert.ok(back)
+  assert.equal(back.videoCount, 6)
+  assert.equal(back.imageSkipped, 2)
+
+  assert.equal(readDeliverMetaPayload({ lastPackagedAt: 'yesterday' }), null)
+  assert.equal(readDeliverMetaPayload({ videoCount: -1 }), null)
+  assert.equal(readDeliverMetaPayload('x'), null)
 })
 
 test('画布存储：保存→读取往返，脏数据被拒', () => {

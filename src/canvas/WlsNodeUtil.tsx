@@ -16,6 +16,8 @@ import { AssetNodeBody } from './AssetNodeBody.tsx'
 import { GenerateNodeBody } from './GenerateNodeBody.tsx'
 import { ScriptNodeBody } from './ScriptNodeBody.tsx'
 import { StoryboardNodeBody } from './StoryboardNodeBody.tsx'
+import { ProductNodeBody } from './ProductNodeBody.tsx'
+import { DeliverNodeBody } from './DeliverNodeBody.tsx'
 
 /**
  * 画布 Agent 节点 shape（CANVAS_PLAN.md §4.1-2）。
@@ -74,7 +76,7 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
   }
 
   override onResize(shape: WlsNodeShape, info: TLResizeInfo<WlsNodeShape>) {
-    // B2/B3/B4：上限扩展（script 300×220、storyboard 300×560、generate 300×320、asset 200×380）
+    // B2/B3/B4/B5：上限扩展（script 300×220、storyboard 300×560、generate 300×320、asset 200×380、product 300×340、deliver 300×400）
     const w = Math.max(180, Math.min(560, Math.round(shape.props.w * info.scaleX)))
     const h = Math.max(120, Math.min(720, Math.round(shape.props.h * info.scaleY)))
     return {
@@ -119,6 +121,10 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
             <AssetNodeBody shape={shape} />
           ) : shape.props.kind === 'generate' ? (
             <GenerateNodeBody shape={shape} />
+          ) : shape.props.kind === 'product' ? (
+            <ProductNodeBody shape={shape} />
+          ) : shape.props.kind === 'deliver' ? (
+            <DeliverNodeBody shape={shape} />
           ) : shape.props.kind === 'script' ? (
             // 内嵌交互节点约定（B4 generate / B5 product/deliver 同此）：
             // pointerdown 冒泡阻断必须收窄到【具体控件元素】（textarea/select/button 各自

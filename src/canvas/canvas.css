@@ -947,6 +947,241 @@
   overflow: hidden;
 }
 
+/* ---------- B5：素材导入（product）+ 成片交付（deliver）节点 ---------- */
+.wls-node[data-kind='product'] .wls-node-body,
+.wls-node[data-kind='deliver'] .wls-node-body {
+  overflow-y: auto;
+  padding: 0.15rem 0.7rem 0.3rem;
+}
+
+.wls-product,
+.wls-deliver {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+}
+
+.wls-product-title,
+.wls-product-link,
+.wls-product-file {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--cv-line);
+  border-radius: 8px;
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  font-size: 0.74rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.wls-product-title:focus-visible,
+.wls-product-link:focus-visible {
+  outline: 2px solid var(--cv-miku);
+  outline-offset: 0;
+}
+
+.wls-product-stale {
+  color: #8a6d1a;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  background: #fdf6e3;
+  border: 1px solid #ecd9a0;
+  border-radius: 8px;
+  padding: 0.22rem 0.5rem;
+}
+
+.wls-product-entry {
+  display: block;
+  border: 1px dashed var(--cv-line);
+  border-radius: 8px;
+  background: var(--cv-panel-2);
+  color: var(--cv-ink);
+  font-size: 0.74rem;
+  padding: 0.4rem 0.6rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.wls-product-entry:hover {
+  border-color: var(--cv-miku);
+}
+
+.wls-product-file {
+  display: none;
+}
+
+.wls-product-linkrow {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.wls-product-link {
+  flex: 1;
+  min-width: 0;
+}
+
+.wls-product-addlink {
+  flex: none;
+  border: none;
+  background: var(--cv-miku);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.28rem 0.55rem;
+}
+
+.wls-product-addlink:hover {
+  background: var(--cv-miku-deep);
+}
+
+.wls-product-notice {
+  color: var(--cv-mute);
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
+.wls-product-error,
+.wls-deliver-error {
+  color: #c2427c;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.wls-product-ok,
+.wls-deliver-ok {
+  color: #2e7d32;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.wls-product-imports {
+  border-top: 1px dashed var(--cv-line);
+  padding-top: 0.3rem;
+}
+
+.wls-product-imports-head {
+  color: var(--cv-mute);
+  font-size: 0.66rem;
+  margin-bottom: 0.2rem;
+}
+
+.wls-product-import {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  color: var(--cv-ink);
+  padding: 0.1rem 0;
+}
+
+.wls-product-import-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wls-deliver-wallet {
+  color: var(--cv-ink);
+  font-size: 0.74rem;
+  background: var(--cv-panel-2);
+  border: 1px solid var(--cv-line);
+  border-radius: 8px;
+  padding: 0.3rem 0.55rem;
+}
+
+.wls-deliver-wallet strong {
+  font-family: var(--mono);
+  color: var(--cv-miku-deep);
+}
+
+.wls-deliver-frozen {
+  color: var(--cv-mute);
+  font-size: 0.66rem;
+}
+
+.wls-deliver-hint,
+.wls-deliver-companion-note {
+  color: var(--cv-mute);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.wls-deliver-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.wls-deliver-count {
+  color: var(--cv-ink);
+  font-size: 0.72rem;
+}
+
+.wls-deliver-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  color: var(--cv-ink);
+}
+
+.wls-deliver-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wls-deliver-more {
+  color: var(--cv-mute);
+  font-size: 0.64rem;
+}
+
+.wls-deliver-pack {
+  flex: none;
+  border: none;
+  background: var(--cv-miku);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.34rem 0.6rem;
+  align-self: flex-start;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.wls-deliver-pack:hover:not(:disabled) {
+  background: var(--cv-miku-deep);
+}
+
+.wls-deliver-pack:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.wls-deliver-pack:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wls-deliver-companion {
+  background: var(--cv-halo);
+}
+
+.wls-deliver-companion:hover:not(:disabled) {
+  background: #5fb3d9;
+}
+
+.wls-deliver-history {
+  color: var(--cv-mute);
+  font-size: 0.64rem;
+  border-top: 1px dashed var(--cv-line);
+  padding-top: 0.25rem;
+}
+
 .wls-script {
   display: flex;
   flex-direction: column;

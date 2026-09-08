@@ -265,7 +265,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     if (!editor) return
     const nodeId = createNodeId()
     const bounds = editor.getViewportPageBounds()
-    // B2/B3/B4：按节点内容定默认尺寸
+    // B2/B3/B4/B5：按节点内容定默认尺寸
     const [w, h] =
       kind === 'script'
         ? [300, 220]
@@ -275,7 +275,11 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             ? [300, 320]
             : kind === 'asset'
               ? [200, 380]
-              : [260, 160]
+              : kind === 'product'
+                ? [300, 340]
+                : kind === 'deliver'
+                  ? [300, 400]
+                  : [260, 160]
     // B4 任务 0：初始摆放避开底部对话栏浮层（避让带 150px），防止控件被遮挡
     const y = initialNodeY(
       bounds.center.y,

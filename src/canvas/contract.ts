@@ -371,6 +371,8 @@ export const generateMetaPayloadSchema = z.object({
   providerId: z.literal('mock'),
   artifacts: z.array(artifactSchema).max(6),
   storyDigest: z.string(),
+  /** B5：生成时的 Story 快照（deliver 打包剪映草稿所需，沿边读取） */
+  story: storyMetaSchema.optional(),
 })
 export type GenerateMetaPayload = z.infer<typeof generateMetaPayloadSchema>
 
@@ -391,7 +393,8 @@ export function writeGenerateMetaPayload(
 
 /** 产物卡（kind='asset'）meta 载荷：大资产只存引用（idbref://），blob URL 绝不入档 */
 export const assetMetaPayloadSchema = z.object({
-  type: z.literal('video'),
+  /** B5：扩展 'image'（素材导入产物：上传图片 / 视频抽帧） */
+  type: z.enum(['video', 'image']),
   url: z
     .string()
     .refine((u) => u.startsWith('idbref://') || u.startsWith('http://') || u.startsWith('https://'), {
@@ -432,6 +435,75 @@ export function initialNodeY(
   const ideal = viewportCenterY - nodeHeight / 2 + jitterPx
   const safeBottom = viewportBottomY - safeBandPx
   return ideal + nodeHeight > safeBottom ? safeBottom - nodeHeight : ideal
+}
+
+/* ------------------------------------------------------------------ *
+ * B5：素材导入（product）+ 成片交付（deliver）节点契约
+ * ------------------------------------------------------------------ */
+
+/** 可持久化产物引用：idbref:// 或 http(s) 直链（blob: 跨刷新失效，禁止入档）——与 asset url 规则一致 */
+const persistentUrlSchema = z
+  .string()
+  .refine(
+    (u) => u.startsWith('idbref://') || u.startsWith('http://') || u.startsWith('https://'),
+    { message: '产物 url 只允许 idbref:// 引用或 http(s) 直链（blob: 跨刷新失效，禁止持久化）' }
+  )
+
+/** product 节点单条导入记录 */
+export const productImportItemSchema = z.object({
+  kind: z.enum(['image', 'link', 'video-frame']),
+  url: persistentUrlSchema,
+  name: z.string().max(120).optional(),
+  createdAt: z.number().finite().positive(),
+})
+export type ProductImportItem = z.infer<typeof productImportItemSchema>
+
+/** product 节点 meta 载荷：商品标题 + 导入历史 */
+export const productMetaPayloadSchema = z.object({
+  title: z.string().max(120),
+  /** 生成时上游 Brief 文本快照（沿 B2/B3 模式做变更提示） */
+  upstreamText: z.string().max(2000),
+  imports: z.array(productImportItemSchema).max(50),
+})
+export type ProductMetaPayload = z.infer<typeof productMetaPayloadSchema>
+
+export function readProductMetaPayload(meta: unknown): ProductMetaPayload | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  const parsed = productMetaPayloadSchema.safeParse(meta)
+  return parsed.success ? parsed.data : null
+}
+
+export function writeProductMetaPayload(
+  baseMeta: Record<string, unknown>,
+  payload: ProductMetaPayload
+): Record<string, unknown> | null {
+  const parsed = productMetaPayloadSchema.safeParse(payload)
+  if (!parsed.success) return null
+  return { ...baseMeta, ...parsed.data }
+}
+
+/** deliver 节点 meta 载荷：打包动作的持久化痕迹（zip 本体走浏览器下载，不入档） */
+export const deliverMetaPayloadSchema = z.object({
+  lastPackagedAt: z.number().finite().positive().optional(),
+  videoCount: z.number().int().min(0).optional(),
+  /** 图片类产物不入剪映视频轨的数量（如实记录跳过数） */
+  imageSkipped: z.number().int().min(0).optional(),
+})
+export type DeliverMetaPayload = z.infer<typeof deliverMetaPayloadSchema>
+
+export function readDeliverMetaPayload(meta: unknown): DeliverMetaPayload | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  const parsed = deliverMetaPayloadSchema.safeParse(meta)
+  return parsed.success ? parsed.data : null
+}
+
+export function writeDeliverMetaPayload(
+  baseMeta: Record<string, unknown>,
+  payload: DeliverMetaPayload
+): Record<string, unknown> | null {
+  const parsed = deliverMetaPayloadSchema.safeParse(payload)
+  if (!parsed.success) return null
+  return { ...baseMeta, ...parsed.data }
 }
 
 const nodeIdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/)

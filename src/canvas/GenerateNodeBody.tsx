@@ -3,6 +3,7 @@ import { useEditor, useValue, type JsonObject, type TLShapeId } from 'tldraw'
 import { ExecutorEngine } from '../director/nodes/executorNode.ts'
 import type { ShotJob } from '../domain/shotJob.ts'
 import { VisualPlanSchema } from '../domain/sellVisual.ts'
+import type { Story } from '../types.ts'
 import { walletManager } from '../domain/wallet.ts'
 import {
   getAssetObjectUrl,
@@ -11,14 +12,13 @@ import {
   putBlobAsset,
 } from '../persist/assetStore.ts'
 import {
-  createNodeId,
-  nodeIdToShapeId,
   readGenerateMetaPayload,
   readStoryboardMetaPayload,
   scriptDigest,
   writeGenerateMetaPayload,
   type Artifact,
 } from './contract.ts'
+import { upsertAssetCard } from './assetCard.ts'
 import type { WlsNodeShape } from './WlsNodeUtil.tsx'
 
 /**
@@ -91,6 +91,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   const [playingArtifact, setPlayingArtifact] = useState<string | null>(null)
   // 生成时上游 story 的摘要快照（产物条目写入 meta 时使用，与 B2/B3 模式一致）
   const storyDigestRef = useRef('')
+  // 生成时的 Story 快照（写入 meta.story 供 deliver 打包剪映草稿沿边读取，B5）
+  const storyRef = useRef<Story | null>(null)
   // 最新上游（subscribe 回调内使用，避免 effect 依赖链）
   const upstreamRef = useRef(upstream)
   upstreamRef.current = upstream
@@ -120,58 +122,29 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
       providerId: 'mock',
       artifacts: next,
       storyDigest: storyDigestRef.current,
+      ...(storyRef.current ? { story: storyRef.current } : {}),
     })
     if (!nextMeta) return
     editor.updateShape({ id: shape.id, type: shape.type, props: { meta: nextMeta as JsonObject } })
   }
 
-  /** 画布创建/更新产物卡（kind='asset'）：按 shotId 检索——已有卡就原地替换 url（重建防堆积，不依赖组件内存 ref） */
+  /** 画布创建/更新产物卡：B5 起复用共享 upsertAssetCard（shotId 检索替换 + 新建后 zoomToFit） */
   const createAssetCard = (shotId: string, url: string) => {
     const self = editor.getShape(shape.id)
     if (!self || self.type !== 'wls-node') return
-    const existing = editor
-      .getCurrentPageShapes()
-      .find(
-        (s): s is WlsNodeShape =>
-          s.type === 'wls-node' &&
-          (s.props as { kind?: unknown }).kind === 'asset' &&
-          (s.props as { meta?: Record<string, unknown> }).meta?.shotId === shotId
-      )
-    if (existing) {
-      const meta = { ...(existing.props.meta as unknown as Record<string, unknown>) }
-      meta.url = url
-      meta.createdAt = Date.now()
-      editor.updateShape({
-        id: existing.id,
-        type: existing.type,
-        props: { meta: meta as JsonObject },
-      })
-      return
-    }
     const story = upstreamRef.current?.story
     const shot = story?.shots.find((s) => `${story.id}-${s.id}` === shotId)
-    const count = editor.getCurrentPageShapes().filter(
-      (s) => s.type === 'wls-node' && (s.props as { kind?: unknown }).kind === 'asset'
-    ).length
-    const nodeId = createNodeId()
-    editor.createShape({
-      id: nodeIdToShapeId(nodeId) as TLShapeId,
-      type: 'wls-node',
-      x: self.x + self.props.w + 60 + Math.floor(count / 2) * 240,
-      y: self.y + (count % 2) * 400,
-      props: {
-        w: 200,
-        h: 380,
-        kind: 'asset',
-        meta: {
-          type: 'video',
-          url,
-          shotId,
-          createdAt: Date.now(),
-          ...(shot?.line ? { title: shot.line.slice(0, 40) } : {}),
-        } as JsonObject,
-      },
-    })
+    upsertAssetCard(
+      editor,
+      { shapeId: shape.id, x: self.x, y: self.y, w: self.props.w },
+      {
+        type: 'video',
+        url,
+        shotId,
+        createdAt: Date.now(),
+        ...(shot?.line ? { title: shot.line.slice(0, 40) } : {}),
+      }
+    )
   }
 
   /** 出片成功：blob 产物转存 IndexedDB → 产物条目持久化 → 画布创建产物卡 */
@@ -223,6 +196,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     setBusy(true)
     setError(null)
     storyDigestRef.current = scriptDigest(story)
+    storyRef.current = story
     try {
       const plans = story.shots.map((shot) =>
         VisualPlanSchema.parse({
