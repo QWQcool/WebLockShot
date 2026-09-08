@@ -8,6 +8,7 @@ import {
   CANVAS_NODE_SHAPE_TYPE,
   CANVAS_SCENE_TEMPLATES,
   createNodeId,
+  initialNodeY,
   nodeIdToShapeId,
   shapeIdToNodeId,
   validateCanvasDoc,
@@ -264,14 +265,30 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     if (!editor) return
     const nodeId = createNodeId()
     const bounds = editor.getViewportPageBounds()
-    // B2/B3：script 300×220（表单+摘要）、storyboard 320×420（9:16 竖屏预演），其余一期 A 尺寸
+    // B2/B3/B4：按节点内容定默认尺寸
     const [w, h] =
-      kind === 'script' ? [300, 220] : kind === 'storyboard' ? [320, 420] : [260, 160]
+      kind === 'script'
+        ? [300, 220]
+        : kind === 'storyboard'
+          ? [300, 560]
+          : kind === 'generate'
+            ? [300, 320]
+            : kind === 'asset'
+              ? [200, 380]
+              : [260, 160]
+    // B4 任务 0：初始摆放避开底部对话栏浮层（避让带 150px），防止控件被遮挡
+    const y = initialNodeY(
+      bounds.center.y,
+      h,
+      bounds.maxY,
+      150,
+      Math.random() * 60 - 30
+    )
     editor.createShape({
       id: nodeIdToShapeId(nodeId) as TLShapeId,
       type: CANVAS_NODE_SHAPE_TYPE,
       x: Math.round(bounds.center.x - w / 2 + (Math.random() * 60 - 30)),
-      y: Math.round(bounds.center.y - h / 2 + (Math.random() * 60 - 30)),
+      y: Math.round(y),
       props: { w, h, kind, meta: meta as JsonObject },
     })
   }, [])

@@ -60,6 +60,26 @@ export async function putDataUrlAsset(id: string, dataUrl: string): Promise<stri
   }
 }
 
+/**
+ * 将 Blob 直接存入 IndexedDB，返回 idbref:// 引用（B4：Mock 引擎产物为 blob objectURL，
+ * 跨刷新失效，必须在落档前转为 IndexedDB 持久引用）；失败时返回 null。
+ */
+export async function putBlobAsset(id: string, blob: Blob): Promise<string | null> {
+  try {
+    const db = await openDb()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite')
+      tx.objectStore(STORE_NAME).put(blob, id)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error || new Error('写入 IndexedDB 失败'))
+    })
+    return `${IDB_REF_PREFIX}${id}`
+  } catch (err) {
+    console.warn('[AssetStore] Blob 资产写入 IndexedDB 失败:', err)
+    return null
+  }
+}
+
 /** 读取资产并生成 blob objectURL；不存在返回 null */
 export async function getAssetObjectUrl(id: string): Promise<string | null> {
   try {
@@ -98,5 +118,6 @@ export function isIdbRef(value: string | undefined | null): value is string {
 }
 
 export function idbRefToId(ref: string): string {
-  return ref.slice(IDB_REF_PREFIX.length)
+  // B4：idbref 可带 ？v= 版本参数（产物重生成后强制播放器重新 hydrate），解析时剥离
+  return ref.slice(IDB_REF_PREFIX.length).split('?')[0] ?? ''
 }

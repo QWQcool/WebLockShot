@@ -19,6 +19,7 @@ export const CANVAS_NODE_KINDS = [
   'script',
   'storyboard',
   'generate',
+  'asset',
   'edit',
   'stage3d',
   'deliver',
@@ -108,7 +109,14 @@ export const CANVAS_NODE_META: Record<
     icon: '⚙️',
     phase: '1B',
     accent: '#7ec8e3',
-    hint: '可灵 / 即梦 / ComfyUI / Mock 多引擎调度（一期 B 接通，走钱包事务）',
+    hint: '连入 storyboard 后逐镜生成（ExecutorEngine 串行队列，钱包事务原样生效）',
+  },
+  asset: {
+    label: '产物卡',
+    icon: '🎬',
+    phase: '1B',
+    accent: '#7ec8e3',
+    hint: '单镜出片产物（视频卡，大资产入 IndexedDB），可连线送入成片交付',
   },
   edit: {
     label: '局部重绘',
@@ -135,8 +143,10 @@ export const CANVAS_NODE_META: Record<
 
 /** 一期 A 可用的节点（1B 节点可摆放但内容为「待接通」占位；2/3 期节点为灰态） */
 export function nodeAvailability(kind: CanvasNodeKind): 'ready' | 'pending' | 'locked' {
-  // B2 蜕壳：script 节点接通 AI 层；B3 蜕壳：storyboard 接通 ShotStage 本地预演
-  if (kind === 'script' || kind === 'storyboard') return 'ready'
+  // B2 script / B3 storyboard / B4 generate+asset 蜕壳接通
+  if (kind === 'script' || kind === 'storyboard' || kind === 'generate' || kind === 'asset') {
+    return 'ready'
+  }
   const phase = CANVAS_NODE_META[kind].phase
   if (phase === '1A') return 'ready'
   if (phase === '1B') return 'pending'
@@ -335,6 +345,93 @@ export function scriptDigest(script: unknown): string {
     hash = ((hash << 5) + hash + ch.charCodeAt(0)) | 0
   }
   return (hash >>> 0).toString(36)
+}
+
+/* ------------------------------------------------------------------ *
+ * B4 出片生成节点 + 产物卡契约（CANVAS_PLAN.md §9 B4）
+ * ------------------------------------------------------------------ */
+
+/** 产物条目状态：与 domain/shotJob.ts ShotJob.status / FSM 四态严格一致 */
+export const ARTIFACT_STATUSES = ['queued', 'running', 'succeeded', 'failed'] as const
+export type ArtifactStatus = (typeof ARTIFACT_STATUSES)[number]
+
+/** 单镜产物条目（generate 节点产物列表 + 持久化） */
+export const artifactSchema = z.object({
+  shotId: z.string().min(1),
+  order: z.number().int().min(1).max(6),
+  status: z.enum(ARTIFACT_STATUSES),
+  /** 仅 succeeded 有值：idbref:// 引用（IndexedDB 大资产）或 http(s) 直链；blob: 不持久化 */
+  url: z.string().optional(),
+  error: z.string().optional(),
+})
+export type Artifact = z.infer<typeof artifactSchema>
+
+/** generate 节点 meta 载荷：产物列表（仅终态，生成中不写 meta，刷新如实回 idle） */
+export const generateMetaPayloadSchema = z.object({
+  providerId: z.literal('mock'),
+  artifacts: z.array(artifactSchema).max(6),
+  storyDigest: z.string(),
+})
+export type GenerateMetaPayload = z.infer<typeof generateMetaPayloadSchema>
+
+export function readGenerateMetaPayload(meta: unknown): GenerateMetaPayload | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  const parsed = generateMetaPayloadSchema.safeParse(meta)
+  return parsed.success ? parsed.data : null
+}
+
+export function writeGenerateMetaPayload(
+  baseMeta: Record<string, unknown>,
+  payload: GenerateMetaPayload
+): Record<string, unknown> | null {
+  const parsed = generateMetaPayloadSchema.safeParse(payload)
+  if (!parsed.success) return null
+  return { ...baseMeta, ...parsed.data }
+}
+
+/** 产物卡（kind='asset'）meta 载荷：大资产只存引用（idbref://），blob URL 绝不入档 */
+export const assetMetaPayloadSchema = z.object({
+  type: z.literal('video'),
+  url: z
+    .string()
+    .refine((u) => u.startsWith('idbref://') || u.startsWith('http://') || u.startsWith('https://'), {
+      message: '产物卡 url 只允许 idbref:// 引用或 http(s) 直链（blob: 跨刷新失效，禁止持久化）',
+    }),
+  shotId: z.string().min(1),
+  createdAt: z.number().finite().positive(),
+  title: z.string().max(120).optional(),
+})
+export type AssetMetaPayload = z.infer<typeof assetMetaPayloadSchema>
+
+export function readAssetMetaPayload(meta: unknown): AssetMetaPayload | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  const parsed = assetMetaPayloadSchema.safeParse(meta)
+  return parsed.success ? parsed.data : null
+}
+
+export function writeAssetMetaPayload(
+  baseMeta: Record<string, unknown>,
+  payload: AssetMetaPayload
+): Record<string, unknown> | null {
+  const parsed = assetMetaPayloadSchema.safeParse(payload)
+  if (!parsed.success) return null
+  return { ...baseMeta, ...parsed.data }
+}
+
+/**
+ * addNode 初始摆放纵坐标（纯函数）：避开底部对话栏浮层（B4 任务 0）。
+ * 理想位置为视口垂直居中；若节点底边侵入「对话栏避让带」（视口底部 safeBandPx）则整体上移。
+ */
+export function initialNodeY(
+  viewportCenterY: number,
+  nodeHeight: number,
+  viewportBottomY: number,
+  safeBandPx = 150,
+  jitterPx = 0
+): number {
+  const ideal = viewportCenterY - nodeHeight / 2 + jitterPx
+  const safeBottom = viewportBottomY - safeBandPx
+  return ideal + nodeHeight > safeBottom ? safeBottom - nodeHeight : ideal
 }
 
 const nodeIdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/)
@@ -571,7 +668,8 @@ export const CANVAS_EDGE_COMPAT: Record<CanvasNodeKind, readonly CanvasNodeKind[
   image: ['edit', 'deliver'],
   script: ['storyboard'],
   storyboard: ['generate'],
-  generate: ['deliver'],
+  generate: ['asset', 'deliver'],
+  asset: ['deliver'],
   edit: ['deliver'],
   stage3d: ['storyboard', 'generate'],
   deliver: [],

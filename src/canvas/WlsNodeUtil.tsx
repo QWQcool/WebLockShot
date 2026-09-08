@@ -12,6 +12,8 @@ import {
   nodeAvailability,
   type CanvasNodeKind,
 } from './contract.ts'
+import { AssetNodeBody } from './AssetNodeBody.tsx'
+import { GenerateNodeBody } from './GenerateNodeBody.tsx'
 import { ScriptNodeBody } from './ScriptNodeBody.tsx'
 import { StoryboardNodeBody } from './StoryboardNodeBody.tsx'
 
@@ -72,9 +74,9 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
   }
 
   override onResize(shape: WlsNodeShape, info: TLResizeInfo<WlsNodeShape>) {
-    // B2：上限扩展（script 节点默认 300×220，可放大到 560×480 容纳结果摘要）
-    const w = Math.max(200, Math.min(560, Math.round(shape.props.w * info.scaleX)))
-    const h = Math.max(120, Math.min(480, Math.round(shape.props.h * info.scaleY)))
+    // B2/B3/B4：上限扩展（script 300×220、storyboard 300×560、generate 300×320、asset 200×380）
+    const w = Math.max(180, Math.min(560, Math.round(shape.props.w * info.scaleX)))
+    const h = Math.max(120, Math.min(720, Math.round(shape.props.h * info.scaleY)))
     return {
       id: shape.id,
       type: shape.type,
@@ -113,7 +115,11 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
           </span>
         </div>
         <div className="wls-node-body">
-          {shape.props.kind === 'script' ? (
+          {shape.props.kind === 'asset' ? (
+            <AssetNodeBody shape={shape} />
+          ) : shape.props.kind === 'generate' ? (
+            <GenerateNodeBody shape={shape} />
+          ) : shape.props.kind === 'script' ? (
             // 内嵌交互节点约定（B4 generate / B5 product/deliver 同此）：
             // pointerdown 冒泡阻断必须收窄到【具体控件元素】（textarea/select/button 各自
             // onPointerDown stopPropagation），绝不可挂在 body 或卡片根容器——

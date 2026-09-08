@@ -16,7 +16,10 @@ import {
   createNodeId,
   edgeIdToArrowShapeId,
   edgeToArrowMaterial,
+  initialNodeY,
   nodeIdToShapeId,
+  readAssetMetaPayload,
+  readGenerateMetaPayload,
   readScriptMetaPayload,
   readStoryboardMetaPayload,
   scriptDigest,
@@ -25,6 +28,8 @@ import {
   shapeSnapshotToCanvasNode,
   validateCanvasDoc,
   validateEdgeKind,
+  writeAssetMetaPayload,
+  writeGenerateMetaPayload,
   writeScriptMetaPayload,
   writeStoryboardMetaPayload,
   type CanvasDoc,
@@ -522,6 +527,89 @@ test('B3 scriptDigest：确定性 + 上游脚本变化即指纹变化', () => {
   const sameScript = readScriptMetaPayload(makeScriptPayload({ scriptScene: 'drama' }))
   assert.ok(sameScript)
   assert.equal(da, scriptDigest(sameScript.script))
+})
+
+/* ---------------- B4：generate 节点 + 产物卡契约 ---------------- */
+
+test('B4 边兼容：generate→asset、asset→deliver 合法，asset 无其它下游', () => {
+  assert.deepEqual(validateEdgeKind('generate', 'asset'), { ok: true })
+  assert.deepEqual(validateEdgeKind('asset', 'deliver'), { ok: true })
+  const out = validateEdgeKind('asset', 'script')
+  assert.equal(out.ok, false)
+  assert.ok(CANVAS_EDGE_COMPAT.generate.includes('asset'))
+  assert.deepEqual([...CANVAS_EDGE_COMPAT.asset], ['deliver'])
+  assert.ok(CANVAS_NODE_KINDS.includes('asset'))
+})
+
+test('B4 asset meta：idbref/http 合法，blob: 拒绝持久化，缺字段拒绝', () => {
+  const ok = readAssetMetaPayload({
+    type: 'video',
+    url: 'idbref://canvas-asset-s1',
+    shotId: 'story1-s1',
+    createdAt: 1000,
+    title: '钩子',
+  })
+  assert.ok(ok)
+  assert.equal(ok.url.startsWith('idbref://'), true)
+
+  assert.ok(readAssetMetaPayload({ type: 'video', url: 'https://cdn.example/v.webm', shotId: 's', createdAt: 1 }))
+  // blob URL 跨刷新失效：契约拒绝持久化
+  assert.equal(readAssetMetaPayload({ type: 'video', url: 'blob:https://x/abc', shotId: 's', createdAt: 1 }), null)
+  // 缺 shotId / type 错误
+  assert.equal(readAssetMetaPayload({ type: 'video', url: 'idbref://a', createdAt: 1 }), null)
+  assert.equal(readAssetMetaPayload({ type: 'audio', url: 'idbref://a', shotId: 's', createdAt: 1 }), null)
+  assert.equal(readAssetMetaPayload(null), null)
+
+  const merged = writeAssetMetaPayload({ custom: 1 }, ok!)
+  assert.ok(merged)
+  assert.equal(merged.custom, 1)
+})
+
+test('B4 generate meta：产物列表往返（四态状态机一致），非法状态/超量拒绝', () => {
+  const artifacts = [
+    { shotId: 'story1-s1', order: 1, status: 'succeeded', url: 'idbref://a' },
+    { shotId: 'story1-s2', order: 2, status: 'failed', error: '轮询超时' },
+    { shotId: 'story1-s3', order: 3, status: 'queued' },
+    { shotId: 'story1-s4', order: 4, status: 'running' },
+  ]
+  const payload = { providerId: 'mock', artifacts, storyDigest: 'd1' }
+  const merged = writeGenerateMetaPayload({ text: 'x' }, payload as never)
+  assert.ok(merged)
+  const back = readGenerateMetaPayload(merged)
+  assert.ok(back)
+  assert.equal(back.artifacts.length, 4)
+  // 四态与 FSM 状态集合一致
+  for (const a of back.artifacts) {
+    assert.ok(['queued', 'running', 'succeeded', 'failed'].includes(a.status))
+  }
+
+  // 非法状态
+  assert.equal(
+    readGenerateMetaPayload({ providerId: 'mock', storyDigest: 'd', artifacts: [{ shotId: 's', order: 1, status: 'done' }] }),
+    null
+  )
+  // providerId 只允许 mock（可灵/即梦画布未接通）
+  assert.equal(
+    readGenerateMetaPayload({ providerId: 'kling', storyDigest: 'd', artifacts: [] }),
+    null
+  )
+  // 超过 6 条拒绝
+  const tooMany = {
+    providerId: 'mock',
+    storyDigest: 'd',
+    artifacts: Array.from({ length: 7 }, (_, i) => ({ shotId: `s${i}`, order: 1, status: 'failed' })),
+  }
+  assert.equal(readGenerateMetaPayload(tooMany), null)
+})
+
+test('B4 initialNodeY：默认居中；侵入对话栏避让带时上移；jitter 不越带', () => {
+  // 视口高 720：center 360，bottom 720，避让带 150 → safeBottom 570
+  assert.equal(initialNodeY(360, 160, 720), 280) // 280+160=440 < 570 → 居中不动
+  // 高节点 560：居中 80..640 侵入避让带 → 上移为 570-560=10
+  assert.equal(initialNodeY(360, 560, 720), 10)
+  // jitter 不会越过避让带
+  assert.ok(initialNodeY(360, 560, 720, 150, 30) <= 570 - 560)
+  assert.equal(initialNodeY(360, 160, 720, 150, 30), 310)
 })
 
 test('画布存储：保存→读取往返，脏数据被拒', () => {
