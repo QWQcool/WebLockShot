@@ -15,6 +15,7 @@
     "test:ui": "vitest run",
     "preview": "vite preview",
     "start:server": "node server/weblockshot-server.mjs",
+    "test:chaos": "node scripts/chaos-smoke.mjs",
     "verify:providers": "node --experimental-strip-types scripts/verify-providers.mjs"
   },
   "dependencies": {

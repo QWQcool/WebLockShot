@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { View, Text, Progress, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 // 复用主仓 domain 轮询配置（@domain 别名 → ../src/domain，src 层面零改动）
-import { getPollingWindow, pollSleep } from '@domain/pollingConfig.ts'
+import { getPollingWindow, pollSleep, createPollFailureTolerance } from '@domain/pollingConfig.ts'
 import { pollVideoTask } from '../../api/client'
 import { getCurrentTask, markTaskSucceeded } from '../../store/taskStore'
 import './progress.scss'
@@ -27,6 +27,7 @@ export default function ProgressPage() {
     }
 
     const pollingWindow = getPollingWindow()
+    const tolerance = createPollFailureTolerance() // O9：连续失败容忍 3 次，网络抖动不再一次判死
     let attempt = 0
 
     const loop = async () => {
@@ -38,6 +39,7 @@ export default function ProgressPage() {
         try {
           const result = await pollVideoTask(task)
           if (!pollingRef.current) return
+          tolerance.onSuccess() // 中途任何一次成功即恢复计数
           setProgress(Math.max(progress, result.progress))
           setStatusText(`模型渲染中…（已等待 ${Math.round((attempt * pollingWindow.intervalMs) / 1000)}s）`)
 
@@ -53,9 +55,17 @@ export default function ProgressPage() {
             return
           }
         } catch (err) {
-          pollingRef.current = false
-          setError(err instanceof Error ? err.message : '查询任务状态失败')
-          return
+          if (!pollingRef.current) return
+          // O9：连续失败未达容忍上限 → 继续轮询；达上限才判死
+          const exhausted = tolerance.onFailure()
+          if (exhausted) {
+            pollingRef.current = false
+            setError(err instanceof Error ? err.message : '查询任务状态失败')
+            return
+          }
+          setStatusText(
+            `网络波动，正在重试…（${tolerance.consecutiveFailures}/3）`
+          )
         }
       }
 

@@ -44,6 +44,8 @@ export default function Index() {
     })
 
   const handleSubmit = async () => {
+    // O9 修复：提交进行中直接拦截，防止双击创建双任务
+    if (submitting) return
     const prompt = [title.trim(), sellingPoint.trim()].filter(Boolean).join('，')
     if (!prompt) {
       setError('请至少填写商品名称或核心卖点')
@@ -100,7 +102,12 @@ export default function Index() {
         </View>
       )}
 
-      <Button className="btn-primary submit-btn" loading={submitting} onClick={handleSubmit}>
+      <Button
+        className="btn-primary submit-btn"
+        loading={submitting}
+        disabled={submitting}
+        onClick={handleSubmit}
+      >
         {submitting ? '正在提交任务…' : '🎬 提交生成任务'}
       </Button>
 

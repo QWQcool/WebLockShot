@@ -31,6 +31,10 @@ jobs:
         run: npm run lint
       - name: Unit Tests
         run: npm test
+      # Chaos 冒烟（边缘情况专项）：验证 CLI 全程存活。非阻断（部署不依赖），失败仅告警
+      - name: Chaos Smoke (non-blocking)
+        run: npm run test:chaos
+        continue-on-error: true
 
   deploy:
     needs: quality-gate
