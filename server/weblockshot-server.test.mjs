@@ -774,9 +774,11 @@ test('O12 静态托管：同前缀兄弟目录（dist-evil）不得越界读取'
 
       // server 存活
       assert.equal((await fetch(`${base}/healthz`)).status, 200)
-      // 正常静态请求不受影响
+      // 正常静态请求不受影响：必须命中「注入的 dist」（内容断言锁定，
+      // 防止 opts.dist 被静默忽略后因仓库恰好存在已构建 dist 而侥幸通过——CI 即因此失败）
       const ok = await fetch(`${base}/index.html`)
       assert.equal(ok.status, 200)
+      assert.equal(await ok.text(), '<html>ok</html>', '应服务注入 dist 的 index.html，而非仓库 dist')
     } finally {
       await close(server)
     }

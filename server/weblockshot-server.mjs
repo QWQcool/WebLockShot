@@ -462,6 +462,9 @@ function serveStatic(req, res, distDir) {
 // ---------------- 服务工厂（CLI 与测试共用） ----------------
 export async function startServer(opts = {}) {
   const args = parseArgs(opts.argv || process.argv.slice(2), opts.env || process.env)
+  // dist 支持注入（O12 测试暴露：此前 opts.dist 被静默忽略，测试注入的 dist 目录
+  // 不生效——Windows 本机因恰好存在已构建的仓库 dist 而侥幸通过，CI 无 dist 即失败）
+  const distDir = opts.dist !== undefined ? resolve(opts.dist) : args.dist
   const logger = opts.logger || createLogger({ level: args.logLevel })
   const storage = opts.storage || (await createStorage({ mode: args.storageMode, sqlitePath: args.sqlitePath, logger }))
   const keys = opts.keys !== undefined ? opts.keys : parseWlsKeys(args.keysRaw, logger)
@@ -622,7 +625,7 @@ export async function startServer(opts = {}) {
       return
     }
 
-    serveStatic(req, res, args.dist)
+    serveStatic(req, res, distDir)
   }
 
   const server = http.createServer(handler)
