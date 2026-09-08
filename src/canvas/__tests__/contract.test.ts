@@ -5,21 +5,28 @@ import {
   CANVAS_DOC_KEY,
   CANVAS_EDGE_COMPAT,
   CANVAS_NODE_KINDS,
+  SCRIPT_SCENE_LABEL,
+  SCRIPT_SCENE_TEMPLATE_ID,
   WLS_ARROW_SHAPE_PREFIX,
   arrowShapeIdToEdgeId,
   arrowSnapshotsToEdges,
+  briefTextToWriterInput,
   canvasNodeToShapePartial,
   createEmptyCanvasDoc,
   createNodeId,
   edgeIdToArrowShapeId,
   edgeToArrowMaterial,
   nodeIdToShapeId,
+  readScriptMetaPayload,
+  scriptSceneOf,
   shapeIdToNodeId,
   shapeSnapshotToCanvasNode,
   validateCanvasDoc,
   validateEdgeKind,
+  writeScriptMetaPayload,
   type CanvasDoc,
 } from '../contract.ts'
+import { STRUCTURE_TEMPLATES } from '../../prompts/library/structures.ts'
 import {
   loadCanvasDocFrom,
   saveCanvasDocTo,
@@ -324,6 +331,107 @@ test('edgeToArrowMaterial：几何与绑定参数正确且确定性（含中心�
 
   // 自环拒绝
   assert.equal(edgeToArrowMaterial({ id: 'e1', from: 'n1', to: 'n1' }, from, from), null)
+})
+
+/* ---------------- B2：script 节点契约 ---------------- */
+
+/** 构造合法的脚本生成 meta 载荷 */
+function makeScriptPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    scriptScene: 'ecommerce',
+    script: {
+      logline: '测试脚本 logline',
+      templateId: 't1_pain_opening',
+      beats: [
+        { order: 1, role: 'hook', goal: 'g', action: 'a', audio: { kind: 'vo', speaker: '主播', text: 't1' } },
+        { order: 2, role: 'pain', goal: 'g', action: 'a' },
+        { order: 3, role: 'reveal', goal: 'g', action: 'a' },
+        { order: 4, role: 'demo', goal: 'g', action: 'a' },
+        { order: 5, role: 'proof', goal: 'g', action: 'a' },
+        { order: 6, role: 'cta', goal: 'g', action: 'a' },
+      ],
+      ctaLine: 'cta',
+      lengthTargetSec: 18,
+    },
+    critic: {
+      score: 92,
+      passed: true,
+      summary: 'summary',
+      strengths: ['s1'],
+      suggestions: ['sug1'],
+    },
+    demo: true,
+    upstreamText: '手表，续航长，防水',
+    ...overrides,
+  }
+}
+
+test('B2 契约：脚本场景路由表覆盖结构库既有模板 id', () => {
+  const ids = new Set(STRUCTURE_TEMPLATES.map((t) => t.id))
+  for (const scene of Object.keys(SCRIPT_SCENE_TEMPLATE_ID) as (keyof typeof SCRIPT_SCENE_TEMPLATE_ID)[]) {
+    assert.ok(ids.has(SCRIPT_SCENE_TEMPLATE_ID[scene]), `${scene} 路由的模板必须存在于结构库`)
+  }
+  assert.equal(Object.keys(SCRIPT_SCENE_LABEL).length, 3)
+  assert.equal(SCRIPT_SCENE_LABEL.ecommerce, '带货短视频')
+  assert.equal(SCRIPT_SCENE_LABEL.drama, '剧情短剧')
+  assert.equal(SCRIPT_SCENE_LABEL.brand, '品牌叙事')
+})
+
+test('B2 readScriptMetaPayload：合法载荷通过（含 demo 标记），非法载荷拒绝', () => {
+  const ok = readScriptMetaPayload(makeScriptPayload())
+  assert.ok(ok)
+  assert.equal(ok.demo, true)
+  assert.equal(ok.script.beats.length, 6)
+  assert.equal(ok.critic.score, 92)
+  assert.equal(ok.scriptScene, 'ecommerce')
+
+  // 非法：缺 critic / demo 非布尔 / scene 非法 / beats 数量不对
+  const missingCritic = { ...makeScriptPayload() } as Record<string, unknown>
+  delete missingCritic.critic
+  assert.equal(readScriptMetaPayload(missingCritic), null)
+  assert.equal(readScriptMetaPayload(makeScriptPayload({ demo: 'yes' })), null)
+  assert.equal(readScriptMetaPayload(makeScriptPayload({ scriptScene: 'hacker' })), null)
+  assert.equal(readScriptMetaPayload(null), null)
+  assert.equal(readScriptMetaPayload('x'), null)
+  const badBeats = makeScriptPayload()
+  ;(badBeats.script as { beats: unknown[] }).beats = []
+  assert.equal(readScriptMetaPayload(badBeats), null)
+})
+
+test('B2 writeScriptMetaPayload：校验通过合并保留 base 键，校验失败拒写（不半渲染）', () => {
+  const base = { text: '上游 brief', custom: 1 }
+  const merged = writeScriptMetaPayload(base, makeScriptPayload() as never)
+  assert.ok(merged)
+  assert.equal(merged.text, '上游 brief')
+  assert.equal(merged.custom, 1)
+  assert.equal(merged.demo, true)
+  // 回读一致（写入即合法）
+  assert.ok(readScriptMetaPayload(merged))
+
+  const bad = makeScriptPayload({ upstreamText: 123 })
+  assert.equal(writeScriptMetaPayload(base, bad as never), null)
+})
+
+test('B2 scriptSceneOf：缺省与非法值回退 ecommerce', () => {
+  assert.equal(scriptSceneOf({}), 'ecommerce')
+  assert.equal(scriptSceneOf({ scriptScene: 'drama' }), 'drama')
+  assert.equal(scriptSceneOf({ scriptScene: 'nope' }), 'ecommerce')
+  assert.equal(scriptSceneOf(null), 'ecommerce')
+  assert.equal(scriptSceneOf('x'), 'ecommerce')
+})
+
+test('B2 briefTextToWriterInput：首段标题 + 后续卖点拆分；空文本返回空输入', () => {
+  const out = briefTextToWriterInput('钛合金机械手表\n超长续航；防水一百米，蓝宝石镜面')
+  assert.equal(out.productTitle, '钛合金机械手表')
+  assert.deepEqual(out.sellingPoints, ['超长续航', '防水一百米', '蓝宝石镜面'])
+
+  // 无独立段落：从标题内拆逗号短语
+  const single = briefTextToWriterInput('便携榨汁杯，一秒出汁，食品级材质')
+  assert.equal(single.productTitle, '便携榨汁杯，一秒出汁，食品级材质')
+  assert.deepEqual(single.sellingPoints, ['便携榨汁杯', '一秒出汁', '食品级材质'])
+
+  // 空文本
+  assert.deepEqual(briefTextToWriterInput('   '), { productTitle: '', sellingPoints: [] })
 })
 
 test('画布存储：保存→读取往返，脏数据被拒', () => {

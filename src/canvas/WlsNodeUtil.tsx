@@ -12,6 +12,7 @@ import {
   nodeAvailability,
   type CanvasNodeKind,
 } from './contract.ts'
+import { ScriptNodeBody } from './ScriptNodeBody.tsx'
 
 /**
  * 画布 Agent 节点 shape（CANVAS_PLAN.md §4.1-2）。
@@ -70,8 +71,9 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
   }
 
   override onResize(shape: WlsNodeShape, info: TLResizeInfo<WlsNodeShape>) {
-    const w = Math.max(200, Math.min(520, Math.round(shape.props.w * info.scaleX)))
-    const h = Math.max(120, Math.min(400, Math.round(shape.props.h * info.scaleY)))
+    // B2：上限扩展（script 节点默认 300×220，可放大到 560×480 容纳结果摘要）
+    const w = Math.max(200, Math.min(560, Math.round(shape.props.w * info.scaleX)))
+    const h = Math.max(120, Math.min(480, Math.round(shape.props.h * info.scaleY)))
     return {
       id: shape.id,
       type: shape.type,
@@ -88,7 +90,7 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
         : availability === 'pending'
           ? '一期 B 接通'
           : `${meta.phase} 期开放`
-    // 对话栏生成的 Brief 文本存在 meta.text（一期 A 只上画布，接 LLM 是一期 B）
+    // 对话栏生成的 Brief 文本存在 meta.text（script 节点沿边读取上游 Brief，见 ScriptNodeBody）
     const briefText =
       typeof shape.props.meta.text === 'string' && shape.props.meta.text.trim().length > 0
         ? shape.props.meta.text.trim()
@@ -110,13 +112,23 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
           </span>
         </div>
         <div className="wls-node-body">
-          {briefText ? (
-            <p className="wls-node-text">{briefText}</p>
+          {shape.props.kind === 'script' ? (
+            // 内嵌交互节点约定（B4 generate / B5 product/deliver 同此）：
+            // pointerdown 冒泡阻断必须收窄到【具体控件元素】（textarea/select/button 各自
+            // onPointerDown stopPropagation），绝不可挂在 body 或卡片根容器——
+            // 根容器级会吞掉从 body 空白区起笔的画线事件（start 端绑定失效，edges 不落盘）。
+            <ScriptNodeBody shape={shape} />
           ) : (
-            <p className="wls-node-hint">{meta.hint}</p>
-          )}
-          {availability === 'locked' && (
-            <p className="wls-node-locked-note">当前为 {meta.phase} 期开放能力，一期 A 仅摆放占位。</p>
+            <>
+              {briefText ? (
+                <p className="wls-node-text">{briefText}</p>
+              ) : (
+                <p className="wls-node-hint">{meta.hint}</p>
+              )}
+              {availability === 'locked' && (
+                <p className="wls-node-locked-note">当前为 {meta.phase} 期开放能力，一期 A 仅摆放占位。</p>
+              )}
+            </>
           )}
         </div>
         <div className="wls-node-foot">

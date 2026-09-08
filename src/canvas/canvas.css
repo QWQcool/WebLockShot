@@ -541,6 +541,217 @@
   box-sizing: border-box;
 }
 
+/* ---------- B2：脚本创编节点内嵌 UI ---------- */
+.wls-node[data-kind='script'] .wls-node-body {
+  overflow-y: auto;
+  padding: 0.15rem 0.7rem 0.3rem;
+}
+
+.wls-script {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+}
+
+.wls-script-upstream {
+  color: var(--cv-ink);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  background: var(--cv-panel-2);
+  border: 1px solid var(--cv-line);
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+.wls-script-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 3.2rem;
+  resize: none;
+  border: 1px solid var(--cv-line);
+  border-radius: 8px;
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  font-size: 0.74rem;
+  font-family: var(--body);
+  line-height: 1.45;
+  padding: 0.3rem 0.5rem;
+}
+
+.wls-script-input:focus-visible {
+  outline: 2px solid var(--cv-miku);
+  outline-offset: 0;
+}
+
+.wls-script-stale {
+  color: #8a6d1a;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  background: #fdf6e3;
+  border: 1px solid #ecd9a0;
+  border-radius: 8px;
+  padding: 0.22rem 0.5rem;
+}
+
+.wls-script-controls {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.wls-script-scene {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--cv-line);
+  border-radius: 8px;
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  font-size: 0.74rem;
+  padding: 0.28rem 0.35rem;
+}
+
+.wls-script-generate {
+  flex: none;
+  border: none;
+  background: var(--cv-miku);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.32rem 0.6rem;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.wls-script-generate:hover:not(:disabled) {
+  background: var(--cv-miku-deep);
+}
+
+.wls-script-generate:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.wls-script-generate:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wls-script-busy {
+  color: var(--cv-mute);
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.wls-script-busy::before {
+  content: '';
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: none;
+  border: 2px solid var(--cv-line);
+  border-top-color: var(--cv-miku);
+  border-radius: 50%;
+  animation: wls-script-spin 0.8s linear infinite;
+}
+
+@keyframes wls-script-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wls-script-busy::before {
+    animation: none;
+  }
+}
+
+.wls-script-error {
+  color: #c2427c;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.wls-script-result {
+  border-top: 1px dashed var(--cv-line);
+  padding-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.wls-script-badges {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.wls-script-badge-demo {
+  font-size: 0.64rem;
+  border-radius: 999px;
+  padding: 0.06rem 0.5rem;
+  color: #8a6d1a;
+  background: #fdf6e3;
+  border: 1px solid #ecd9a0;
+}
+
+.wls-script-badge-real {
+  font-size: 0.64rem;
+  border-radius: 999px;
+  padding: 0.06rem 0.5rem;
+  color: #fff;
+  background: var(--cv-miku);
+  border: 1px solid var(--cv-miku);
+}
+
+.wls-script-badge-scene {
+  font-size: 0.64rem;
+  border-radius: 999px;
+  padding: 0.06rem 0.5rem;
+  color: var(--cv-mute);
+  border: 1px solid var(--cv-line);
+  background: var(--cv-panel-2);
+}
+
+.wls-script-logline {
+  margin: 0;
+  color: var(--cv-ink);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+.wls-script-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  color: var(--cv-mute);
+  font-size: 0.68rem;
+}
+
+.wls-script-notes {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--cv-mute);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* ---------- 响应式（对齐项目断点：<768px 单栏） ---------- */
 @media (max-width: 768px) {
   .wls-canvas-body {

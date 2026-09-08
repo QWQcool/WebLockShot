@@ -264,8 +264,8 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     if (!editor) return
     const nodeId = createNodeId()
     const bounds = editor.getViewportPageBounds()
-    const w = 260
-    const h = 160
+    // B2：script 节点默认尺寸调大（容纳表单 + 结果摘要），其余保持一期 A 尺寸
+    const [w, h] = kind === 'script' ? [300, 220] : [260, 160]
     editor.createShape({
       id: nodeIdToShapeId(nodeId) as TLShapeId,
       type: CANVAS_NODE_SHAPE_TYPE,

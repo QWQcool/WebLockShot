@@ -22,8 +22,9 @@ dist-ssr
 .workbuddy/
 .playwright-cli/
 
-# 测试 Agent 冒烟临时快照
+# 测试 Agent 冒烟临时快照与临时输出
 canvas.yaml
+.tmp-*
 
 # 伴生服务运行产物（剪映草稿 zip 落盘目录 / TTS 音频 / ffmpeg 成片）
 jianying-drafts/

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ScriptSchema } from '../domain/script.ts'
 
 /**
  * CanvasDoc 数据契约（CANVAS_PLAN.md §3，一期冻结，只扩不破）。
@@ -92,7 +93,7 @@ export const CANVAS_NODE_META: Record<
     icon: '📝',
     phase: '1B',
     accent: '#39c5bb',
-    hint: 'ScriptWriter + Critic 双智体：带货口播 / 剧情台词 / 品牌叙事（一期 B 接通）',
+    hint: 'ScriptWriter + Critic 双智体：带货口播 / 剧情台词 / 品牌叙事（连入 Brief 或手动输入需求）',
   },
   storyboard: {
     label: '分镜预演',
@@ -133,10 +134,117 @@ export const CANVAS_NODE_META: Record<
 
 /** 一期 A 可用的节点（1B 节点可摆放但内容为「待接通」占位；2/3 期节点为灰态） */
 export function nodeAvailability(kind: CanvasNodeKind): 'ready' | 'pending' | 'locked' {
+  // B2 蜕壳：script 节点接通 AI 层，转为就绪
+  if (kind === 'script') return 'ready'
   const phase = CANVAS_NODE_META[kind].phase
   if (phase === '1A') return 'ready'
   if (phase === '1B') return 'pending'
   return 'locked'
+}
+
+/* ------------------------------------------------------------------ *
+ * B2 脚本创编节点契约（CANVAS_PLAN.md §9 B2）
+ * ------------------------------------------------------------------ */
+
+/** script 节点契约路由（三选一，对应结构库既有模板，不新写结构） */
+export const CANVAS_SCRIPT_SCENES = ['ecommerce', 'drama', 'brand'] as const
+export type CanvasScriptScene = (typeof CANVAS_SCRIPT_SCENES)[number]
+
+export const SCRIPT_SCENE_LABEL: Record<CanvasScriptScene, string> = {
+  ecommerce: '带货短视频',
+  drama: '剧情短剧',
+  brand: '品牌叙事',
+}
+
+/** 场景 → 结构库模板路由（模板 id 来自 src/prompts/library/structures.ts 的 STRUCTURE_TEMPLATES） */
+export const SCRIPT_SCENE_TEMPLATE_ID: Record<CanvasScriptScene, string> = {
+  ecommerce: 't1_pain_opening', // 痛点提问开场：经典带货转化结构
+  drama: 't4_story_insert', // 短剧反转植入：剧情叙事
+  brand: 't2_contrast_reveal', // 效果强烈反差：品牌视觉叙事
+}
+
+/** Critic 评审结果的 meta 载荷（对齐 CriticReviewResult 字段） */
+export const scriptCriticMetaSchema = z.object({
+  score: z.number().min(0).max(100),
+  passed: z.boolean(),
+  summary: z.string(),
+  strengths: z.array(z.string()),
+  suggestions: z.array(z.string()),
+})
+
+/**
+ * script 节点生成结果的 meta 载荷（B2）：
+ * Script 直接复用 src/domain/script.ts 的 zod 契约；demo=true 表示无 Key 演示模式
+ * （本地规则引擎产物，评分非真实 LLM 质检，UI 必须如实标注）。
+ */
+export const scriptMetaPayloadSchema = z.object({
+  scriptScene: z.enum(CANVAS_SCRIPT_SCENES),
+  script: ScriptSchema,
+  critic: scriptCriticMetaSchema,
+  demo: z.boolean(),
+  /** 生成时使用的需求文本快照（上游 Brief 或手动输入），用于「上游已更新」同步提示 */
+  upstreamText: z.string().max(2000),
+})
+export type ScriptMetaPayload = z.infer<typeof scriptMetaPayloadSchema>
+
+/** 读取：从 shape meta 解析脚本生成结果（缺失/非法返回 null，不半渲染） */
+export function readScriptMetaPayload(meta: unknown): ScriptMetaPayload | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  const parsed = scriptMetaPayloadSchema.safeParse(meta)
+  return parsed.success ? parsed.data : null
+}
+
+/** 写入：生成结果经 zod 校验后合并进 meta（校验失败返回 null 拒写，不合格则整体失败） */
+export function writeScriptMetaPayload(
+  baseMeta: Record<string, unknown>,
+  payload: ScriptMetaPayload
+): Record<string, unknown> | null {
+  const parsed = scriptMetaPayloadSchema.safeParse(payload)
+  if (!parsed.success) return null
+  return { ...baseMeta, ...parsed.data }
+}
+
+/** 场景读取：meta.scriptScene 非法或缺省时回退 'ecommerce' */
+export function scriptSceneOf(meta: unknown): CanvasScriptScene {
+  const scene =
+    meta && typeof meta === 'object' && !Array.isArray(meta)
+      ? (meta as Record<string, unknown>).scriptScene
+      : undefined
+  return CANVAS_SCRIPT_SCENES.includes(scene as CanvasScriptScene)
+    ? (scene as CanvasScriptScene)
+    : 'ecommerce'
+}
+
+/**
+ * 上游 Brief 文本 → ScriptWriter 输入（纯函数）：
+ * 首段（按换行/分号切分）为商品或主题标题，其余段落按逗号细分拆为卖点（最多 5 条）；
+ * 无独立段落时从标题内拆逗号短语作为卖点。
+ */
+export function briefTextToWriterInput(text: string): {
+  productTitle: string
+  sellingPoints: string[]
+} {
+  const normalized = text.trim()
+  if (!normalized) return { productTitle: '', sellingPoints: [] }
+  const segments = normalized
+    .split(/[\n；;]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+  const productTitle = (segments[0] ?? normalized).slice(0, 80)
+  let sellingPoints = segments
+    .slice(1)
+    .flatMap((s) => s.split(/[，,]/))
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2)
+    .slice(0, 5)
+  if (sellingPoints.length === 0) {
+    sellingPoints = productTitle
+      .split(/[，,]/)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 2 && s !== productTitle)
+      .slice(0, 5)
+  }
+  return { productTitle, sellingPoints }
 }
 
 const nodeIdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/)
