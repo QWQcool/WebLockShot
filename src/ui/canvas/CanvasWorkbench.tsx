@@ -2,19 +2,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Tldraw, type Editor, type JsonObject, type TLShapeId } from 'tldraw'
 import 'tldraw/tldraw.css'
 import '../../canvas/canvas.css'
+import { chatCompletionsText } from '../../ai/client.ts'
+import { TOKEN_STORAGE_KEY, type TokenConfig } from '../../types.ts'
 import {
   CANVAS_NODE_KINDS,
   CANVAS_NODE_META,
   CANVAS_NODE_SHAPE_TYPE,
   CANVAS_SCENE_TEMPLATES,
+  buildDemoOrchestrationPlan,
   createNodeId,
+  filterOrchestrationParams,
   initialNodeY,
   nodeIdToShapeId,
+  parseOrchestrationPlan,
+  routeOrchestrationScene,
   shapeIdToNodeId,
   validateCanvasDoc,
   validateEdgeKind,
   type CanvasDoc,
   type CanvasNodeKind,
+  type OrchestrationPlan,
 } from '../../canvas/contract.ts'
 import {
   clearCanvasDoc,
@@ -297,16 +304,245 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     })
   }, [])
 
-  // 对话栏：一句话 → Brief 节点上画布（一期 A 只落画布；调 LLM 编排是一期 B，页内诚实标注）
+  // 对话栏：B6 LLM/演示两态编排（一句话 → 整批节点+连线上画布，可一键撤销）
   const [chatDraft, setChatDraft] = useState('')
   const chatInputRef = useRef<HTMLInputElement>(null)
-  const onChatSend = useCallback(() => {
+  const [orchestrating, setOrchestrating] = useState(false)
+  const [orchestrationNotice, setOrchestrationNotice] = useState<string | null>(null)
+  const [orchestrationNoticeOpen, setOrchestrationNoticeOpen] = useState(false)
+  // 撤销按钮显隐信号（ids 本体存 orchestrationIdsRef，避免渲染期读 ref）
+  const [hasUndoable, setHasUndoable] = useState(false)
+  // P1 修复：撤销 ids 用 ref 快照（布置时写入）——不依赖渲染期 state（tldraw shape 组件
+  // 可能 remount 导致 state 重置/闭包过期，B4/B6 两轮教训）
+  const orchestrationIdsRef = useRef<TLShapeId[] | null>(null)
+  const orchestrationUndoTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (orchestrationUndoTimerRef.current !== null) {
+        window.clearTimeout(orchestrationUndoTimerRef.current)
+      }
+    }
+  }, [])
+
+  const showOrchestrationNotice = useCallback((msg: string) => {
+    setOrchestrationNotice(msg)
+    setOrchestrationNoticeOpen(true)
+    if (orchestrationUndoTimerRef.current !== null) {
+      window.clearTimeout(orchestrationUndoTimerRef.current)
+    }
+  }, [])
+
+  const closeOrchestrationNotice = useCallback(() => {
+    setOrchestrationNoticeOpen(false)
+    if (orchestrationUndoTimerRef.current !== null) {
+      window.clearTimeout(orchestrationUndoTimerRef.current)
+      orchestrationUndoTimerRef.current = null
+    }
+  }, [])
+
+  /**
+   * P1 修复：撤销本次编排——直接读布置时记录的 shapeIds 快照（ref），不依赖渲染期引用；
+   * 除整批 shapes 外，再扫描「两端任在本批」的箭头一并删除；异常不吞（console 保留现场）。
+   */
+  const handleOrchestrationUndo = useCallback(() => {
+    const editor = editorRef.current
+    const ids = orchestrationIdsRef.current
+    if (!editor || !ids || ids.length === 0) return
+    try {
+      const idSet = new Set<string>(ids)
+      // 相关箭头一并删：两端任一端在本批中的箭头（防用户已手动改动拓扑后残留连线）
+      const relatedArrows = editor
+        .getCurrentPageShapes()
+        .filter((s) => {
+          if (s.type !== 'arrow') return false
+          const bs = editor.getBindingsFromShape(s, 'arrow')
+          return bs.some((b) => idSet.has(b.toId))
+        })
+        .map((s) => s.id)
+      editor.deleteShapes([...ids, ...relatedArrows])
+      orchestrationIdsRef.current = null
+      setHasUndoable(false)
+      closeOrchestrationNotice()
+    } catch (err) {
+      console.warn('[Canvas][orchestration-undo] 删除失败:', err)
+      closeOrchestrationNotice()
+    }
+  }, [closeOrchestrationNotice])
+
+  /** 把编排计划落到画布：单一 editor.run batch（节点+连线整体，Ctrl+Z 一次回滚） */
+  const applyOrchestrationPlan = useCallback(
+    (plan: OrchestrationPlan, mode: 'demo' | 'llm'): TLShapeId[] => {
+      const editor = editorRef.current
+      if (!editor) return []
+      const created: TLShapeId[] = []
+      const orchestrationId = `orch-${Date.now().toString(36)}`
+      const bounds = editor.getViewportPageBounds()
+      const nodeShapeIds: TLShapeId[] = []
+      editor.run(() => {
+        plan.nodes.forEach((node, index) => {
+          const nodeId = createNodeId()
+          const shapeId = nodeIdToShapeId(nodeId) as TLShapeId
+          nodeShapeIds.push(shapeId)
+          // 编排布局：两列瀑布式，避开对话栏避让带
+          const col = Math.floor(index / 3)
+          const row = index % 3
+          const [w, h] =
+            node.kind === 'storyboard'
+              ? [300, 560]
+              : node.kind === 'generate' || node.kind === 'product' || node.kind === 'deliver'
+                ? [300, 320]
+                : node.kind === 'script'
+                  ? [300, 220]
+                  : [260, 160]
+          const meta: Record<string, unknown> = {
+            ...filterOrchestrationParams(node.kind, node.params),
+            orchestrated: mode,
+            orchestrationId,
+          }
+          if (node.kind === 'brief' && typeof meta.text !== 'string') meta.text = plan.title
+          const x = Math.round(bounds.minX + 40 + col * 380)
+          const y = Math.round(
+            initialNodeY(bounds.center.y, h, bounds.maxY, 150) - 120 + row * (h + 40)
+          )
+          editor.createShape({
+            id: shapeId,
+            type: CANVAS_NODE_SHAPE_TYPE,
+            x,
+            y,
+            props: { w, h, kind: node.kind, meta: meta as JsonObject },
+          })
+          created.push(shapeId)
+        })
+        // 连线（plan.edges 下标对 → 箭头 shape + 两端 binding）
+        plan.edges.forEach((edge) => {
+          const fromShapeId = nodeShapeIds[edge.from]
+          const toShapeId = nodeShapeIds[edge.to]
+          if (!fromShapeId || !toShapeId) return
+          const fromShape = editor.getShape(fromShapeId)
+          const toShape = editor.getShape(toShapeId)
+          if (!fromShape || !toShape) return
+          const arrowId = `shape:orch-${orchestrationId}-${edge.from}-${edge.to}` as TLShapeId
+          editor.createShape({
+            id: arrowId,
+            type: 'arrow',
+            x: fromShape.x,
+            y: fromShape.y,
+            props: {
+              start: { x: 0, y: 0 },
+              end: { x: toShape.x - fromShape.x, y: toShape.y - fromShape.y },
+            },
+          })
+          created.push(arrowId)
+          editor.createBindings([
+            {
+              fromId: arrowId,
+              toId: fromShapeId,
+              type: 'arrow',
+              props: { terminal: 'start' as const },
+            },
+            {
+              fromId: arrowId,
+              toId: toShapeId,
+              type: 'arrow',
+              props: { terminal: 'end' as const },
+            },
+          ])
+        })
+      })
+      return created
+    },
+    []
+  )
+
+  const onChatSend = useCallback(async () => {
     const text = chatDraft.trim()
-    if (!text) return
-    addNode('brief', { text })
-    setChatDraft('')
-    chatInputRef.current?.focus()
-  }, [addNode, chatDraft])
+    const editor = editorRef.current
+    if (!text || !editor || orchestrating) return
+    setOrchestrating(true)
+    setOrchestrationNotice(null)
+    setOrchestrationNoticeOpen(false)
+    try {
+      // 两态判定（沿 B2 同源口径）：实时读 sessionStorage token
+      let token: TokenConfig | null = null
+      try {
+        const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)
+        if (raw) token = JSON.parse(raw) as TokenConfig
+      } catch {}
+      const hasKey = Boolean(token?.apiKey?.trim())
+      const scene = routeOrchestrationScene(text)
+
+      let plan: OrchestrationPlan | null = null
+      let mode: 'demo' | 'llm' = 'demo'
+      let degraded = false
+      // P2-1：busy 可见反馈——提示条常驻「布置中」，输入框 placeholder 同步切换
+      orchestrationIdsRef.current = null
+      setHasUndoable(false)
+      showOrchestrationNotice('🤖 Agent 正在布置画布，请稍候…')
+      if (hasKey && token) {
+        // 真实 LLM 编排：结构化 JSON 拓扑建议，≤2 次重试后降级演示
+        mode = 'llm'
+        const systemPrompt = `你是创意画布的编排助手。根据用户需求输出一个严格 JSON 对象（不加 Markdown 围栏）：
+{
+  "title": "编排主题（20字内）",
+  "nodes": [{ "kind": "节点类型", "params": { } }],
+  "edges": [{ "from": 0, "to": 1 }]
+}
+硬约束：
+1. kind 只能取：brief, product, script, storyboard, generate, deliver；
+2. nodes 数量 2~5 个，第一个节点必须是 brief，其 params.text 为用户需求的完整原文；
+3. edges 用 nodes 数组下标连线，from 不得等于 to；
+4. script 节点 params.scriptScene 只能取：ecommerce（带货）/ brand（品牌） / drama（短剧）之一；
+5. 其余节点 params 留空对象。`
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const raw = await chatCompletionsText(token, [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: text },
+          ])
+          const parsed = parseOrchestrationPlan(raw)
+          if (parsed) {
+            // 参数按各自 meta 契约白名单收窄
+            plan = {
+              title: parsed.title,
+              nodes: parsed.nodes.map((n) => ({
+                kind: n.kind,
+                params: filterOrchestrationParams(n.kind, n.params),
+              })),
+              edges: parsed.edges,
+            }
+            break
+          }
+        }
+        if (!plan) {
+          mode = 'demo'
+          degraded = true
+        }
+      }
+
+      if (!plan) {
+        plan = buildDemoOrchestrationPlan(text, scene)
+      }
+
+      // 演示路径给 ~600ms「Agent 正在布置画布…」的动效感（真实 LLM 路径已有网络等待）
+      if (mode === 'demo') await new Promise((res) => setTimeout(res, 600))
+
+      const created = applyOrchestrationPlan(plan, mode)
+      orchestrationIdsRef.current = created // P1：布置时记录 shapeIds 快照，撤销按钮直接读 ref
+      setHasUndoable(created.length > 0)
+      editor.zoomToFit()
+      const modeLabel = mode === 'llm' ? '✓ LLM 编排' : '🧪 演示编排 · 非真实 LLM'
+      showOrchestrationNotice(
+        `${modeLabel}：已布置 ${plan.nodes.length} 个节点、${plan.edges.length} 条连线` +
+          (degraded ? '（LLM 编排不合格，已降级演示）' : '')
+      )
+      setChatDraft('')
+      chatInputRef.current?.focus()
+    } catch (err) {
+      showOrchestrationNotice(`⚠️ 编排失败：${err instanceof Error ? err.message : '未知错误'}`)
+    } finally {
+      setOrchestrating(false)
+    }
+  }, [applyOrchestrationPlan, chatDraft, orchestrating, showOrchestrationNotice])
 
   const onChatKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -429,6 +665,33 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               </div>
             )}
 
+            {/* B6：编排提示条（busy 反馈 / 结果 + 一键撤销；✕ 手动关闭，不自动消失） */}
+            {orchestrationNoticeOpen && orchestrationNotice && (
+              <div className="wls-orch-toast" role="status" data-testid="orchestration-notice">
+                <span>{orchestrationNotice}</span>
+                {hasUndoable && !orchestrating && (
+                    <button
+                      type="button"
+                      className="wls-orch-undo"
+                      data-testid="orchestration-undo"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={handleOrchestrationUndo}
+                    >
+                      ↩️ 撤销本次编排
+                    </button>
+                  )}
+                <button
+                  type="button"
+                  className="wls-orch-close"
+                  aria-label="关闭提示"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={closeOrchestrationNotice}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* 对话栏：对齐 Miora 图1 底部大输入卡 + 场景模板快捷入口 */}
             <div className="wls-chat-dock">
               <div className="wls-chat-bar">
@@ -437,13 +700,20 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
                   className="wls-chat-input"
                   value={chatDraft}
                   maxLength={500}
-                  placeholder="描述你想要什么，Agent 帮你上画布…"
+                  placeholder={
+                    orchestrating ? '🤖 Agent 正在布置画布，请稍候…' : '描述你想要什么，Agent 帮你上画布…'
+                  }
                   aria-label="对话栏：一句话生成 Brief 节点"
                   onChange={(e) => setChatDraft(e.target.value)}
                   onKeyDown={onChatKeyDown}
                 />
-                <button type="button" className="wls-chat-send" onClick={onChatSend}>
-                  发送 ↗
+                <button
+                  type="button"
+                  className="wls-chat-send"
+                  disabled={orchestrating}
+                  onClick={() => void onChatSend()}
+                >
+                  {orchestrating ? '🤖 编排中…' : '发送 ↗'}
                 </button>
               </div>
               <div className="wls-chat-templates">

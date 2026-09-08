@@ -109,7 +109,14 @@ export function ProductNodeBody({ shape }: { shape: WlsNodeShape }) {
         upsertAssetCard(
           editor,
           { shapeId: shape.id, x: shape.x, y: shape.y, w: shape.props.w },
-          { type: 'image', url: stored, shotId, createdAt: Date.now(), title: name.slice(0, 120) }
+          {
+            type: 'image',
+            url: stored,
+            shotId,
+            createdAt: Date.now(),
+            // B6 任务 0 P2-3：产物卡 title 统一用商品标题（brief 预填），文件名仅兜底
+            title: (effectiveTitle || name).slice(0, 120),
+          }
         )
         setOkMsg(`✅ 已导入素材并生成产物卡：${name}`)
       }

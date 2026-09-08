@@ -420,6 +420,57 @@
   stroke: var(--cv-miku);
 }
 
+/* ---------- B6：编排提示条 + 撤销 ---------- */
+.wls-orch-toast {
+  position: absolute;
+  top: 0.9rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 340;
+  max-width: min(40rem, calc(100% - 2rem));
+  background: var(--cv-panel);
+  border: 1px solid var(--cv-miku);
+  border-radius: 12px;
+  padding: 0.5rem 0.7rem 0.5rem 0.95rem;
+  color: var(--cv-ink);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  box-shadow: var(--cv-shadow-lift);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.wls-orch-undo {
+  flex: none;
+  border: 1px solid var(--cv-pink);
+  background: #fff;
+  color: #c2427c;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.24rem 0.55rem;
+  transition: background 0.15s ease;
+}
+
+.wls-orch-undo:hover {
+  background: #fff0f6;
+}
+
+.wls-orch-close {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--cv-mute);
+  font-size: 0.8rem;
+  padding: 0 0.2rem;
+  cursor: pointer;
+}
+
+.wls-orch-close:hover {
+  color: var(--cv-ink);
+}
+
 /* ---------- 节点卡片（白卡浮起，色条标识 Agent 身份） ---------- */
 .wls-node {
   display: flex;

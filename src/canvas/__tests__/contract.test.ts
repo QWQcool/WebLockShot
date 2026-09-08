@@ -16,8 +16,11 @@ import {
   createNodeId,
   edgeIdToArrowShapeId,
   edgeToArrowMaterial,
+  buildDemoOrchestrationPlan,
+  filterOrchestrationParams,
   initialNodeY,
   nodeIdToShapeId,
+  parseOrchestrationPlan,
   readAssetMetaPayload,
   readDeliverMetaPayload,
   readGenerateMetaPayload,
@@ -26,6 +29,7 @@ import {
   readStoryboardMetaPayload,
   scriptDigest,
   scriptSceneOf,
+  routeOrchestrationScene,
   shapeIdToNodeId,
   shapeSnapshotToCanvasNode,
   validateCanvasDoc,
@@ -689,6 +693,124 @@ test('B5 deliver meta：打包痕迹往返（imageSkipped 如实记录），非�
   assert.equal(readDeliverMetaPayload({ lastPackagedAt: 'yesterday' }), null)
   assert.equal(readDeliverMetaPayload({ videoCount: -1 }), null)
   assert.equal(readDeliverMetaPayload('x'), null)
+})
+
+/* ---------------- B6：对话栏 LLM 编排契约 ---------------- */
+
+test('B6 场景关键词路由：五类命中 + 未命中回退 ecommerce（确定性）', () => {
+  assert.equal(routeOrchestrationScene('给商品拍一条带货短视频'), 'ecommerce')
+  assert.equal(routeOrchestrationScene('设计一个新消费品牌的视觉海报'), 'brand')
+  assert.equal(routeOrchestrationScene('把一句话故事拆成短剧分镜，要有反转'), 'drama')
+  assert.equal(routeOrchestrationScene('为独立游戏做一支宣传 PV'), 'game')
+  assert.equal(routeOrchestrationScene('设计一个记账 App 的三屏界面'), 'app')
+  assert.equal(routeOrchestrationScene('随便说说'), 'ecommerce')
+  assert.equal(routeOrchestrationScene('给商品拍一条带货短视频'), routeOrchestrationScene('给商品拍一条带货短视频'))
+})
+
+test('B6 演示编排拓扑：brief 起链 + 场景映射 script 契约 + 边有效', () => {
+  const plan = buildDemoOrchestrationPlan('钛合金机械手表带货', 'ecommerce')
+  assert.equal(plan.nodes.length, 5)
+  assert.equal(plan.nodes[0].kind, 'brief')
+  assert.equal(plan.nodes[0].params.text, '钛合金机械手表带货')
+  assert.equal(plan.nodes[1].kind, 'script')
+  assert.equal(plan.nodes[1].params.scriptScene, 'ecommerce')
+  assert.equal(plan.edges.length, 4)
+  // 全部 kind 均为 ready 集合成员（灰态不允许被编排）
+  for (const n of plan.nodes) {
+    assert.ok(
+      ['brief', 'product', 'script', 'storyboard', 'generate', 'deliver'].includes(n.kind)
+    )
+  }
+  // drama 场景映射
+  const dramaPlan = buildDemoOrchestrationPlan('故事反转短剧', 'drama')
+  assert.equal(dramaPlan.nodes[1].params.scriptScene, 'drama')
+})
+
+test('B6 编排参数白名单：非白名单键剔除、非法 scriptScene 剔除、文本截断', () => {
+  const out = filterOrchestrationParams('script', {
+    scriptScene: 'ecommerce',
+    hacker: 'evil',
+    text: 'should-be-ignored',
+  })
+  assert.deepEqual(out, { scriptScene: 'ecommerce' })
+
+  assert.deepEqual(filterOrchestrationParams('script', { scriptScene: 'hacker' }), {})
+  const brief = filterOrchestrationParams('brief', { text: '  ' + '长'.repeat(2100), evil: 1 })
+  assert.equal(String(brief.text).length, 2000)
+  assert.equal(brief.evil, undefined)
+  assert.deepEqual(filterOrchestrationParams('storyboard', { anything: 1 }), {})
+  assert.deepEqual(filterOrchestrationParams('generate', { prompt: 'x' }), {})
+})
+
+test('B6 编排拓扑契约：合法通过；灰态 kind / 参数缺失 / 下标越界 / 自环拒绝', () => {
+  const raw = JSON.stringify({
+    title: '编排',
+    nodes: [
+      { kind: 'brief', params: { text: '需求原文' } },
+      { kind: 'script', params: { scriptScene: 'ecommerce' } },
+      { kind: 'generate' },
+    ],
+    edges: [
+      { from: 0, to: 1 },
+      { from: 1, to: 2 },
+    ],
+  })
+  const plan = parseOrchestrationPlan(raw)
+  assert.ok(plan)
+  assert.equal(plan.nodes.length, 3)
+  assert.equal(plan.edges.length, 2)
+
+  // 灰态 kind（image/edit/stage3d 不在 ready 集合）拒绝
+  assert.equal(
+    parseOrchestrationPlan(
+      JSON.stringify({
+        nodes: [
+          { kind: 'brief', params: {} },
+          { kind: 'image', params: {} },
+        ],
+        edges: [{ from: 0, to: 1 }],
+      })
+    ),
+    null
+  )
+
+  // 下标越界
+  assert.equal(
+    parseOrchestrationPlan(
+      JSON.stringify({
+        nodes: [
+          { kind: 'brief', params: {} },
+          { kind: 'script', params: {} },
+        ],
+        edges: [{ from: 0, to: 5 }],
+      })
+    ),
+    null
+  )
+
+  // 自环
+  assert.equal(
+    parseOrchestrationPlan(
+      JSON.stringify({
+        nodes: [
+          { kind: 'brief', params: {} },
+          { kind: 'script', params: {} },
+        ],
+        edges: [{ from: 1, to: 1 }],
+      })
+    ),
+    null
+  )
+
+  // 节点过少 / 非法 JSON / Markdown 围栏可剥
+  assert.equal(
+    parseOrchestrationPlan(JSON.stringify({ nodes: [{ kind: 'brief', params: {} }], edges: [] })),
+    null
+  )
+  assert.equal(parseOrchestrationPlan('not-json'), null)
+  assert.ok(
+    parseOrchestrationPlan('```json\n' + raw + '\n```')
+  )
 })
 
 test('画布存储：保存→读取往返，脏数据被拒', () => {

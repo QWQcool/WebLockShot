@@ -223,6 +223,12 @@ export function DeliverNodeBody({ shape }: { shape: WlsNodeShape }) {
               🎬 视频产物 {videos.length} 镜
               {images.length > 0 && ` · 🖼️ 图片 ${images.length} 张（不入剪映轨，打包时跳过）`}
             </div>
+            {/* P2-2：videos=0 的引导常驻派生显示（不依赖点击触发 error state） */}
+            {videos.length === 0 && (
+              <div className="wls-deliver-error" role="alert">
+                没有可打包的视频产物：图片不入剪映视频轨，请连入 generate 节点完成出片
+              </div>
+            )}
             {items.slice(0, 4).map((it) => (
               <div key={it.shotId + it.url} className="wls-deliver-item">
                 <span>{it.kind === 'video' ? '🎬' : '🖼️'}</span>
@@ -236,11 +242,11 @@ export function DeliverNodeBody({ shape }: { shape: WlsNodeShape }) {
         )}
       </div>
 
-      {/* 控件级 stopPropagation（B2 标准） */}
+      {/* 控件级 stopPropagation（B2 标准）；videos=0 时按钮仍可点，点击后给出诚实引导（B6 任务 0 P2-2） */}
       <button
         type="button"
         className="wls-deliver-pack"
-        disabled={busy || videos.length === 0}
+        disabled={busy}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => void handlePackage('download')}
       >

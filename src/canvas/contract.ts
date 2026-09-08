@@ -143,14 +143,37 @@ export const CANVAS_NODE_META: Record<
 
 /** 一期 A 可用的节点（1B 节点可摆放但内容为「待接通」占位；2/3 期节点为灰态） */
 export function nodeAvailability(kind: CanvasNodeKind): 'ready' | 'pending' | 'locked' {
-  // B2 script / B3 storyboard / B4 generate+asset 蜕壳接通
-  if (kind === 'script' || kind === 'storyboard' || kind === 'generate' || kind === 'asset') {
+  // B2 script / B3 storyboard / B4 generate+asset / B5 product+deliver 蜕壳接通
+  if (
+    kind === 'script' ||
+    kind === 'storyboard' ||
+    kind === 'generate' ||
+    kind === 'asset' ||
+    kind === 'product' ||
+    kind === 'deliver'
+  ) {
     return 'ready'
   }
   const phase = CANVAS_NODE_META[kind].phase
   if (phase === '1A') return 'ready'
   if (phase === '1B') return 'pending'
   return 'locked'
+}
+
+/** B6：已蜕壳（ready）的节点集合——LLM/演示编排只允许创建这些 kind（灰态节点不允许被编排创建） */
+export const READY_NODE_KINDS: readonly CanvasNodeKind[] = CANVAS_NODE_KINDS.filter(
+  (k) => nodeAvailability(k) === 'ready'
+)
+
+/** B6：各 ready 节点允许被编排预填的 meta 参数键白名单（按各自 payload 契约收窄） */
+export const ORCHESTRATION_PARAM_KEYS: Record<string, readonly string[]> = {
+  brief: ['text'],
+  product: ['title'],
+  script: ['scriptScene'],
+  storyboard: [],
+  generate: [],
+  deliver: [],
+  asset: [],
 }
 
 /* ------------------------------------------------------------------ *
@@ -762,5 +785,135 @@ export function validateEdgeKind(
   return {
     ok: false,
     reason: `${CANVAS_NODE_META[from].label}不能直连${CANVAS_NODE_META[to].label}：数据流自上游向下游`,
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * B6：对话栏 LLM 编排契约（CANVAS_PLAN.md §9 B6）
+ * ------------------------------------------------------------------ */
+
+/** 编排场景（关键词路由结果；brand/game/app 共用 brand 叙事脚本契约） */
+export const ORCHESTRATION_SCENES = ['ecommerce', 'brand', 'drama', 'game', 'app'] as const
+export type OrchestrationScene = (typeof ORCHESTRATION_SCENES)[number]
+
+/** 编排节点建议（LLM 输出/演示生成的最小单元） */
+export const orchestrationNodeSchema = z.object({
+  kind: z.enum(READY_NODE_KINDS as unknown as [CanvasNodeKind, ...CanvasNodeKind[]]),
+  params: z.record(z.string(), z.unknown()).default({}),
+})
+export type OrchestrationNode = z.infer<typeof orchestrationNodeSchema>
+
+/** 编排连线建议：from/to 为 nodes 数组下标 */
+export const orchestrationEdgeSchema = z.object({
+  from: z.number().int().min(0),
+  to: z.number().int().min(0),
+})
+
+/** 编排拓扑建议整体契约：kind 必须 ready、节点 2~9、边 ≤12、下标有效且不指自身 */
+export const orchestrationPlanSchema = z
+  .object({
+    title: z.string().max(120).default(''),
+    nodes: z.array(orchestrationNodeSchema).min(2).max(9),
+    edges: z.array(orchestrationEdgeSchema).max(12),
+  })
+  .refine(
+    (plan) =>
+      plan.edges.every(
+        (e) => e.from !== e.to && e.from < plan.nodes.length && e.to < plan.nodes.length
+      ),
+    { message: '编排连线下标越界或自环' }
+  )
+export type OrchestrationPlan = z.infer<typeof orchestrationPlanSchema>
+
+/** 解析 LLM 编排建议（剥 Markdown 围栏 → zod 校验）；不合法返回 null（调用方降级演示） */
+export function parseOrchestrationPlan(raw: string): OrchestrationPlan | null {
+  try {
+    const cleaned = raw
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim()
+    const parsed = orchestrationPlanSchema.safeParse(JSON.parse(cleaned))
+    if (parsed.success) return parsed.data
+    console.warn('[Orchestration] LLM 编排建议未通过 zod 校验:', parsed.error.issues.slice(0, 5))
+    return null
+  } catch (err) {
+    console.warn('[Orchestration] LLM 编排输出不是合法 JSON:', err)
+    return null
+  }
+}
+
+/**
+ * 编排节点参数白名单过滤（纯函数）：
+ * 只保留 ORCHESTRATION_PARAM_KEYS 中该 kind 允许的键，并按最小契约校验取值——
+ * brief.text / product.title 必须非空字符串（截断 2000/120），script.scriptScene 必须合法枚举。
+ */
+export function filterOrchestrationParams(
+  kind: CanvasNodeKind,
+  params: Record<string, unknown>
+): Record<string, unknown> {
+  const allowed = ORCHESTRATION_PARAM_KEYS[kind] ?? []
+  const out: Record<string, unknown> = {}
+  for (const key of allowed) {
+    const v = params[key]
+    if (key === 'text' || key === 'title') {
+      if (typeof v === 'string' && v.trim()) out[key] = v.trim().slice(0, key === 'text' ? 2000 : 120)
+    } else if (key === 'scriptScene') {
+      if (
+        typeof v === 'string' &&
+        CANVAS_SCRIPT_SCENES.includes(v as CanvasScriptScene)
+      ) {
+        out[key] = v
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * 对话栏文本场景关键词路由（纯函数，确定性）：命中优先级从上到下，未命中回退 ecommerce。
+ * brand/game/app 三类共用 brand 叙事脚本契约（scriptScene 枚举仅三选一）。
+ */
+export function routeOrchestrationScene(text: string): OrchestrationScene {
+  const t = text.toLowerCase()
+  if (/(app|界面|记账|小程序|桌面端)/.test(t)) return 'app'
+  if (/(游戏|pv|关卡|独立游戏)/.test(t)) return 'game'
+  if (/(短剧|剧情|台词|反转|人物|故事)/.test(t)) return 'drama'
+  if (/(品牌|视觉|logo|海报|社媒|风格)/.test(t)) return 'brand'
+  return 'ecommerce'
+}
+
+/** 场景 → script 契约路由（复用 B2 的 SCRIPT_SCENE_TEMPLATE_ID 语义） */
+export function sceneToScriptScene(scene: OrchestrationScene): 'ecommerce' | 'drama' | 'brand' {
+  if (scene === 'drama') return 'drama'
+  if (scene === 'ecommerce') return 'ecommerce'
+  return 'brand'
+}
+
+/**
+ * 演示编排拓扑生成（纯函数，确定性，node --test 可跑）：
+ * 用户原文落 Brief，后续按场景映射 ready 节点链 brief→script→storyboard→generate→deliver，
+ * 节点参数按各自 meta 契约预填（script 的场景 select、brief 的原文等）。
+ */
+export function buildDemoOrchestrationPlan(
+  text: string,
+  scene: OrchestrationScene
+): OrchestrationPlan {
+  const briefText = text.trim().slice(0, 2000)
+  const scriptScene = sceneToScriptScene(scene)
+  return {
+    title: briefText.slice(0, 60),
+    nodes: [
+      { kind: 'brief', params: { text: briefText } },
+      { kind: 'script', params: { scriptScene } },
+      { kind: 'storyboard', params: {} },
+      { kind: 'generate', params: {} },
+      { kind: 'deliver', params: {} },
+    ],
+    edges: [
+      { from: 0, to: 1 },
+      { from: 1, to: 2 },
+      { from: 2, to: 3 },
+      { from: 3, to: 4 },
+    ],
   }
 }
