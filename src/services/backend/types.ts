@@ -1,4 +1,5 @@
 import type { PipelineSessionV2 } from '../../persistV2.ts'
+import type { CanvasDoc } from '../../canvas/contract.ts'
 
 /**
  * BackendAdapter 预留层接口（「预留接口做好不用」原则的核心）。
@@ -65,4 +66,13 @@ export interface BackendAdapter {
 
   /** 预留：错误上报（未实现为 undefined） */
   reportError?(report: ErrorReport): Promise<void>
+
+  /**
+   * 画布文档持久化（CANVAS_PLAN.md §4.1-6，可选方法）：
+   * - local 模式：委托 localStorage 实现（canvasStore）；
+   * - rest 模式：预留未实现（undefined），调用方需判空并回退本地。
+   */
+  saveCanvasDoc?(doc: CanvasDoc): boolean
+  loadCanvasDoc?(): CanvasDoc | null
+  clearCanvasDoc?(): void
 }

@@ -43,7 +43,7 @@ import {
 
 const EMPTY_TOKEN: TokenConfig = { baseUrl: '', apiKey: '', model: '' }
 
-export function DramaEditor({ onSwitchToSell }: { onSwitchToSell: () => void }) {
+export function DramaEditor({ onSwitchToSell, onSwitchToCanvas }: { onSwitchToSell: () => void; onSwitchToCanvas: () => void }) {
   const [mode, setMode] = useState<EditorMode>('preset')
   const [presetId, setPresetId] = useState(defaultPresetId)
   const [story, setStory] = useState<Story>(() => loadPreset(defaultPresetId()))
@@ -419,22 +419,40 @@ export function DramaEditor({ onSwitchToSell }: { onSwitchToSell: () => void }) 
         <span style={{ color: '#94a3b8', fontSize: '13px' }}>
           当前模式：<strong>🎭 经典剧情短剧粗剪台（《门缝》《未读》《13层》）</strong>
         </span>
-        <button
-          type="button"
-          onClick={onSwitchToSell}
-          style={{
-            background: 'linear-gradient(135deg, #e63946, #d90429)',
-            color: '#fff',
-            border: 'none',
-            padding: '6px 14px',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          🎯 切换至带货工作台（仿爆款） →
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={onSwitchToSell}
+            style={{
+              background: 'linear-gradient(135deg, #e63946, #d90429)',
+              color: '#fff',
+              border: 'none',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            🎯 切换至带货工作台（仿爆款） →
+          </button>
+          <button
+            type="button"
+            onClick={onSwitchToCanvas}
+            style={{
+              background: 'linear-gradient(135deg, #39c5bb, #2aa8a0)',
+              color: '#fff',
+              border: 'none',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            🎨 切换至 Agent 画布 →
+          </button>
+        </div>
       </div>
       <EditorChrome
       mode={mode}

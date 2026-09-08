@@ -1,6 +1,11 @@
 import { readGenerateSession } from '../../persist.ts'
 import type { PipelineSessionV2 } from '../../persistV2.ts'
 import {
+  loadCanvasDocFrom,
+  saveCanvasDocTo,
+  clearCanvasDocFrom,
+} from '../../canvas/canvasStore.ts'
+import {
   deleteAsset,
   getAssetObjectUrl,
   idbRefToId,
@@ -168,6 +173,18 @@ export function createLocalAdapter(): BackendAdapter {
         // 配额查询失败不致命
       }
       return null
+    },
+
+    saveCanvasDoc(doc) {
+      return saveCanvasDocTo(getStorage(), doc)
+    },
+
+    loadCanvasDoc() {
+      return loadCanvasDocFrom(getStorage())
+    },
+
+    clearCanvasDoc() {
+      clearCanvasDocFrom(getStorage())
     },
   }
 }

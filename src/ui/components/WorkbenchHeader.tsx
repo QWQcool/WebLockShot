@@ -15,8 +15,8 @@ export const STEP_NAMES: { step: WorkbenchStep; label: string; icon: string }[] 
 export type StudioMode = 'pipeline' | 'single-agent' | 'multi-agent'
 
 type Props = {
-  mode: 'sell' | 'drama'
-  onModeChange: (mode: 'sell' | 'drama') => void
+  mode: 'sell' | 'drama' | 'canvas'
+  onModeChange: (mode: 'sell' | 'drama' | 'canvas') => void
   currentStep: WorkbenchStep
   onStepChange: (step: WorkbenchStep) => void
   maxReachedStep: WorkbenchStep
@@ -68,6 +68,13 @@ export const WorkbenchHeader: React.FC<Props> = ({
               onClick={() => onModeChange('drama')}
             >
               🎭 剧情短剧（粗剪台）
+            </button>
+            <button
+              type="button"
+              className={`mode-btn ${mode === 'canvas' ? 'active' : ''}`}
+              onClick={() => onModeChange('canvas')}
+            >
+              🎨 Agent 画布
             </button>
           </div>
 

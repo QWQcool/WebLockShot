@@ -1,0 +1,398 @@
+import { z } from 'zod'
+
+/**
+ * CanvasDoc 数据契约（CANVAS_PLAN.md §3，一期冻结，只扩不破）。
+ *
+ * - 画布文档作为新的一种 session 实体持久化（localStorage 索引 + BackendAdapter 可选方法）；
+ * - 节点业务 payload 一律走 zod 校验，非法数据拒绝入画布（不合格则整体拒绝，不半渲染）；
+ * - 大资产（视频/图 blob）一期不进画布文档，节点 meta 只存轻量 JSON。
+ */
+
+export const CANVAS_DOC_KEY = 'weblockshot.canvas.v1' as const
+
+export const CANVAS_NODE_KINDS = [
+  'brief',
+  'product',
+  'image',
+  'script',
+  'storyboard',
+  'generate',
+  'edit',
+  'stage3d',
+  'deliver',
+] as const
+
+export type CanvasNodeKind = (typeof CANVAS_NODE_KINDS)[number]
+
+/**
+ * 对话栏快捷场景模板（对齐 Miora 图1 底部模板入口，定位多元化创意工作室而非只做电商带货）。
+ * 一期 A：点击回填对话栏输入框；一期 B：接通 LLM 后按场景路由 Agent 编排。
+ */
+export const CANVAS_SCENE_TEMPLATES: { id: string; label: string; icon: string; prompt: string }[] = [
+  {
+    id: 'ecommerce',
+    label: '带货短视频',
+    icon: '🛒',
+    prompt: '给「填入商品」拍一条 30 秒竖屏带货短视频：3 秒钩子开场、突出核心卖点、结尾引导下单',
+  },
+  {
+    id: 'brand',
+    label: '品牌视觉',
+    icon: '🎨',
+    prompt: '为一个新消费品牌设计一套视觉：Logo 方向、主视觉海报、社媒头图，风格统一可延展',
+  },
+  {
+    id: 'drama',
+    label: '短剧分镜',
+    icon: '🎞️',
+    prompt: '把一句话故事拆成 6 镜竖屏短剧分镜：人物、冲突、最后一镜留钩子',
+  },
+  {
+    id: 'game',
+    label: '游戏宣传',
+    icon: '🎮',
+    prompt: '为独立游戏做一支 20 秒宣传 PV：世界观快剪、技能特写、上架日期收尾',
+  },
+  {
+    id: 'app',
+    label: 'App 界面',
+    icon: '📱',
+    prompt: '设计一个记账 App 的核心三屏：首页、统计、设置，走清新插画风',
+  },
+]
+
+/** 节点元数据：身份色条 / 图标 / 展示名 / 开放阶段（灰态节点点击给出诚实说明） */
+export const CANVAS_NODE_META: Record<
+  CanvasNodeKind,
+  { label: string; icon: string; phase: '1A' | '1B' | '2' | '3'; accent: string; hint: string }
+> = {
+  brief: {
+    label: '需求 Brief',
+    icon: '🗒️',
+    phase: '1A',
+    accent: '#7ec8e3',
+    hint: '一句话需求：想做什么、给谁看、突出什么（对话栏可直接生成）',
+  },
+  product: {
+    label: '素材导入',
+    icon: '📥',
+    phase: '1B',
+    accent: '#39c5bb',
+    hint: '商品图 / 参考图 / 视频 / 链接统一入口（一期 B 接通素材理解）',
+  },
+  image: {
+    label: '图像生成',
+    icon: '🖼️',
+    phase: '2',
+    accent: '#ff7eb6',
+    hint: '二期开放：ComfyUI 文生图 / 图生图，多风格视觉资产',
+  },
+  script: {
+    label: '脚本创编',
+    icon: '📝',
+    phase: '1B',
+    accent: '#39c5bb',
+    hint: 'ScriptWriter + Critic 双智体：带货口播 / 剧情台词 / 品牌叙事（一期 B 接通）',
+  },
+  storyboard: {
+    label: '分镜预演',
+    icon: '🎞️',
+    phase: '1B',
+    accent: '#39c5bb',
+    hint: '9:16 GSAP 预演舞台内嵌（一期 B 接通）',
+  },
+  generate: {
+    label: '视频生成',
+    icon: '⚙️',
+    phase: '1B',
+    accent: '#7ec8e3',
+    hint: '可灵 / 即梦 / ComfyUI / Mock 多引擎调度（一期 B 接通，走钱包事务）',
+  },
+  edit: {
+    label: '局部重绘',
+    icon: '🖌️',
+    phase: '2',
+    accent: '#ff7eb6',
+    hint: '二期开放：框选 / 笔刷出 mask，ComfyUI inpaint 指哪改哪',
+  },
+  stage3d: {
+    label: '3D 运镜台',
+    icon: '🎥',
+    phase: '3',
+    accent: '#2aa8a0',
+    hint: '三期开放：摆角色 / 调机位 / 录关键帧，本地预演不耗积分',
+  },
+  deliver: {
+    label: '成片交付',
+    icon: '✨',
+    phase: '1B',
+    accent: '#39c5bb',
+    hint: '产物送入剪映草稿三轨对齐链路 / 直接导出（一期 B 接通）',
+  },
+}
+
+/** 一期 A 可用的节点（1B 节点可摆放但内容为「待接通」占位；2/3 期节点为灰态） */
+export function nodeAvailability(kind: CanvasNodeKind): 'ready' | 'pending' | 'locked' {
+  const phase = CANVAS_NODE_META[kind].phase
+  if (phase === '1A') return 'ready'
+  if (phase === '1B') return 'pending'
+  return 'locked'
+}
+
+const nodeIdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/)
+
+export const canvasNodeSchema = z.object({
+  id: nodeIdSchema,
+  kind: z.enum(CANVAS_NODE_KINDS),
+  x: z.number().finite(),
+  y: z.number().finite(),
+  w: z.number().finite().positive(),
+  h: z.number().finite().positive(),
+  meta: z.record(z.string(), z.unknown()).default({}),
+})
+export type CanvasNode = z.infer<typeof canvasNodeSchema>
+
+export const canvasEdgeSchema = z.object({
+  id: nodeIdSchema,
+  from: nodeIdSchema,
+  to: nodeIdSchema,
+})
+export type CanvasEdge = z.infer<typeof canvasEdgeSchema>
+
+export const canvasDocSchema = z.object({
+  version: z.literal(1),
+  id: nodeIdSchema,
+  name: z.string().min(1).max(120),
+  nodes: z.array(canvasNodeSchema).max(200),
+  edges: z.array(canvasEdgeSchema).max(400),
+  updatedAt: z.number().finite().nonnegative(),
+})
+export type CanvasDoc = z.infer<typeof canvasDocSchema>
+
+/** 校验 + 白名单清洗：非法输入返回 null（诚实拒绝，不半渲染） */
+export function validateCanvasDoc(raw: unknown): CanvasDoc | null {
+  const parsed = canvasDocSchema.safeParse(raw)
+  if (!parsed.success) return null
+  const doc = parsed.data
+
+  // 边引用完整性：指向不存在节点的边直接丢弃
+  const nodeIds = new Set(doc.nodes.map((n) => n.id))
+  const edges = doc.edges.filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to))
+  if (edges.length !== doc.edges.length) {
+    return { ...doc, edges }
+  }
+  return doc
+}
+
+export function createEmptyCanvasDoc(name = '未命名画布'): CanvasDoc {
+  return {
+    version: 1,
+    id: `canvas-${Date.now().toString(36)}`,
+    name,
+    nodes: [],
+    edges: [],
+    updatedAt: Date.now(),
+  }
+}
+
+/** 新节点 id（同时用作 tldraw shape id 的一部分，保证双向无损映射） */
+export function createNodeId(): string {
+  const rand = Math.random().toString(36).slice(2, 8)
+  return `n${Date.now().toString(36)}${rand}`
+}
+
+export const CANVAS_NODE_SHAPE_TYPE = 'wls-node' as const
+/** tldraw shape id ↔ CanvasNode id（`shape:wls-<nodeId>` 双向无损） */
+export function nodeIdToShapeId(nodeId: string): string {
+  return `shape:wls-${nodeId}`
+}
+export function shapeIdToNodeId(shapeId: string): string | null {
+  return shapeId.startsWith('shape:wls-') ? shapeId.slice('shape:wls-'.length) : null
+}
+
+/** 序列化纯函数：节点 → tldraw shape partial（不依赖 tldraw 运行时，node --test 可跑） */
+export type WlsNodeShapePartial = {
+  id: string
+  type: typeof CANVAS_NODE_SHAPE_TYPE
+  x: number
+  y: number
+  props: {
+    w: number
+    h: number
+    kind: CanvasNodeKind
+    meta: Record<string, unknown>
+  }
+}
+
+export function canvasNodeToShapePartial(node: CanvasNode): WlsNodeShapePartial {
+  return {
+    id: nodeIdToShapeId(node.id),
+    type: CANVAS_NODE_SHAPE_TYPE,
+    x: node.x,
+    y: node.y,
+    props: { w: node.w, h: node.h, kind: node.kind, meta: node.meta },
+  }
+}
+
+/** 反序列化纯函数：tldraw shape 快照（最小结构） → CanvasNode（非法 kind 拒绝） */
+export type WlsShapeSnapshot = {
+  id: string
+  type: string
+  x: number
+  y: number
+  props: { w?: number; h?: number; kind?: string; meta?: unknown }
+}
+
+export function shapeSnapshotToCanvasNode(shape: WlsShapeSnapshot): CanvasNode | null {
+  const nodeId = shapeIdToNodeId(shape.id)
+  if (!nodeId) return null
+  const kindCheck = z.enum(CANVAS_NODE_KINDS).safeParse(shape.props.kind)
+  if (!kindCheck.success) return null
+  const w = typeof shape.props.w === 'number' && Number.isFinite(shape.props.w) ? shape.props.w : 260
+  const h = typeof shape.props.h === 'number' && Number.isFinite(shape.props.h) ? shape.props.h : 160
+  const meta =
+    shape.props.meta && typeof shape.props.meta === 'object' && !Array.isArray(shape.props.meta)
+      ? (shape.props.meta as Record<string, unknown>)
+      : {}
+  const node = canvasNodeSchema.safeParse({
+    id: nodeId,
+    kind: kindCheck.data,
+    x: shape.x,
+    y: shape.y,
+    w,
+    h,
+    meta,
+  })
+  return node.success ? node.data : null
+}
+
+/** 边提取纯函数：箭头绑定信息 → CanvasEdge（自环 / 非法引用由调用方经 validateCanvasDoc 兜底过滤） */
+export type ArrowBindingSnapshot = {
+  arrowId: string
+  startShapeId: string | null
+  endShapeId: string | null
+}
+
+/**
+ * 箭头 → 边：id 按箭头 id 直接映射并清洗为 nodeIdSchema 合法字符（`e` + 去掉 `arrow:` 前缀后的字母数字）。
+ * 注意：tldraw 真实箭头 id 形如 `shape:AbC123`（含冒号），必须清洗，否则整份文档会被
+ * canvasEdgeSchema 拒绝、落盘静默失败。
+ * 恢复路径物化的箭头（`shape:earrow-<edgeId>`）直接取回边 id，保证「保存→刷新→恢复→再保存」跨刷新稳定。
+ * 同向多箭头去重时取 id 最小者为代表，且输出按 id 排序——
+ * 保证同一组箭头无论遍历顺序如何，多次序列化得到的边 id 与顺序完全一致（id 稳定）。
+ */
+export function arrowSnapshotsToEdges(
+  arrows: ArrowBindingSnapshot[],
+  shapeIdToNode: (shapeId: string) => string | null
+): CanvasEdge[] {
+  const best = new Map<string, CanvasEdge>()
+  for (const arrow of arrows) {
+    if (!arrow.startShapeId || !arrow.endShapeId) continue
+    const from = shapeIdToNode(arrow.startShapeId)
+    const to = shapeIdToNode(arrow.endShapeId)
+    if (!from || !to || from === to) continue
+    const id = arrowIdToEdgeId(arrow.arrowId)
+    const key = `${from}->${to}`
+    const existing = best.get(key)
+    if (!existing || id < existing.id) {
+      best.set(key, { id, from, to })
+    }
+  }
+  return Array.from(best.values()).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
+
+/** 物化箭头 shape id 前缀：由 doc.edges 恢复画布时使用（区别于 tldraw 随机箭头 id） */
+export const WLS_ARROW_SHAPE_PREFIX = 'shape:earrow-' as const
+
+/** 边 id → 箭头 shape id（确定性映射，跨刷新稳定） */
+export function edgeIdToArrowShapeId(edgeId: string): string {
+  return `${WLS_ARROW_SHAPE_PREFIX}${edgeId}`
+}
+
+/** 箭头 shape id → 边 id（仅物化箭头可逆；用户手绘箭头返回 null） */
+export function arrowShapeIdToEdgeId(arrowId: string): string | null {
+  return arrowId.startsWith(WLS_ARROW_SHAPE_PREFIX)
+    ? arrowId.slice(WLS_ARROW_SHAPE_PREFIX.length)
+    : null
+}
+
+/** 用户手绘箭头 id → 边 id（清洗为 nodeIdSchema 合法字符；不保证与物化箭头互逆） */
+export function rawArrowIdToEdgeId(arrowId: string): string {
+  const raw = arrowId.replace(/^arrow:/, '')
+  return `e${raw.replace(/[^A-Za-z0-9_-]/g, '')}`
+}
+
+function arrowIdToEdgeId(arrowId: string): string {
+  return arrowShapeIdToEdgeId(arrowId) ?? rawArrowIdToEdgeId(arrowId)
+}
+
+/** 边 → 箭头物化参数（纯函数，node --test 可跑）：箭头从 from 节点中心指向 to 节点中心 */
+export type EdgeArrowMaterial = {
+  arrowShapeId: string
+  x: number
+  y: number
+  start: { x: number; y: number }
+  end: { x: number; y: number }
+  bindings: { toShapeId: string; terminal: 'start' | 'end' }[]
+}
+
+export function edgeToArrowMaterial(
+  edge: Pick<CanvasEdge, 'id' | 'from' | 'to'>,
+  fromNode: Pick<CanvasNode, 'id' | 'x' | 'y' | 'w' | 'h'>,
+  toNode: Pick<CanvasNode, 'id' | 'x' | 'y' | 'w' | 'h'>
+): EdgeArrowMaterial | null {
+  if (edge.from === edge.to) return null
+  const fromCx = fromNode.x + fromNode.w / 2
+  const fromCy = fromNode.y + fromNode.h / 2
+  const toCx = toNode.x + toNode.w / 2
+  const toCy = toNode.y + toNode.h / 2
+  const dx = toCx - fromCx
+  const dy = toCy - fromCy
+  // 两节点中心重合时给一个最小可见向量，避免零长箭头
+  const end = dx === 0 && dy === 0 ? { x: 0, y: 1 } : { x: dx, y: dy }
+  return {
+    arrowShapeId: edgeIdToArrowShapeId(edge.id),
+    x: fromCx,
+    y: fromCy,
+    start: { x: 0, y: 0 },
+    end,
+    bindings: [
+      { toShapeId: nodeIdToShapeId(edge.from), terminal: 'start' },
+      { toShapeId: nodeIdToShapeId(edge.to), terminal: 'end' },
+    ],
+  }
+}
+
+/**
+ * 边类型兼容契约（CANVAS_PLAN.md §9 B1）：每类节点允许的下游集合。
+ * 拓扑语义：数据流自上游向下游（A 的产物 → B 的输入），deliver 为终点。
+ */
+export const CANVAS_EDGE_COMPAT: Record<CanvasNodeKind, readonly CanvasNodeKind[]> = {
+  brief: ['product', 'script', 'image'],
+  product: ['script', 'image'],
+  image: ['edit', 'deliver'],
+  script: ['storyboard'],
+  storyboard: ['generate'],
+  generate: ['deliver'],
+  edit: ['deliver'],
+  stage3d: ['storyboard', 'generate'],
+  deliver: [],
+}
+
+/** 连线校验纯函数：合法返回 ok；非法返回中文原因（供画布内提示条展示） */
+export function validateEdgeKind(
+  from: CanvasNodeKind,
+  to: CanvasNodeKind
+): { ok: true } | { ok: false; reason: string } {
+  if (from === to) {
+    return { ok: false, reason: `${CANVAS_NODE_META[from].label}不能连接自身：数据流自上游向下游` }
+  }
+  if (CANVAS_EDGE_COMPAT[from].includes(to)) return { ok: true }
+  if (from === 'deliver') {
+    return { ok: false, reason: '成片交付是流程终点，产物不再流向下游节点' }
+  }
+  return {
+    ok: false,
+    reason: `${CANVAS_NODE_META[from].label}不能直连${CANVAS_NODE_META[to].label}：数据流自上游向下游`,
+  }
+}

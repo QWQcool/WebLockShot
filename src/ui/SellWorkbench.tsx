@@ -57,9 +57,10 @@ const DEFAULT_PRODUCT_INPUT: ProductInput = {
 
 type Props = {
   onSwitchToDrama: () => void
+  onSwitchToCanvas: () => void
 }
 
-export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
+export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama, onSwitchToCanvas }) => {
   const [initialSession] = useState<PipelineSessionV2 | null>(() => loadPipelineSession())
 
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
@@ -372,6 +373,7 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama }) => {
         mode="sell"
         onModeChange={(m) => {
           if (m === 'drama') onSwitchToDrama()
+          if (m === 'canvas') onSwitchToCanvas()
         }}
         currentStep={currentStep}
         onStepChange={(s) => setCurrentStep(s)}

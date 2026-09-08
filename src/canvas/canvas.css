@@ -1,0 +1,583 @@
+/* ============================================================
+   Agent 创意画布 · 初音青 × Miroa 浅色工作室风（CANVAS_PLAN.md §2 v1.1）
+   对齐参考稿：浅色画布 + 白色圆角浮卡 + 柔和阴影 + 强调色点缀
+   作用域：.wls-canvas-app（不污染 sell / drama 主题）
+   ============================================================ */
+
+/* 懒加载兜底（画布 chunk 加载中，位于 .wls-canvas-app 之外） */
+.wls-canvas-loading {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #eef7f9;
+  color: #5b7a86;
+  font-family: var(--body);
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+
+.wls-canvas-app {
+  --cv-bg: #f1f7f9;
+  --cv-bg-glow-a: rgba(255, 255, 255, 0.9);
+  --cv-bg-glow-b: rgba(183, 236, 243, 0.55);
+  --cv-panel: #ffffff;
+  --cv-panel-2: #f7fcfd;
+  --cv-line: #dbe9ee;
+  --cv-line-strong: #c3dde4;
+  --cv-miku: #39c5bb;
+  --cv-miku-deep: #2aa8a0;
+  --cv-pink: #ff7eb6;
+  --cv-halo: #7ec8e3;
+  --cv-ink: #16323f;
+  --cv-mute: #5b7a86;
+  --cv-shadow: 0 8px 28px rgba(22, 50, 63, 0.08), 0 2px 8px rgba(22, 50, 63, 0.05);
+  --cv-shadow-lift: 0 12px 34px rgba(22, 50, 63, 0.13), 0 3px 10px rgba(22, 50, 63, 0.07);
+
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  color: var(--cv-ink);
+  background:
+    radial-gradient(900px 460px at 10% -10%, var(--cv-bg-glow-a) 0%, transparent 55%),
+    radial-gradient(760px 420px at 95% 6%, var(--cv-bg-glow-b) 0%, transparent 52%),
+    var(--cv-bg);
+  font-family: var(--body);
+}
+
+/* ---------- 顶栏（白色玻璃浮条） ---------- */
+.wls-canvas-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid var(--cv-line);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.wls-canvas-topbar .logo-badge {
+  display: inline-block;
+  background: var(--cv-miku);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 rgba(22, 50, 63, 0.12);
+}
+
+.wls-canvas-topbar .header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.wls-canvas-topbar .brand-text h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  color: var(--cv-ink);
+}
+
+.wls-canvas-phase-tag {
+  color: var(--cv-mute);
+  font-size: 0.78rem;
+}
+
+.wls-canvas-topbar .mode-toggle {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.wls-canvas-topbar .mode-btn {
+  border: 1px solid var(--cv-line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--cv-mute);
+  border-radius: 999px;
+  padding: 0.42rem 0.9rem;
+  font-size: 0.86rem;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.wls-canvas-topbar .mode-btn:hover {
+  color: var(--cv-ink);
+  border-color: var(--cv-miku);
+  transform: translateY(-1px);
+}
+
+.wls-canvas-topbar .mode-btn.active {
+  color: #fff;
+  background: var(--cv-miku);
+  border-color: var(--cv-miku);
+  box-shadow: 0 4px 14px rgba(57, 197, 187, 0.35);
+}
+
+/* ---------- 主体 ---------- */
+.wls-canvas-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+/* ---------- 左侧节点面板（白色浮卡列） ---------- */
+.wls-node-palette {
+  width: 15.5rem;
+  padding: 0.85rem 0.75rem;
+  border-right: 1px solid var(--cv-line);
+  background: rgba(255, 255, 255, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  overflow-y: auto;
+}
+
+.wls-palette-title {
+  font-family: var(--display);
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  color: var(--cv-mute);
+  margin-bottom: 0.2rem;
+}
+
+.wls-palette-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  border: 1px solid var(--cv-line);
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  border-radius: 12px;
+  padding: 0.52rem 0.6rem 0.52rem 0.85rem;
+  text-align: left;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(22, 50, 63, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.wls-palette-item:hover {
+  border-color: var(--cv-miku);
+  box-shadow: var(--cv-shadow);
+  transform: translateY(-1px);
+}
+
+.wls-palette-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  opacity: 0.9;
+}
+
+.wls-palette-icon {
+  font-size: 1rem;
+}
+
+.wls-palette-label {
+  flex: 1;
+  font-size: 0.86rem;
+}
+
+.wls-palette-phase {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--cv-mute);
+  border: 1px solid var(--cv-line);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  background: var(--cv-panel-2);
+}
+
+.wls-palette-tip {
+  margin-top: 0.4rem;
+  color: var(--cv-mute);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+/* ---------- 画布舞台 ---------- */
+.wls-canvas-stage {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.wls-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--cv-line);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.wls-canvas-name {
+  width: 16rem;
+  border: 1px solid var(--cv-line);
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  border-radius: 9px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.86rem;
+}
+
+.wls-canvas-name:focus-visible {
+  outline: 2px solid var(--cv-miku);
+  outline-offset: 1px;
+}
+
+.wls-canvas-btn {
+  border: 1px solid var(--cv-line);
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  border-radius: 9px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+  transition: border-color 0.15s ease;
+}
+
+.wls-canvas-btn:hover {
+  border-color: var(--cv-pink);
+}
+
+.wls-canvas-save-state {
+  margin-left: auto;
+  color: var(--cv-mute);
+  font-size: 0.76rem;
+  font-family: var(--mono);
+}
+
+.wls-canvas-root {
+  position: relative;
+  min-height: 0;
+}
+
+/* 画布顶部诚实标注条（在 tldraw 左上菜单下方，避开底部对话栏与工具条） */
+.wls-canvas-hint {
+  position: absolute;
+  left: 0.8rem;
+  top: 3.4rem;
+  z-index: 300;
+  pointer-events: none;
+  color: var(--cv-mute);
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--cv-line);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  box-shadow: 0 2px 8px rgba(22, 50, 63, 0.06);
+}
+
+/* ---------- 对话栏（对齐 Miora 图1：底部居中大输入卡 + 模板快捷入口） ---------- */
+.wls-chat-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 320;
+  width: min(41rem, calc(100% - 6rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wls-chat-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: var(--cv-panel);
+  border: 1px solid var(--cv-line);
+  border-radius: 18px;
+  padding: 0.45rem 0.55rem 0.45rem 1rem;
+  box-shadow: var(--cv-shadow-lift);
+}
+
+.wls-chat-bar:focus-within {
+  border-color: var(--cv-miku);
+  box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.14), var(--cv-shadow-lift);
+}
+
+.wls-chat-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--cv-ink);
+  font-size: 0.92rem;
+  padding: 0.42rem 0;
+  outline: none;
+}
+
+.wls-chat-input::placeholder {
+  color: #9db4bd;
+}
+
+.wls-chat-send {
+  flex: none;
+  border: none;
+  background: var(--cv-miku);
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.5rem 0.95rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.wls-chat-send:hover {
+  background: var(--cv-miku-deep);
+}
+
+.wls-chat-send:active {
+  transform: scale(0.97);
+}
+
+.wls-chat-templates {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.wls-chat-chip {
+  border: 1px solid var(--cv-line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--cv-ink);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.76rem;
+  box-shadow: 0 2px 6px rgba(22, 50, 63, 0.05);
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.wls-chat-chip:hover {
+  border-color: var(--cv-miku);
+  color: var(--cv-miku-deep);
+  transform: translateY(-1px);
+}
+
+.wls-chat-note {
+  text-align: center;
+  color: var(--cv-mute);
+  font-size: 0.68rem;
+}
+
+/* ---------- tldraw 浅色换肤（v5 主题变量 --tl-color-*，作用域限定本模式） ---------- */
+.wls-canvas-root .tl-container {
+  --tl-color-background: #f6fafb;
+  --tl-color-grid: #e3eef2;
+  --tl-color-text: #16323f;
+  --tl-color-text-0: #16323f;
+  --tl-color-text-1: #16323f;
+  --tl-color-text-3: #5b7a86;
+  --tl-color-primary: #39c5bb;
+  --tl-color-selection-fill: rgba(57, 197, 187, 0.08);
+  --tl-color-selection-stroke: #39c5bb;
+  --tl-color-selected: #39c5bb;
+  --tl-color-panel: #ffffff;
+  --tl-color-panel-contrast: #f7fcfd;
+  --tl-color-panel-overlay: rgba(255, 255, 255, 0.95);
+  --tl-color-muted-1: #5b7a86;
+  --tl-color-muted-2: #9db4bd;
+  --tl-color-divider: #dbe9ee;
+  --tl-color-low: #ffffff;
+  --tl-color-low-border: #dbe9ee;
+  --tl-color-overlay: rgba(22, 50, 63, 0.25);
+  --tl-color-focus: #ff7eb6;
+  --tl-color-hint: #39c5bb;
+  --tl-color-tooltip: #ffffff;
+  --tl-layer-canvas-background: #f6fafb;
+}
+
+/* ---------- B1：非法连线拒绝提示条（画布内顶部居中，3 秒自动消失） ---------- */
+.wls-edge-toast {
+  position: absolute;
+  top: 0.9rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 340;
+  max-width: min(34rem, calc(100% - 2rem));
+  background: var(--cv-panel);
+  border: 1px solid var(--cv-pink);
+  border-radius: 12px;
+  padding: 0.5rem 0.95rem;
+  color: var(--cv-ink);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  box-shadow: var(--cv-shadow-lift);
+  pointer-events: none;
+}
+
+/* B1：连线（数据流箭头）统一初音青描边（默认箭头头型为开放 V 形，随描边着色） */
+.wls-canvas-root .tl-shape[data-shape-type='arrow'] .tl-svg-container path {
+  stroke: var(--cv-miku);
+}
+
+/* ---------- 节点卡片（白卡浮起，色条标识 Agent 身份） ---------- */
+.wls-node {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--cv-panel);
+  border: 1px solid var(--cv-line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--cv-shadow);
+  font-family: var(--body);
+}
+
+.wls-node-accent {
+  height: 4px;
+  flex: none;
+  width: 100%;
+}
+
+.wls-node-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem 0.3rem;
+}
+
+.wls-node-icon {
+  font-size: 0.95rem;
+}
+
+.wls-node-title {
+  flex: 1;
+  font-family: var(--display);
+  font-size: 0.9rem;
+  color: var(--cv-ink);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wls-node-badge {
+  flex: none;
+  font-size: 0.64rem;
+  border-radius: 999px;
+  padding: 0.08rem 0.45rem;
+  border: 1px solid var(--cv-line);
+  color: var(--cv-mute);
+  background: var(--cv-panel-2);
+}
+
+.wls-node-badge-ready {
+  color: #fff;
+  background: var(--cv-miku);
+  border-color: var(--cv-miku);
+}
+
+.wls-node-badge-pending {
+  color: #2b7a96;
+  border-color: #bfe2ee;
+  background: #eef8fc;
+}
+
+.wls-node-badge-locked {
+  color: var(--cv-mute);
+  border-style: dashed;
+}
+
+.wls-node-body {
+  flex: 1;
+  padding: 0.15rem 0.7rem;
+  overflow: hidden;
+}
+
+.wls-node-hint {
+  margin: 0.2rem 0 0;
+  color: var(--cv-mute);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.wls-node-text {
+  margin: 0.35rem 0 0;
+  color: var(--cv-ink);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wls-node-locked-note {
+  margin: 0.4rem 0 0;
+  color: #c2427c;
+  font-size: 0.7rem;
+}
+
+.wls-node[data-availability='locked'] {
+  border-style: dashed;
+  opacity: 0.78;
+}
+
+.wls-node-foot {
+  padding: 0.25rem 0.7rem 0.45rem;
+}
+
+.wls-node-id {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: #9db4bd;
+}
+
+.wls-node-indicator {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  box-sizing: border-box;
+}
+
+/* ---------- 响应式（对齐项目断点：<768px 单栏） ---------- */
+@media (max-width: 768px) {
+  .wls-canvas-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .wls-node-palette {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--cv-line);
+    max-height: 9.5rem;
+  }
+
+  .wls-palette-title {
+    width: 100%;
+  }
+
+  .wls-palette-item {
+    width: calc(50% - 0.25rem);
+  }
+
+  .wls-palette-tip {
+    display: none;
+  }
+
+  .wls-chat-dock {
+    width: calc(100% - 1.6rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wls-palette-item,
+  .wls-canvas-topbar .mode-btn,
+  .wls-chat-chip {
+    transition: none;
+  }
+}
