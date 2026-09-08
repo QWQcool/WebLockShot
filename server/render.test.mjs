@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { spawn } from 'node:child_process'
 import { startServer } from './weblockshot-server.mjs'
 import {
@@ -10,6 +10,7 @@ import {
   validateRenderBody,
   detectFfmpeg,
   createRenderMutex,
+  resolveLocalAsset,
 } from './render.mjs'
 
 function tmpDist() {
@@ -452,6 +453,78 @@ test('POST /api/render：本站素材不存在 → 404；ffmpeg 失败 → 502',
       })
       assert.equal(fail.status, 502)
       assert.ok((await fail.json()).error.includes('ffmpeg'))
+    } finally {
+      await close(server)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('S1 安全：resolveLocalAsset 路径穿越防护（../ 与 %2e%2e 双形态）', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wls-s1-test-'))
+  try {
+    const ttsDir = join(dir, 'tts')
+    mkdirSync(ttsDir, { recursive: true })
+    // 秘密文件放在白名单目录之外（ttsDir 上一级）
+    const secretPath = join(dir, 'secret.mp4')
+    writeFileSync(secretPath, Buffer.from('top-secret'))
+    const opts = { ttsDir, renderDir: join(dir, 'render') }
+
+    // 正常文件可解析
+    assert.equal(resolveLocalAsset('/files/tts/ok.mp4', opts), join(ttsDir, 'ok.mp4'))
+
+    // ../ 穿越 → 拒绝
+    assert.equal(resolveLocalAsset('/files/tts/../secret.mp4', opts), null)
+    // 嵌套 .. → 拒绝
+    assert.equal(resolveLocalAsset('/files/tts/../../secret.mp4', opts), null)
+    // URL 编码 %2e%2e → 解码后含 .. → 拒绝
+    assert.equal(resolveLocalAsset('/files/tts/%2e%2e/secret.mp4', opts), null)
+    assert.equal(resolveLocalAsset('/files/tts/%2e%2e%2fsecret.mp4', opts), null)
+    // 双编码 %252e → 解码一次后仍为 %2e%2e 字面量目录名（不构成真实穿越），解析结果仍停留在白名单目录内
+    const dbl = resolveLocalAsset('/files/tts/%252e%252e/secret.mp4', opts)
+    assert.ok(dbl === null || dbl.startsWith(ttsDir + sep), '双编码形态不得越出白名单目录')
+
+    // 反斜杠与绝对路径 → 拒绝
+    assert.equal(resolveLocalAsset('/files/tts/..\\secret.mp4', opts), null)
+    assert.equal(resolveLocalAsset('/files/tts//etc/passwd.mp4', opts), null, '绝对路径形态（resolve 替换 base）被前缀兜底拒绝')
+    assert.equal(resolveLocalAsset('/files/other/secret.mp4', opts), null, '白名单外前缀')
+    // 畸形转义 → 拒绝
+    assert.equal(resolveLocalAsset('/files/tts/%zz.mp4', opts), null)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('S1 安全：/api/render live 穿越请求 → 404，白名单外文件不被 ffmpeg 摄取', async () => {
+  const dir = tmpDist()
+  try {
+    const ttsDir = join(dir, 'tts-out')
+    mkdirSync(ttsDir, { recursive: true })
+    // 秘密文件位于 ttsDir 上一级（白名单目录之外）
+    writeFileSync(join(dir, 'secret.mp4'), Buffer.from('top-secret-bytes'))
+    const fake = fakeFfmpegChild()
+    const { server, port } = await startServer({
+      port: 0,
+      dist: dir,
+      env: {},
+      ffmpegPath: '/fake/ffmpeg',
+      renderDir: join(dir, 'render-out'),
+      ttsDir,
+      renderSpawnImpl: fake.spawnImpl,
+    })
+    const base = `http://127.0.0.1:${port}`
+    try {
+      for (const payload of ['/files/tts/../secret.mp4', '/files/tts/%2e%2e/secret.mp4']) {
+        const res = await fetch(`${base}/api/render`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: payload }),
+        })
+        assert.equal(res.status, 404, `${payload} 应 404`)
+      }
+      // 关键：fake ffmpeg 从未被调用（穿越路径未进入合成流程）
+      assert.equal(fake.spawnCalls.length, 0)
     } finally {
       await close(server)
     }

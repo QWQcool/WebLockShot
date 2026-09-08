@@ -17,7 +17,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { createReadStream, createWriteStream, existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 
@@ -169,12 +169,42 @@ export function validateRenderBody(body) {
 }
 
 /**
- * 解析本站相对路径到磁盘文件（仅允许 /files/tts/、/files/render/ 白名单前缀）
+ * 解析本站相对路径到磁盘文件（仅允许 /files/tts/、/files/render/ 白名单前缀）。
+ * 安全（S1 修复）：显式拒绝 `..` 穿越（含 URL 编码 %2e%2e 形态，先解码再校验）、
+ * 反斜杠与绝对路径，并做 resolve 后前缀兜底校验，确保解析结果不越出白名单目录。
  */
 export function resolveLocalAsset(urlPath, { ttsDir, renderDir }) {
-  if (urlPath.startsWith('/files/tts/')) return join(ttsDir, urlPath.slice('/files/tts/'.length))
-  if (urlPath.startsWith('/files/render/')) return join(renderDir, urlPath.slice('/files/render/'.length))
-  return null
+  let decoded
+  try {
+    decoded = decodeURIComponent(urlPath)
+  } catch {
+    return null // 畸形转义直接拒绝
+  }
+
+  let base = null
+  let rel = null
+  if (decoded.startsWith('/files/tts/')) {
+    base = ttsDir
+    rel = decoded.slice('/files/tts/'.length)
+  } else if (decoded.startsWith('/files/render/')) {
+    base = renderDir
+    rel = decoded.slice('/files/render/'.length)
+  } else {
+    return null
+  }
+
+  // 防穿越：拒绝 .. 段（覆盖 ../ 与 ..\ 语义）、反斜杠、绝对路径（/x 或 C:\x）
+  if (!rel || rel.includes('..') || rel.includes('\\') || resolve(rel) === rel) {
+    return null
+  }
+
+  // 兜底：resolve 后必须仍落在 base 目录内
+  const baseAbs = resolve(base)
+  const resolved = resolve(baseAbs, rel)
+  if (resolved !== baseAbs && !resolved.startsWith(baseAbs + sep)) {
+    return null
+  }
+  return resolved
 }
 
 /**
