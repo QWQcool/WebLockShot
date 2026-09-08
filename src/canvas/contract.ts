@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ScriptSchema } from '../domain/script.ts'
+import { MOTION_IDS, PROP_IDS, SHOT_SIZES } from '../types.ts'
 
 /**
  * CanvasDoc 数据契约（CANVAS_PLAN.md §3，一期冻结，只扩不破）。
@@ -100,7 +101,7 @@ export const CANVAS_NODE_META: Record<
     icon: '🎞️',
     phase: '1B',
     accent: '#39c5bb',
-    hint: '9:16 GSAP 预演舞台内嵌（一期 B 接通）',
+    hint: '连入 script 节点后一键生成 6 镜分镜，内嵌 9:16 GSAP 预演（本地预演 · 非成片）',
   },
   generate: {
     label: '视频生成',
@@ -134,8 +135,8 @@ export const CANVAS_NODE_META: Record<
 
 /** 一期 A 可用的节点（1B 节点可摆放但内容为「待接通」占位；2/3 期节点为灰态） */
 export function nodeAvailability(kind: CanvasNodeKind): 'ready' | 'pending' | 'locked' {
-  // B2 蜕壳：script 节点接通 AI 层，转为就绪
-  if (kind === 'script') return 'ready'
+  // B2 蜕壳：script 节点接通 AI 层；B3 蜕壳：storyboard 接通 ShotStage 本地预演
+  if (kind === 'script' || kind === 'storyboard') return 'ready'
   const phase = CANVAS_NODE_META[kind].phase
   if (phase === '1A') return 'ready'
   if (phase === '1B') return 'pending'
@@ -245,6 +246,95 @@ export function briefTextToWriterInput(text: string): {
       .slice(0, 5)
   }
   return { productTitle, sellingPoints }
+}
+
+/* ------------------------------------------------------------------ *
+ * B3 分镜预演节点契约（CANVAS_PLAN.md §9 B3）
+ * ------------------------------------------------------------------ */
+
+/** Story/Shot 的 meta 载荷校验（对齐 src/types.ts Story 契约；types.ts 为纯类型故在此补 zod） */
+export const storyMetaSchema = z.object({
+  id: z.string().min(1),
+  title: z.string(),
+  input: z.object({
+    theme: z.string(),
+    character: z.string(),
+    conflict: z.string(),
+    hook: z.string(),
+  }),
+  characters: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      color: z.string(),
+      anchor: z.string(),
+    })
+  ),
+  setting: z.object({
+    place: z.string(),
+    time: z.string(),
+    light: z.string(),
+  }),
+  shots: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        // 字面量联合（非 range number）：与 src/types.ts Shot['order'] 类型对齐，可直接传给 ShotStage
+        order: z.union([
+          z.literal(1),
+          z.literal(2),
+          z.literal(3),
+          z.literal(4),
+          z.literal(5),
+          z.literal(6),
+        ]),
+        purpose: z.string(),
+        shotSize: z.enum(SHOT_SIZES),
+        motionId: z.enum(MOTION_IDS),
+        durationSec: z.number().min(2).max(5),
+        cast: z.array(z.string()),
+        line: z.string(),
+        lineSpeaker: z.string().optional(),
+        prop: z.enum(PROP_IDS).optional(),
+      })
+    )
+    .length(6),
+})
+
+/** storyboard 节点生成结果的 meta 载荷：story（6 镜）+ 上游脚本摘要（上游变更检测用） */
+export const storyboardMetaPayloadSchema = z.object({
+  story: storyMetaSchema,
+  /** 生成时上游 Script 的摘要指纹（djb2），用于「上游脚本已更新」提示 */
+  scriptDigest: z.string(),
+  /** 生成时上游脚本的 logline 快照（供 UI 展示来源） */
+  scriptLogline: z.string().max(200),
+})
+export type StoryboardMetaPayload = z.infer<typeof storyboardMetaPayloadSchema>
+
+/** 读取：从 shape meta 解析分镜结果（缺失/非法返回 null，不半渲染） */
+export function readStoryboardMetaPayload(meta: unknown): StoryboardMetaPayload | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  const parsed = storyboardMetaPayloadSchema.safeParse(meta)
+  return parsed.success ? parsed.data : null
+}
+
+/** 写入：分镜结果经 zod 校验后合并进 meta（校验失败返回 null 拒写） */
+export function writeStoryboardMetaPayload(
+  baseMeta: Record<string, unknown>,
+  payload: StoryboardMetaPayload
+): Record<string, unknown> | null {
+  const parsed = storyboardMetaPayloadSchema.safeParse(payload)
+  if (!parsed.success) return null
+  return { ...baseMeta, ...parsed.data }
+}
+
+/** 脚本摘要指纹（djb2，纯函数）：上游脚本任何字段变化都会改变指纹，驱动「重新生成分镜」提示 */
+export function scriptDigest(script: unknown): string {
+  let hash = 5381
+  for (const ch of JSON.stringify(script)) {
+    hash = ((hash << 5) + hash + ch.charCodeAt(0)) | 0
+  }
+  return (hash >>> 0).toString(36)
 }
 
 const nodeIdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/)

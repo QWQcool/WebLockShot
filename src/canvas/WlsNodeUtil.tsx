@@ -13,6 +13,7 @@ import {
   type CanvasNodeKind,
 } from './contract.ts'
 import { ScriptNodeBody } from './ScriptNodeBody.tsx'
+import { StoryboardNodeBody } from './StoryboardNodeBody.tsx'
 
 /**
  * 画布 Agent 节点 shape（CANVAS_PLAN.md §4.1-2）。
@@ -118,6 +119,8 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
             // onPointerDown stopPropagation），绝不可挂在 body 或卡片根容器——
             // 根容器级会吞掉从 body 空白区起笔的画线事件（start 端绑定失效，edges 不落盘）。
             <ScriptNodeBody shape={shape} />
+          ) : shape.props.kind === 'storyboard' ? (
+            <StoryboardNodeBody shape={shape} />
           ) : (
             <>
               {briefText ? (

@@ -18,14 +18,18 @@ import {
   edgeToArrowMaterial,
   nodeIdToShapeId,
   readScriptMetaPayload,
+  readStoryboardMetaPayload,
+  scriptDigest,
   scriptSceneOf,
   shapeIdToNodeId,
   shapeSnapshotToCanvasNode,
   validateCanvasDoc,
   validateEdgeKind,
   writeScriptMetaPayload,
+  writeStoryboardMetaPayload,
   type CanvasDoc,
 } from '../contract.ts'
+import { scriptToStory } from '../../director/nodes/storyboardNode.ts'
 import { STRUCTURE_TEMPLATES } from '../../prompts/library/structures.ts'
 import {
   loadCanvasDocFrom,
@@ -432,6 +436,92 @@ test('B2 briefTextToWriterInput：首段标题 + 后续卖点拆分；空文本�
 
   // 空文本
   assert.deepEqual(briefTextToWriterInput('   '), { productTitle: '', sellingPoints: [] })
+})
+
+/* ---------------- B3：storyboard 节点契约 ---------------- */
+
+test('B3 契约：scriptToStory 现成转换产物可通过 storyboard meta 校验（复用兼容性）', () => {
+  // 用 B2 的合法 script 载荷走现成转换函数（不新写转换逻辑）
+  const scriptPayload = readScriptMetaPayload(makeScriptPayload())
+  assert.ok(scriptPayload)
+  const story = scriptToStory(scriptPayload.script, '钛合金机械手表')
+  assert.equal(story.shots.length, 6)
+  assert.equal(story.shots[0].order, 1)
+  assert.equal(story.shots[5].order, 6)
+  assert.equal(story.shots[0].motionId, 'push_in')
+
+  const payload = {
+    story,
+    scriptDigest: scriptDigest(scriptPayload.script),
+    scriptLogline: scriptPayload.script.logline,
+  }
+  const merged = writeStoryboardMetaPayload({ text: 'x' }, payload)
+  assert.ok(merged)
+  assert.equal(merged.text, 'x')
+  const back = readStoryboardMetaPayload(merged)
+  assert.ok(back)
+  assert.equal(back.story.id, story.id)
+  assert.equal(back.story.shots.length, 6)
+  assert.equal(back.scriptDigest, payload.scriptDigest)
+})
+
+test('B3 readStoryboardMetaPayload：shots≠6 / 非法运镜 / 非法景别 / 缺字段拒绝', () => {
+  const scriptPayload = readScriptMetaPayload(makeScriptPayload())
+  assert.ok(scriptPayload)
+  const base = {
+    story: scriptToStory(scriptPayload.script, 'x'),
+    scriptDigest: 'abc',
+    scriptLogline: 'logline',
+  }
+
+  // shots 数量不符
+  const badCount = {
+    ...base,
+    story: { ...base.story, shots: base.story.shots.slice(0, 5) },
+  }
+  assert.equal(readStoryboardMetaPayload(badCount), null)
+
+  // 非法 motionId
+  const badMotion = structuredClone(base) as {
+    story: { shots: { motionId: string }[] }
+  }
+  badMotion.story.shots[0].motionId = 'fly_to_moon'
+  assert.equal(readStoryboardMetaPayload(badMotion), null)
+
+  // 非法 shotSize
+  const badSize = structuredClone(base) as {
+    story: { shots: { shotSize: string }[] }
+  }
+  badSize.story.shots[1].shotSize = 'xxl'
+  assert.equal(readStoryboardMetaPayload(badSize), null)
+
+  // durationSec 超范围
+  const badDur = structuredClone(base)
+  badDur.story.shots[2].durationSec = 9
+  assert.equal(readStoryboardMetaPayload(badDur), null)
+
+  // 非法输入
+  assert.equal(readStoryboardMetaPayload(null), null)
+  assert.equal(readStoryboardMetaPayload(42), null)
+})
+
+test('B3 writeStoryboardMetaPayload：校验失败拒写（不半渲染）', () => {
+  const bad = { story: { id: 'x' }, scriptDigest: 'a', scriptLogline: 'l' }
+  assert.equal(writeStoryboardMetaPayload({}, bad as never), null)
+})
+
+test('B3 scriptDigest：确定性 + 上游脚本变化即指纹变化', () => {
+  const a = readScriptMetaPayload(makeScriptPayload())
+  assert.ok(a)
+  const b = { ...a.script, ctaLine: '不同的话术收尾' }
+  const da = scriptDigest(a.script)
+  assert.equal(da, scriptDigest(a.script)) // 确定性
+  assert.notEqual(da, scriptDigest(b)) // 脚本内容不同 → 指纹不同
+  assert.notEqual(da, scriptDigest({ ...a.script, logline: '改一句' }))
+  // 场景字段不属于 script 内容，指纹不变
+  const sameScript = readScriptMetaPayload(makeScriptPayload({ scriptScene: 'drama' }))
+  assert.ok(sameScript)
+  assert.equal(da, scriptDigest(sameScript.script))
 })
 
 test('画布存储：保存→读取往返，脏数据被拒', () => {
