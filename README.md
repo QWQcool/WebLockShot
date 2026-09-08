@@ -1,14 +1,15 @@
-# WEB锁镜 WebLockShot (v2.0)
+# WEB锁镜 WebLockShot (v2.1)
 
-面向电商带货与竖屏创作者的 **多 Agent 工业级视频生成与剪映工程交付工作台**。
+面向电商带货与竖屏创作者的 **多 Agent 工业级视频生成与剪映工程交付工作台**，现已升级为 **Agent 创意画布**驱动的多元化创意工作室。
 
+- **🎨 Agent 创意画布（新 · 自由创作空间）**：tldraw 无限画布上的第三工作模式。对话栏一句话（或五类场景模板：带货短视频/品牌视觉/短剧分镜/游戏宣传/App 界面）→ LLM/演示编排自动布置 Agent 节点拓扑（可一键整批撤销）→ 脚本创编（ScriptWriter+Critic）→ 9:16 GSAP 分镜预演 → Mock 多引擎逐镜出片（钱包两阶段事务上画布）→ 产物卡 → 剪映草稿 zip 一键打包。数据流连线带类型契约校验，全画布 localStorage 持久化 + 多标签页同步。定位多元化创意工作室，电商带货只是场景之一。
 - **🛒 电商全链路六步爆款工作流**：商品多模态导入（链接/图片/视频抽帧）→ 5 大爆款结构与黄金 3 秒钩子库（JSON 数据资产 + 品类路由 + 胜率加权采样）→ 双 Agent 剧本创编与对立面评审 → `sell-stage` 9:16 GSAP 动态分镜预演 → 视觉提示词方案编译 → 任务队列并发调度出片 → 剪映草稿工程声画字微秒级对齐导出（含完整素材 zip 包）。
 - **⚡ 单 Agent 极速直出模式**：高转化提示词预设库、AI 运镜智能润色扩写、多模态参考底图/视频导入、1~60s 自由时长微调。
 - **🤖 多 Agent 协同编导研讨室**：接入真实 LLM 时进行导演 + 运镜 + 质检 + 调度四智体结构化推演并给出真实质检评分；未配置 API Key 时诚实标注「演示动画模式 · 评分非真实」，绝不伪造评分。
 - **📊 数据反馈闭环**：回流看板手动录入平台数据（3 秒完播率/完播率/转化），按结构/钩子/品类聚合胜率（Laplace 平滑），ScriptWriter 采样按真实胜率加权。
 - **🔥 自建 ComfyUI 私有 GPU 算力穿透**：本地开发走 Vite 反代、生产走零依赖伴生服务反代，直调 Wan 2.1 工作流，内置一键 Ping GPU 显存探测。
-- **💰 虚拟钱包两阶段结算事务**：per-refId 冻结账本，生片前预冻结，成功核销，异常/超时/取消全额原路退款；无冻结凭据的核销/退款一律拒绝，重复结算幂等，孤儿冻结 30 分钟 TTL 自动回收。
-- **📥 剪映 / CapCut 电脑版草稿交付**：视频轨 + 旁白音轨 + 花字字幕轨微秒级对齐的 `draft_content.json` 工程文件与完整素材 zip 包（视频素材 + 使用说明），解压放入剪映草稿目录即可导入；伴生服务在线时界面自动出现「发送到伴生服务落盘」按钮，一键解压到本地草稿目录。
+- **💰 虚拟钱包两阶段结算事务**：per-refId 冻结账本，生片前预冻结，成功核销，异常/超时/取消全额原路退款；无冻结凭据的核销/退款一律拒绝，重复结算幂等，孤儿冻结 30 分钟 TTL 自动回收；画布生成节点走同一条钱包管线（全站只此一份收口）。
+- **📥 剪映 / CapCut 电脑版草稿交付**：视频轨 + 旁白音轨 + 花字字幕轨微秒级对齐的 `draft_content.json` 工程文件与完整素材 zip 包（视频素材 + 使用说明），解压放入剪映草稿目录即可导入；伴生服务在线时界面自动出现「发送到伴生服务落盘」按钮，一键解压到本地草稿目录；画布交付节点同样支持纯前端 zip 打包下载。
 - **🔊 Edge-TTS 语音合成（伴生服务）**：`POST /api/tts` 调用 Edge TTS（纯 JS 实现，无需 Python / API Key）合成旁白 mp3 落盘，浏览器直接回读；开关 `WLS_TTS`，默认开启。
 - **🎬 ffmpeg 服务端成片合成（伴生服务）**：`POST /api/render` 将分镜视频 + TTS 音轨 + 可选字幕合成为最终 mp4（音轨自动重编码、字幕软封），落盘后可直接回读下载；开关 `WLS_FFMPEG=auto` 自动探测 ffmpeg，镜像已内置。
 - **🎭 剧情短剧粗剪台（保留兼容）**：内置《门缝》《未读》《13层》6 镜剧情预演与提示词包导出，零回归。
@@ -39,6 +40,19 @@ npm run build
 ```
 
 ---
+
+## 🎨 Agent 创意画布（v2.1 新增模式）
+
+顶栏「🎨 Agent 画布」或深链 `?view=canvas` 进入（tldraw 懒加载独立 chunk，不影响带货/短剧主包）。画布规划详见 [CANVAS_PLAN.md](./CANVAS_PLAN.md)。
+
+**当前能力（一期 A+B 已交付）**：
+- **自由创作空间**：9 种 Agent 节点（需求 Brief / 素材导入 / 脚本创编 / 分镜预演 / 视频生成 / 局部重绘† / 图像生成† / 3D 运镜台† / 成片交付）自由摆放连线，画布文档 localStorage 持久化 + 多标签页同步（† 为后续阶段占位，灰态诚实标注）
+- **对话栏编排**：一句话或场景模板 → 无 Key 走确定性演示编排（「🧪 演示编排 · 非真实 LLM」标注），配置 Key 走真实 LLM 结构化拓扑（zod 校验 + 降级诚实标注）；整批节点支持「↩️ 撤销本次编排」与 Ctrl+Z 一次回滚
+- **节点即管线**：脚本创编复用 ScriptWriter+Critic（演示模式 Critic 评分标注「非真实」）、分镜预演内嵌 GSAP 9:16 舞台（零改动复用 sell 模式组件）、视频生成走 `useVideoPipeline` 全链路（钱包两阶段事务/熔断/幂等上画布，钱包账本与六步工作台同源）
+- **产物与交付**：出片产物自动成卡（视频转存 IndexedDB，`blob:` 拒绝持久化），素材导入三入口（图片上传/视频抽帧/链接存档），交付节点一键打包剪映草稿 zip（纯前端下载）+ 内嵌钱包余额显示
+- **数据流契约**：连线带类型兼容校验（如 `分镜预演→视频生成` 合法、逆向拒绝并提示原因），边 id 跨刷新稳定，刷新后箭头自动物化恢复
+
+**诚实边界**：可灵/即梦在画布模式暂未开放（请走带货工作台，未配 Key 时如实禁用）；Mock 引擎 0 灵感币；图像生成/局部重绘/3D 运镜台为二/三期占位；tldraw 免费版带 License 水印（商用 License 决策待定）。
 
 ## 🖥️ 本地伴生服务（npx 形态，可选）
 
@@ -277,16 +291,18 @@ WebLockShot/
 │   ├── assets/
 │   │   ├── hooks/                    # 爆款结构与钩子句式 JSON 数据资产（品类/情绪轴/胜率元数据）
 │   │   └── presets/                  # 商业 Mock 预设资产与产品图源
+│   ├── canvas/                       # Agent 创意画布 (CanvasDoc 契约, tldraw shape, 序列化, 持久化, 节点 Body)
 │   ├── director/                     # 导演中枢与执行引擎 (ExecutorEngine, StoryboardNode, VisualizerNode)
 │   ├── domain/                       # 领域驱动核心 (Wallet, FSM, Idempotency, Feedback, PollingConfig, ShotJob)
 │   ├── export/                       # 导出引擎 (剪映草稿三轨对齐 + 零依赖 zip 打包)
 │   ├── hooks/                        # 共享管线 Hook (useVideoPipeline, useRevocableObjectUrl)
 │   ├── media/                        # 媒体提供商 (ComfyUI, Kling, Jimeng, Mock, Audio TTS, AssetSize)
 │   ├── persist/                      # IndexedDB 资产存储 (base64 大资产外移)
-│   └── ui/                           # React 界面层 (WorkbenchHeader, SellWorkbench, Studios, FeedbackDashboard, Modals)
+│   └── ui/                           # React 界面层 (WorkbenchHeader, SellWorkbench, Studios, FeedbackDashboard, Modals, canvas/)
 ├── vite.config.ts                    # Vite 构建配置 + API 代理 + vitest 配置
 ├── start-weblockshot.bat             # Windows 一键启动 (装依赖/构建/启动伴生服务)
-└── package.json                      # 脚本定义与 79 项自动化测试配置
+├── CANVAS_PLAN.md                    # Agent 创意画布规划（一期~三期切片规格与验收标准）
+└── package.json                      # 脚本定义与自动化测试配置
 ```
 
 ---
