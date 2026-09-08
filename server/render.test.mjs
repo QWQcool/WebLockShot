@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync, mkdirSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -11,6 +11,10 @@ import {
   detectFfmpeg,
   createRenderMutex,
   resolveLocalAsset,
+  downloadToTemp,
+  parseIpv4Numeric,
+  isPrivateIpv4Value,
+  assertPublicDnsHost,
 } from './render.mjs'
 
 function tmpDist() {
@@ -533,8 +537,7 @@ test('S1 安全：/api/render live 穿越请求 → 404，白名单外文件不�
   }
 })
 
-test('真实 ffmpeg 链路：testsrc 视频正弦音轨合成 mp4（本机/CI 有 ffmpeg 才跑）', { skip: detectFfmpeg() === null ? '本机无 ffmpeg，跳过（CI ubuntu runner 自带）' : false }, async () => {
-  const dir = tmpDist()
+test('真实 ffmpeg 链路：testsrc 视频正弦音轨合成 mp4（本机/CI 有 ffmpeg 才跑）', { skip: detectFfmpeg() === null ? '本机无 ffmpeg，跳过（CI ubuntu runner 自带）' : false }, async () => {  const dir = tmpDist()
   const ffmpegPath = detectFfmpeg()
   try {
     // 1. 用真实 ffmpeg 生成 1s 测试视频（testsrc）与正弦音轨
@@ -589,6 +592,200 @@ test('真实 ffmpeg 链路：testsrc 视频正弦音轨合成 mp4（本机/CI �
       // 产物可回读且为合法 mp4（ftyp box）
       const head = readFileSync(body.path).subarray(4, 8).toString()
       assert.equal(head, 'ftyp', '产物应是合法 mp4 容器')
+    } finally {
+      await close(server)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// ---------------- O4：SSRF 302 重定向 / 非标准 IP 形态绕过防护 ----------------
+
+test('O4 parseIpv4Numeric：十进制/八进制/十六进制/省略零段全部规范化', () => {
+  assert.equal(parseIpv4Numeric('2130706433'), 2130706433, '纯十进制整数形态')
+  assert.equal(parseIpv4Numeric('127.1'), 2130706433, '省略零段')
+  assert.equal(parseIpv4Numeric('0x7f.0.0.1'), 2130706433, '十六进制段')
+  assert.equal(parseIpv4Numeric('0177.0.0.1'), 2130706433, '八进制段')
+  assert.equal(parseIpv4Numeric('127.0.0.1'), 2130706433, '标准点分十进制')
+  // 非法 / 非 IPv4 形态 → null
+  assert.equal(parseIpv4Numeric('cdn.example.com'), null)
+  assert.equal(parseIpv4Numeric('::1'), null)
+  assert.equal(parseIpv4Numeric('1.2.3.4.5'), null)
+  assert.equal(parseIpv4Numeric('300.1.1.1'), null)
+})
+
+test('O4 validateRenderUrl：非标准 IP 形态指向内网一律拒绝', () => {
+  // 十进制整数 2130706433 = 127.0.0.1
+  assert.ok(!validateRenderUrl('http://2130706433/x.mp4').ok)
+  // 八进制 0177.0.0.1 = 127.0.0.1
+  assert.ok(!validateRenderUrl('http://0177.0.0.1/x.mp4').ok)
+  // 十六进制 0x7f000001 = 127.0.0.1
+  assert.ok(!validateRenderUrl('http://0x7f000001/x.mp4').ok)
+  assert.ok(!validateRenderUrl('http://0x7f.0.0.1/x.mp4').ok)
+  // 省略零段 127.1
+  assert.ok(!validateRenderUrl('http://127.1/x.mp4').ok)
+  // 10.0.0.1 的十进制整数形态 167772161
+  assert.ok(!validateRenderUrl('http://167772161/x.mp4').ok)
+  // 169.254.169.254 元数据服务（整数 2852039166）
+  assert.ok(!validateRenderUrl('http://2852039166/latest/meta-data').ok)
+  // 192.168.1.1 整数 3232235777
+  assert.ok(!validateRenderUrl('http://3232235777/x.mp4').ok)
+  // 公网数字形态放行（8.8.8.8 = 134744072）
+  assert.equal(validateRenderUrl('http://134744072/x.mp4').ok, true)
+  // 标准形态回归不破
+  assert.ok(!validateRenderUrl('http://127.0.0.1/x.mp4').ok)
+  assert.equal(validateRenderUrl('http://8.8.8.8/x.mp4').ok, true)
+  assert.equal(isPrivateIpv4Value(parseIpv4Numeric('172.16.0.1')), true)
+  assert.equal(isPrivateIpv4Value(parseIpv4Numeric('172.32.0.1')), false)
+})
+
+test('O4 downloadToTemp：302 重定向逐跳复检，跳向内网拒绝；重定向超限 502', async () => {
+  const destDir = mkdtempSync(join(tmpdir(), 'wls-ssrf-'))
+  try {
+    // 逐跳校验用完整 SSRF 校验函数：第一跳合法公网 URL，302 → 内网 127.0.0.1
+    const redirectingFetch = async () =>
+      new Response(null, { status: 302, headers: { Location: 'http://127.0.0.1:5174/secret.mp4' } })
+    await assert.rejects(
+      downloadToTemp('http://cdn.example.com/v.mp4', destDir, { fetchImpl: redirectingFetch }),
+      (err) => {
+        assert.equal(err.status, 400)
+        assert.match(err.message, /SSRF|内网/)
+        return true
+      }
+    )
+
+    // 重定向环 / 超过 3 跳 → 502
+    let hops = 0
+    const loopFetch = async () => {
+      hops++
+      return new Response(null, { status: 302, headers: { Location: 'http://cdn.example.com/loop' } })
+    }
+    await assert.rejects(
+      downloadToTemp('http://cdn.example.com/loop', destDir, { fetchImpl: loopFetch }),
+      (err) => {
+        assert.equal(err.status, 502)
+        assert.match(err.message, /重定向次数/)
+        return true
+      }
+    )
+    assert.equal(hops, 4, '初始请求 + 3 跳上限')
+  } finally {
+    rmSync(destDir, { recursive: true, force: true })
+  }
+})
+
+test('O4 downloadToTemp：302 后最终地址合法 → 正常下载成功', async () => {
+  const destDir = mkdtempSync(join(tmpdir(), 'wls-ssrf-ok-'))
+  try {
+    const fetchWithRedirect = async (url) => {
+      if (String(url).includes('cdn.example.com')) {
+        return new Response(null, { status: 302, headers: { Location: 'https://cdn2.example.com/real.mp4' } })
+      }
+      return new Response(Buffer.from('video-bytes'), {
+        status: 200,
+        headers: { 'Content-Type': 'video/mp4' },
+      })
+    }
+    const dest = await downloadToTemp('http://cdn.example.com/v.mp4', destDir, { fetchImpl: fetchWithRedirect })
+    assert.equal(readFileSync(dest).toString(), 'video-bytes')
+  } finally {
+    rmSync(destDir, { recursive: true, force: true })
+  }
+})
+
+test('O4 assertPublicDnsHost：DNS 解析到私网地址拒绝（注入 lookup）', async () => {
+  // 解析出 10.0.0.5 → 拒绝
+  await assert.rejects(
+    assertPublicDnsHost('evil.example', async () => [{ address: '10.0.0.5', family: 4 }]),
+    /SSRF|内网/
+  )
+  // 解析出公网地址 → 通过
+  await assert.doesNotReject(
+    assertPublicDnsHost('cdn.example', async () => [{ address: '93.184.216.34', family: 4 }])
+  )
+  // DNS 解析失败 → 尽力而为语义：不放大错误，交由 fetch 报错
+  await assert.doesNotReject(assertPublicDnsHost('nx.example', async () => {
+    throw new Error('ENOTFOUND')
+  }))
+})
+
+// ---------------- O3：ffmpeg 失败/超时不残留损坏 mp4 ----------------
+
+test('O3 /api/render：ffmpeg 非零退出 → 502 且输出目录无残留 mp4', async () => {
+  const dir = tmpDist()
+  try {
+    const ttsDir = join(dir, 'tts-out')
+    mkdirSync(ttsDir, { recursive: true })
+    writeFileSync(join(ttsDir, 'bad.mp4'), Buffer.from('bad'))
+    const renderDir = join(dir, 'render-out')
+
+    const fake = fakeFfmpegChild({ exitCode: 1, stderrText: 'Invalid data found' })
+    const { server, port } = await startServer({
+      port: 0,
+      dist: dir,
+      env: {},
+      ffmpegPath: '/fake/ffmpeg',
+      renderDir,
+      ttsDir,
+      renderSpawnImpl: fake.spawnImpl,
+    })
+    const base = `http://127.0.0.1:${port}`
+    try {
+      const res = await fetch(`${base}/api/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: '/files/tts/bad.mp4' }),
+      })
+      assert.equal(res.status, 502)
+      // 关键断言：无残留 mp4（失败路径统一 unlink）
+      const leftovers = existsSync(renderDir)
+        ? readdirSync(renderDir).filter((f) => f.endsWith('.mp4'))
+        : []
+      assert.equal(leftovers.length, 0, `输出目录应无残留 mp4，实际: ${leftovers.join(',')}`)
+    } finally {
+      await close(server)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('O3 /api/render：ffmpeg 超时 kill → 504 且输出目录无残留 mp4', async () => {
+  const dir = tmpDist()
+  try {
+    const ttsDir = join(dir, 'tts-out')
+    mkdirSync(ttsDir, { recursive: true })
+    writeFileSync(join(ttsDir, 'v.mp4'), Buffer.from('v'))
+    const renderDir = join(dir, 'render-out')
+
+    // fake ffmpeg：先写出部分字节模拟残留，再永不返回（被超时 kill）
+    const spawnImpl = (cmd, args) => {
+      const outPath = args[args.length - 1]
+      writeFileSync(outPath, Buffer.from('partial-corrupt'))
+      return { stderr: { on() {} }, kill() {}, on() {} }
+    }
+    const { server, port } = await startServer({
+      port: 0,
+      dist: dir,
+      env: { WLS_RENDER_TIMEOUT_SEC: '0.3' },
+      ffmpegPath: '/fake/ffmpeg',
+      renderDir,
+      ttsDir,
+      renderSpawnImpl: spawnImpl,
+    })
+    const base = `http://127.0.0.1:${port}`
+    try {
+      const res = await fetch(`${base}/api/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: '/files/tts/v.mp4' }),
+      })
+      assert.equal(res.status, 504)
+      const leftovers = existsSync(renderDir)
+        ? readdirSync(renderDir).filter((f) => f.endsWith('.mp4'))
+        : []
+      assert.equal(leftovers.length, 0, '超时路径同样不得残留输出文件')
     } finally {
       await close(server)
     }

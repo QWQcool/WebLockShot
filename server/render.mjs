@@ -80,8 +80,61 @@ export function detectFfmpeg() {
 }
 
 /**
+ * O4：将 IPv4 的非标准书写形态（十进制整数 / 八进制段 / 十六进制段 / 省略零段）
+ * 规范化为 32 位无符号整数，便于统一判定私网段。
+ * 例：'2130706433' / '127.1' / '0x7f.0.0.1' / '0177.0.0.1' 均解析为 127.0.0.1。
+ * 非 IPv4 数字形态（普通域名 / IPv6 / 非法段）返回 null。
+ * @returns {number|null}
+ */
+export function parseIpv4Numeric(host) {
+  if (!host || !/^[0-9a-fA-FxX.]+$/.test(host)) return null
+  const parts = host.split('.')
+  if (parts.length > 4) return null
+  let value = 0
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    if (!part) return null
+    let n
+    if (/^0[xX][0-9a-fA-F]+$/.test(part)) {
+      n = parseInt(part, 16)
+    } else if (part.length > 1 && /^0[0-7]+$/.test(part)) {
+      n = parseInt(part.slice(1), 8)
+    } else if (/^\d+$/.test(part)) {
+      n = parseInt(part, 10)
+    } else {
+      return null
+    }
+    const isLast = i === parts.length - 1
+    if (isLast) {
+      // 末段可承载剩余字节（inet_aton 语义）：'2130706433' / '127.1'
+      const span = 256 ** (4 - i)
+      if (n > span - 1) return null
+      value = value * span + n
+    } else {
+      if (n > 255) return null
+      value = value * 256 + n
+    }
+  }
+  return value >>> 0
+}
+
+/** O4：32 位 IPv4 整数是否落在私网 / 保留段（loopback / 私网 / link-local / CGNAT / 0.0.0.0） */
+export function isPrivateIpv4Value(value) {
+  const b = [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]
+  return (
+    b[0] === 0 ||
+    b[0] === 10 ||
+    b[0] === 127 ||
+    (b[0] === 100 && b[1] >= 64 && b[1] <= 127) ||
+    (b[0] === 169 && b[1] === 254) ||
+    (b[0] === 172 && b[1] >= 16 && b[1] <= 31) ||
+    (b[0] === 192 && b[1] === 168)
+  )
+}
+
+/**
  * 校验渲染来源 URL：允许 http(s) 与本站相对路径（/ 开头）；禁止 file://、data: 等协议
- * 与内网地址（SSRF 防护）。
+ * 与内网地址（SSRF 防护，含十进制/八进制/十六进制 IP 绕过形态）。
  * @returns {{ ok: true } | { ok: false, error: string }}
  */
 export function validateRenderUrl(raw, { fieldName = 'url' } = {}) {
@@ -124,6 +177,12 @@ export function validateRenderUrl(raw, { fieldName = 'url' } = {}) {
     /^fc[0-9a-f]{2}:/i.test(host) ||
     /^fe80:/i.test(host)
   if (isPrivate) {
+    return { ok: false, error: `${fieldName} 禁止指向内网地址（SSRF 防护）：${host}` }
+  }
+
+  // O4：非标准 IP 书写形态规范化后复检（http://2130706433/ 与 0x7f.0.0.1 等不再绕过）
+  const ipv4Value = parseIpv4Numeric(host)
+  if (ipv4Value !== null && isPrivateIpv4Value(ipv4Value)) {
     return { ok: false, error: `${fieldName} 禁止指向内网地址（SSRF 防护）：${host}` }
   }
 
@@ -208,11 +267,77 @@ export function resolveLocalAsset(urlPath, { ttsDir, renderDir }) {
 }
 
 /**
- * 下载远程文件到临时目录（流式 + 500MB 上限）
+ * O4：下载前对远程主机做尽力而为的 DNS 落地校验（解析出的所有 IP 不得落私网段）。
+ * 注意：这是尽力而为（best-effort）防护——解析与实际连接之间存在 TOCTOU 窗口，
+ * DNS rebinding 不强求完全防护（注释即文档）；完整防护需自定义 Agent 固定连接 IP。
+ * @param {string} hostname
+ * @param {Function} lookupImpl 可注入（单测），默认 dns.promises.lookup(all: true)
+ */
+export async function assertPublicDnsHost(hostname, lookupImpl) {
+  const lookup =
+    lookupImpl ||
+    ((hn) => import('node:dns').then((dns) => dns.promises.lookup(hn, { all: true })))
+  let records
+  try {
+    records = await lookup(hostname)
+  } catch {
+    return // DNS 解析失败交由后续 fetch 报错，此处不放大错误
+  }
+  const addrs = Array.isArray(records) ? records : [records]
+  for (const rec of addrs) {
+    const address = typeof rec === 'string' ? rec : rec?.address
+    if (!address) continue
+    const numeric = parseIpv4Numeric(address)
+    if (numeric !== null && isPrivateIpv4Value(numeric)) {
+      throw Object.assign(
+        new Error(`SSRF 防护：${hostname} 解析到内网地址 ${address}，已拒绝下载`),
+        { status: 400 }
+      )
+    }
+  }
+}
+
+/**
+ * 下载远程文件到临时目录（流式 + 500MB 上限）。
+ * O4 加固：
+ * - redirect: 'manual' 逐跳复检 SSRF（最多 3 跳），302 指向内网不再绕过校验
+ * - 下载前 DNS 解析结果私网校验（尽力而为，见 assertPublicDnsHost 注释）
  * @returns {Promise<string>} 临时文件路径
  */
-export async function downloadToTemp(url, destDir, { fetchImpl = fetch, maxBytes = RENDER_DOWNLOAD_MAX_BYTES } = {}) {
-  const resp = await fetchImpl(url, { redirect: 'follow' })
+export async function downloadToTemp(
+  url,
+  destDir,
+  { fetchImpl = fetch, maxBytes = RENDER_DOWNLOAD_MAX_BYTES, maxRedirects = 3, dnsLookupImpl } = {}
+) {
+  let currentUrl = url
+  let resp = null
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    // 每一跳都重新走完整 URL 校验（协议白名单 + 内网段 + 非标准 IP 形态）
+    const check = validateRenderUrl(currentUrl)
+    if (!check.ok || check.kind !== 'remote') {
+      throw Object.assign(new Error(check.error || `${currentUrl} 非法`), { status: 400 })
+    }
+    try {
+      await assertPublicDnsHost(new URL(currentUrl).hostname, dnsLookupImpl)
+    } catch (err) {
+      throw Object.assign(err instanceof Error ? err : new Error(String(err)), { status: err?.status || 400 })
+    }
+
+    resp = await fetchImpl(currentUrl, { redirect: 'manual' })
+    if (resp.status >= 300 && resp.status < 400) {
+      const location = resp.headers.get('location')
+      if (!location) {
+        throw Object.assign(new Error(`下载失败：重定向响应缺少 Location 头（HTTP ${resp.status}）`), { status: 502 })
+      }
+      if (hop === maxRedirects) {
+        throw Object.assign(new Error(`下载失败：重定向次数超过 ${maxRedirects} 跳上限`), { status: 502 })
+      }
+      currentUrl = new URL(location, currentUrl).toString()
+      continue
+    }
+    break
+  }
+
   if (!resp.ok || !resp.body) {
     throw Object.assign(new Error(`下载失败：HTTP ${resp.status}`), { status: 502 })
   }
@@ -223,7 +348,7 @@ export async function downloadToTemp(url, destDir, { fetchImpl = fetch, maxBytes
 
   // Web ReadableStream → Node 流（Node 18+ 可直接 fromWeb，此处手工桥接保持零额外依赖）
   const nodeStream = Readable.fromWeb(resp.body)
-  const ext = guessExt(url)
+  const ext = guessExt(currentUrl)
   const dest = join(destDir, `dl-${Date.now().toString(36)}${ext}`)
 
   let received = 0
@@ -317,22 +442,53 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function readJsonBody(req, maxBytes) {
+/**
+ * 读取 JSON 请求体（R2 修复：超限 / 中途断开均不再挂起）。
+ * - 超限：先回写 413（Connection: close）再 destroy 并 reject —— 此前只 destroy 不回应，
+ *   await 永挂 → /api/render 互斥锁 release 永不执行 → 后续所有请求永久 429。
+ * - req 'close'/'aborted'（未正常 end 即断开）→ reject，防止 Promise 永挂。
+ * 调用方 catch 中须先判 res.headersSent（413 已直接回写）避免二次响应。
+ */
+function readJsonBody(req, maxBytes, res) {
   return new Promise((resolveBody, rejectBody) => {
     const chunks = []
     let size = 0
     let overflow = false
+    let settled = false
+    const finish = (err, data) => {
+      if (settled) return
+      settled = true
+      if (err) rejectBody(err)
+      else resolveBody(data)
+    }
+    const tooLargeErr = () => Object.assign(new Error('body too large'), { code: 'WLS_BODY_TOO_LARGE' })
+
     req.on('data', (chunk) => {
+      if (settled) return
       size += chunk.length
       if (size > maxBytes) {
         overflow = true
-        req.destroy()
+        if (res && !res.headersSent) {
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' })
+          res.end(JSON.stringify({ error: '请求体超过上限' }))
+        }
+        // resume 排空剩余 body（body-parser 同款）：socket 有未读数据时关闭会发 RST，
+        // 客户端会丢弃 413 响应只见 ECONNRESET；排空后连接干净关闭，413 可正常送达
+        req.resume()
+        finish(tooLargeErr())
         return
       }
       chunks.push(chunk)
     })
-    req.on('end', () => (overflow ? rejectBody(new Error('body too large')) : resolveBody(Buffer.concat(chunks))))
-    req.on('error', rejectBody)
+    req.on('end', () => finish(overflow ? tooLargeErr() : null, Buffer.concat(chunks)))
+    req.on('error', (err) => finish(err instanceof Error ? err : new Error(String(err))))
+    const onAborted = () => {
+      if (!overflow) finish(new Error('request aborted before body completed'))
+    }
+    req.on('aborted', onAborted)
+    req.on('close', () => {
+      if (!settled && !req.readableEnded) onAborted()
+    })
   })
 }
 
@@ -379,11 +535,14 @@ export function createRenderHandler({
     void (async () => {
       await mutex.acquire()
       let tmpCleanup = null
+      let outPath = null
       try {
         let body
         try {
-          body = JSON.parse((await readJsonBody(req, 1024 * 1024)).toString('utf8'))
+          body = JSON.parse((await readJsonBody(req, 1024 * 1024, res)).toString('utf8'))
         } catch (err) {
+          // R2：超限 413 已由 readJsonBody 直接回写（headersSent = true），不再二次响应
+          if (res.headersSent) return
           const tooLarge = err instanceof Error && err.message === 'body too large'
           sendJson(res, 413, { error: tooLarge ? '请求体超过上限' : '请求体必须是合法 JSON' })
           return
@@ -448,7 +607,7 @@ export function createRenderHandler({
         const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
         mkdirSync(renderDir, { recursive: true })
         const outName = `render_${stamp}.mp4`
-        const outPath = join(renderDir, outName)
+        outPath = join(renderDir, outName)
 
         let result
         try {
@@ -474,7 +633,18 @@ export function createRenderHandler({
           bytes: result.bytes,
         })
       } catch (err) {
+        // O3 修复：失败 / 超时 / 重编码失败路径统一清理残留输出。
+        // 此前 ffmpeg 中途被 kill 或退出非零时可能留下损坏 mp4，被 /files/render 命中播放坏片。
+        if (outPath) {
+          try {
+            unlinkSync(outPath)
+          } catch {}
+        }
         logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, '[render] 合成失败')
+        if (res.headersSent) {
+          res.destroy()
+          return
+        }
         sendJson(res, err?.status || 500, {
           error: `渲染失败：${err instanceof Error ? err.message : String(err)}`,
         })
@@ -569,6 +739,9 @@ export function createRenderFileHandler({ renderDir }) {
       res.end()
       return
     }
-    createReadStream(filePath).pipe(res)
+    // O7：stat 与 open 之间存在竞态（文件被删/损坏），流 error 必须被消费
+    createReadStream(filePath).on('error', () => {
+      res.destroy()
+    }).pipe(res)
   }
 }

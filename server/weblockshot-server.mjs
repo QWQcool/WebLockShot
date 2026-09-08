@@ -29,7 +29,7 @@
 import http from 'node:http'
 import https from 'node:https'
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { extname, join, resolve } from 'node:path'
+import { extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { extractZip, safeEntryName } from './zip-extract.mjs'
 import { createLogger } from './logger.mjs'
@@ -70,6 +70,10 @@ function parseArgs(argv, env = process.env) {
     ffmpeg: env.WLS_FFMPEG === 'off' ? 'off' : 'auto',
     renderDir: env.RENDER_DIR,
     renderTimeoutSec: Number(env.WLS_RENDER_TIMEOUT_SEC) || RENDER_DEFAULT_TIMEOUT_SEC,
+    // 反代上游空闲超时（连接+响应共用，秒）：默认 60s（O5）
+    proxyTimeoutSec: Number(env.WLS_PROXY_TIMEOUT_SEC) || 60,
+    // Edge-TTS 单次合成超时（秒）：默认 60s（O6）
+    ttsTimeoutSec: Number(env.WLS_TTS_TIMEOUT_SEC) || 60,
   }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port') args.port = Number(argv[++i]) || args.port
@@ -112,7 +116,36 @@ const BASE_PROXY_ROUTES = [
   { name: 'comfyui', prefix: '/api/comfyui', target: 'http://127.0.0.1:8188' },
 ]
 
-function proxyRequest(req, res, route, keys, logger) {
+/** hop-by-hop 头：不应随代理转发（RFC 7230） */
+const HOP_BY_HOP_HEADERS = [
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+]
+
+function respondJson(res, status, payload) {
+  if (res.headersSent) {
+    res.destroy()
+    return
+  }
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
+  res.end(JSON.stringify(payload))
+}
+
+/**
+ * 反向代理（R3 + O5 加固）：
+ * - 剥离本服务敏感头（x-wls-token / cookie）与 hop-by-hop 头；客户端自带 Authorization 保留
+ *   （透传语义：那是用户自己的引擎密钥）
+ * - proxyRes 与 proxyReq 均挂 error 监听：上游中途断流不再触发未捕获异常进程崩溃
+ * - 所有错误回写前判 res.headersSent，避免 ERR_HTTP_HEADERS_SENT 二次崩溃
+ * - 上游空闲超时（连接 + 响应停顿共用）→ 504
+ */
+function proxyRequest(req, res, route, keys, logger, { timeoutSec = 60 } = {}) {
   const targetPath = req.url.slice(route.prefix.length) || '/'
   const url = new URL(targetPath, route.target)
   const isHttps = url.protocol === 'https:'
@@ -122,6 +155,10 @@ function proxyRequest(req, res, route, keys, logger) {
   delete headers.host
   delete headers.origin
   delete headers.referer
+  // O5：剥离本服务鉴权头与会话 cookie，不得泄漏给上游引擎
+  delete headers['x-wls-token']
+  delete headers.cookie
+  for (const h of HOP_BY_HOP_HEADERS) delete headers[h]
 
   // 预留：WLS_KEYS 注入真实密钥（覆盖客户端 Authorization）；未设置 = 透传
   const injectedKey = keys?.[route.name]
@@ -140,15 +177,38 @@ function proxyRequest(req, res, route, keys, logger) {
     },
     (proxyRes) => {
       res.writeHead(proxyRes.statusCode || 502, proxyRes.headers)
+      // R3：上游响应流中途断流（socket destroyed）→ 只终止客户端响应，进程不死
+      proxyRes.on('error', (err) => {
+        logger?.warn?.({ route: route.name, err: err.message }, '代理上游响应流中断')
+        res.destroy()
+      })
       proxyRes.pipe(res)
     }
   )
 
+  // O5：上游空闲超时（覆盖连接建立与响应中途停顿），默认 60s（WLS_PROXY_TIMEOUT_SEC 可调）
+  proxyReq.setTimeout(timeoutSec * 1000, () => {
+    logger?.warn?.({ route: route.name, timeoutSec }, '代理上游超时')
+    // destroy(err) 会触发下方 'error' 回调，由其统一回写 504（避免与 end 竞态截断响应）
+    proxyReq.destroy(new Error(`上游超时（>${timeoutSec}s 无响应）`))
+  })
+
   proxyReq.on('error', (err) => {
     logger?.warn?.({ route: route.name, err: err.message }, '代理请求失败')
-    res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' })
-    res.end(JSON.stringify({ error: `代理请求失败: ${err.message}` }))
+    // R3：headers 已发出（流式中断）只能销毁连接，否则 writeHead 抛 ERR_HTTP_HEADERS_SENT
+    if (res.headersSent) {
+      res.destroy()
+      return
+    }
+    const isTimeout = err.message?.includes('上游超时')
+    respondJson(res, isTimeout ? 504 : 502, {
+      error: isTimeout ? err.message : `代理请求失败: ${err.message}`,
+    })
   })
+
+  // 客户端提前断开：同步终止上游请求，避免孤儿连接
+  req.on('aborted', () => proxyReq.destroy())
+  req.on('error', () => proxyReq.destroy())
 
   req.pipe(proxyReq)
 }
@@ -169,7 +229,12 @@ async function handleDraftZip(req, res, args, logger) {
   req.on('data', (chunk) => {
     size += chunk.length
     if (size > MAX) {
+      if (tooLarge) return
       tooLarge = true
+      // R2 修复：destroy 前先回 413 并结束响应。此前只 destroy 不回应，
+      // 'end' 永不触发 → 分支内 writeHead(413) 成为死代码，客户端连接被裸重置。
+      res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' })
+      res.end(JSON.stringify({ error: 'zip 超过 200MB 上限' }))
       req.destroy()
       return
     }
@@ -215,22 +280,53 @@ async function handleDraftZip(req, res, args, logger) {
 // ---------------- 会话存储 API（预留，BackendAdapter rest 模式后端） ----------------
 const SESSION_BODY_MAX = 8 * 1024 * 1024 // 8MB
 
-function readBody(req, maxBytes) {
+/**
+ * 读取请求体（R2 修复：超限 / 中途断开均不再挂起）。
+ * - 超限：先回写 413（Connection: close）再 destroy，随后 reject —— 调用方 catch 中须判
+ *   res.headersSent 避免二次回写。此前只 destroy 不回应，await 永挂 → 互斥锁等资源永久饿死。
+ * - req 'close'/'aborted'（未正常 end 即断开）→ reject，防止 Promise 永挂。
+ * @returns {Promise<Buffer>}
+ */
+function readBody(req, maxBytes, res) {
   return new Promise((resolveBody, rejectBody) => {
     const chunks = []
     let size = 0
     let overflow = false
+    let settled = false
+    const finish = (err, data) => {
+      if (settled) return
+      settled = true
+      if (err) rejectBody(err)
+      else resolveBody(data)
+    }
+    const tooLargeErr = () => Object.assign(new Error('body too large'), { code: 'WLS_BODY_TOO_LARGE' })
+
     req.on('data', (chunk) => {
+      if (settled) return
       size += chunk.length
       if (size > maxBytes) {
         overflow = true
-        req.destroy()
+        if (res && !res.headersSent) {
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' })
+          res.end(JSON.stringify({ error: '请求体超过上限' }))
+        }
+        // resume 排空剩余 body，避免 socket 未读数据触发 RST 令客户端丢弃 413（见 render.mjs 注释）
+        req.resume()
+        finish(tooLargeErr())
         return
       }
       chunks.push(chunk)
     })
-    req.on('end', () => (overflow ? rejectBody(new Error('body too large')) : resolveBody(Buffer.concat(chunks))))
-    req.on('error', rejectBody)
+    req.on('end', () => finish(overflow ? tooLargeErr() : null, Buffer.concat(chunks)))
+    req.on('error', (err) => finish(err instanceof Error ? err : new Error(String(err))))
+    const onAborted = () => {
+      if (!overflow) finish(new Error('request aborted before body completed'))
+    }
+    req.on('aborted', onAborted)
+    req.on('close', () => {
+      // 正常路径 end 已 settle；未 end 即 close = 客户端中途断开
+      if (!settled && !req.readableEnded) onAborted()
+    })
   })
 }
 
@@ -276,7 +372,7 @@ async function handleSessionApi(req, res, urlPath, storage) {
     }
 
     if (req.method === 'PUT') {
-      const buf = await readBody(req, SESSION_BODY_MAX)
+      const buf = await readBody(req, SESSION_BODY_MAX, res)
       const parsed = JSON.parse(buf.toString('utf8'))
       const data = parsed && typeof parsed === 'object' && 'data' in parsed ? parsed.data : parsed
       if (!data || typeof data !== 'object') {
@@ -296,6 +392,8 @@ async function handleSessionApi(req, res, urlPath, storage) {
 
     sendJson(res, 405, { error: '仅支持 GET/PUT/DELETE' })
   } catch (err) {
+    // R2：超限 413 已由 readBody 直接回写（headersSent = true），此处不再二次回写
+    if (res.headersSent) return
     const tooLarge = err instanceof Error && err.message === 'body too large'
     sendJson(res, tooLarge ? 413 : 400, {
       error: tooLarge ? '会话快照超过 8MB 上限' : `会话操作失败: ${err instanceof Error ? err.message : String(err)}`,
@@ -323,7 +421,9 @@ const MIME = {
 
 function serveStatic(req, res, distDir) {
   let filePath = join(distDir, decodeUrlLenient(req.url.split('?')[0]))
-  if (req.url === '/' || !filePath.startsWith(distDir)) {
+  // O12 修复：前缀比较必须带路径分隔符，否则 /dist-evil 等同前缀兄弟目录会绕过校验
+  const withinDist = filePath === distDir || filePath.startsWith(distDir + sep)
+  if (req.url === '/' || !withinDist) {
     filePath = join(distDir, 'index.html')
   }
 
@@ -348,7 +448,15 @@ function serveStatic(req, res, distDir) {
   }
 
   res.writeHead(200, { 'Content-Type': MIME[extname(filePath).toLowerCase()] || 'application/octet-stream' })
-  createReadStream(filePath).pipe(res)
+  // O7：stat 与 open 之间存在竞态（文件被删/损坏），流 error 必须被消费，否则未捕获 error 事件崩溃进程
+  createReadStream(filePath).on('error', () => {
+    if (!res.headersSent) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+      res.end('Not Found')
+      return
+    }
+    res.destroy()
+  }).pipe(res)
 }
 
 // ---------------- 服务工厂（CLI 与测试共用） ----------------
@@ -368,11 +476,14 @@ export async function startServer(opts = {}) {
   if (llmTarget) {
     proxyRoutes.push({ name: 'llm', prefix: '/api/llm', target: llmTarget })
   }
+  // O5：反代上游空闲超时可注入（单测用短超时），默认走 args（60s，WLS_PROXY_TIMEOUT_SEC 可调）
+  const proxyTimeoutSec = opts.proxyTimeoutSec !== undefined ? opts.proxyTimeoutSec : args.proxyTimeoutSec
 
   // Edge-TTS 能力（P1-1）：synth 可注入 mock 供协议层单测（不依赖网络）
   const ttsEnabled = opts.tts !== undefined ? opts.tts : args.tts === 'on'
   const ttsDir = opts.ttsDir !== undefined ? opts.ttsDir : args.ttsDir
-  const ttsHandler = createTtsHandler({ enabled: ttsEnabled, ttsDir, logger, synth: opts.ttsSynth })
+  const ttsTimeoutSec = opts.ttsTimeoutSec !== undefined ? opts.ttsTimeoutSec : args.ttsTimeoutSec
+  const ttsHandler = createTtsHandler({ enabled: ttsEnabled, ttsDir, logger, synth: opts.ttsSynth, timeoutSec: ttsTimeoutSec })
   const ttsFileHandler = createTtsFileHandler({ ttsDir })
 
   // ffmpeg 成片合成能力（P1-2）：启动时探测一次二进制；ffmpegPath 可注入供单测
@@ -451,7 +562,7 @@ export async function startServer(opts = {}) {
 
     const route = proxyRoutes.find((r) => urlPath.startsWith(r.prefix))
     if (route) {
-      proxyRequest(req, res, route, keys, logger)
+      proxyRequest(req, res, route, keys, logger, { timeoutSec: proxyTimeoutSec })
       return
     }
 
@@ -532,6 +643,11 @@ export async function startServer(opts = {}) {
     storage,
     keys,
     llmTarget,
+    // R1 修复：ttsEnabled 此前未随返回值暴露，CLI 启动日志回调引用内部变量抛
+    // ReferenceError → 进程 exit(1)，伴生服务全部能力不可用
+    ttsEnabled,
+    ttsTimeoutSec,
+    proxyTimeoutSec,
     host,
     port: server.address()?.port ?? port,
     health: healthPayload,
@@ -552,7 +668,7 @@ function isDirectRun() {
 if (isDirectRun()) {
   const args = parseArgs(process.argv.slice(2))
   startServer()
-    .then(({ server, logger, port, storage, keys, llmTarget }) => {
+    .then(({ server, logger, port, storage, keys, llmTarget, ttsEnabled }) => {
       logger.info(
         {
           appUrl: `http://localhost:${port}`,

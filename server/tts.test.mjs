@@ -7,6 +7,7 @@ import { startServer } from './weblockshot-server.mjs'
 import {
   validateTtsBody,
   isSafeTtsFileName,
+  synthesizeTtsToFile,
   TTS_TEXT_MAX,
   TTS_DEFAULT_VOICE,
 } from './tts.mjs'
@@ -320,6 +321,116 @@ test('GET /api/tts：方法限制 405；WLS_AUTH_TOKEN 对 /api/tts 生效', asy
         headers: { 'x-wls-token': 'tok-1' },
       })
       assert.equal(withAuth.status, 405)
+    } finally {
+      await close(server)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// ---------------- O6：WS 泄漏与半开挂起防护 ----------------
+
+/** 构造可控 fake MsEdgeTTS 客户端（记录 close 调用） */
+function fakeTtsFactory({ metadataError = null, metadataHang = false, streamError = false, chunkCount = 2 } = {}) {
+  const state = { closeCount: 0 }
+  const factory = () => ({
+    async setMetadata() {
+      if (metadataError) throw metadataError
+      if (metadataHang) return new Promise(() => {}) // 半开 WS 永挂
+    },
+    toStream() {
+      const chunks = Array.from({ length: chunkCount }, (_, i) => Buffer.from(`chunk-${i}`))
+      let i = 0
+      const audioStream = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: async () => {
+              if (streamError && i === 1) throw new Error('stream broken mid-way')
+              if (i < chunks.length) return { value: chunks[i++], done: false }
+              return { value: undefined, done: true }
+            },
+          }
+        },
+      }
+      return { audioStream }
+    },
+    close() {
+      state.closeCount++
+    },
+  })
+  return { factory, state }
+}
+
+test('O6 synthesizeTtsToFile：setMetadata 抛错 → close 必须被调用（WS 不泄漏）', async () => {
+  const dir = tmpDist()
+  try {
+    const { factory, state } = fakeTtsFactory({ metadataError: new Error('metadata refused') })
+    await assert.rejects(
+      synthesizeTtsToFile({ text: '你好', ttsDir: dir, ttsFactory: factory }),
+      /metadata refused/
+    )
+    assert.equal(state.closeCount, 1, 'setMetadata 在 try 外抛错也必须 close（O6 根因修复）')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('O6 synthesizeTtsToFile：音频流中途断流 → close 必须被调用', async () => {
+  const dir = tmpDist()
+  try {
+    const { factory, state } = fakeTtsFactory({ streamError: true })
+    await assert.rejects(
+      synthesizeTtsToFile({ text: '你好', ttsDir: dir, ttsFactory: factory }),
+      /stream broken/
+    )
+    assert.equal(state.closeCount, 1)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('O6 synthesizeTtsToFile：半开 WS 永挂 → 整体超时触发并 close', async () => {
+  const dir = tmpDist()
+  try {
+    const { factory, state } = fakeTtsFactory({ metadataHang: true })
+    const start = Date.now()
+    await assert.rejects(
+      synthesizeTtsToFile({ text: '你好', ttsDir: dir, timeoutMs: 120, ttsFactory: factory }),
+      (err) => {
+        assert.equal(err.status, 504)
+        assert.match(err.message, /超时/)
+        return true
+      }
+    )
+    assert.ok(Date.now() - start < 5000, '超时应远小于默认 60s（测试注入 120ms）')
+    assert.equal(state.closeCount, 1, '超时后 close 仍须被调用')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('O6 /api/tts：注入永挂合成客户端 → 504，server 存活', async () => {
+  const dir = tmpDist()
+  try {
+    const { factory } = fakeTtsFactory({ metadataHang: true })
+    const { server, port } = await startServer({
+      port: 0,
+      dist: dir,
+      env: {},
+      ttsDir: join(dir, 'tts-out'),
+      ttsSynth: (args) => synthesizeTtsToFile({ ...args, timeoutMs: 120, ttsFactory: factory }),
+    })
+    const base = `http://127.0.0.1:${port}`
+    try {
+      const res = await fetch(`${base}/api/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: '半开测试' }),
+      })
+      assert.equal(res.status, 504)
+      assert.match((await res.json()).error, /超时/)
+      assert.equal((await fetch(`${base}/healthz`)).status, 200)
     } finally {
       await close(server)
     }
