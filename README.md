@@ -1,8 +1,8 @@
-# WEB锁镜 WebLockShot (v2.1)
+# WEB锁镜 WebLockShot (v2.3)
 
 面向电商带货与竖屏创作者的 **多 Agent 工业级视频生成与剪映工程交付工作台**，现已升级为 **Agent 创意画布**驱动的多元化创意工作室。
 
-- **🎨 Agent 创意画布（新 · 自由创作空间）**：tldraw 无限画布上的第三工作模式。对话栏一句话（或五类场景模板：带货短视频/品牌视觉/短剧分镜/游戏宣传/App 界面）→ LLM/演示编排自动布置 Agent 节点拓扑（可一键整批撤销）→ 脚本创编（ScriptWriter+Critic）→ 9:16 GSAP 分镜预演 → Mock 多引擎逐镜出片（钱包两阶段事务上画布）→ 产物卡 → 剪映草稿 zip 一键打包。数据流连线带类型契约校验，全画布 localStorage 持久化 + 多标签页同步。定位多元化创意工作室，电商带货只是场景之一。
+- **🎨 Agent 创意画布（新 · 自由创作空间）**：tldraw 无限画布上的第三工作模式。对话栏一句话（或五类场景模板：带货短视频/品牌视觉/短剧分镜/游戏宣传/App 界面）→ LLM/演示编排自动布置 Agent 节点拓扑（可一键整批撤销）→ 脚本创编（ScriptWriter+Critic）→ 9:16 GSAP 分镜预演 → Mock 多引擎逐镜出片（钱包两阶段事务上画布）→ 产物卡 → 剪映草稿 zip 一键打包。画布框选可**沉淀为 Skill 工作流包**（manifest JSON：节点拓扑 + 参数槽位 + 输入/输出声明，产物与大资产自动剥离），导入即重建节点组只填新输入（预置「六步爆款带货流」「单图快速出片」两个官方 Skill）；记忆系统按结构/钩子/品类胜率（Laplace 聚合）为脚本采样加权。数据流连线带类型契约校验，全画布 localStorage 持久化 + 多标签页同步。定位多元化创意工作室，电商带货只是场景之一。
 - **🛒 电商全链路六步爆款工作流**：商品多模态导入（链接/图片/视频抽帧）→ 5 大爆款结构与黄金 3 秒钩子库（JSON 数据资产 + 品类路由 + 胜率加权采样）→ 双 Agent 剧本创编与对立面评审 → `sell-stage` 9:16 GSAP 动态分镜预演 → 视觉提示词方案编译 → 任务队列并发调度出片 → 剪映草稿工程声画字微秒级对齐导出（含完整素材 zip 包）。
 - **⚡ 单 Agent 极速直出模式**：高转化提示词预设库、AI 运镜智能润色扩写、多模态参考底图/视频导入、1~60s 自由时长微调。
 - **🤖 多 Agent 协同编导研讨室**：接入真实 LLM 时进行导演 + 运镜 + 质检 + 调度四智体结构化推演并给出真实质检评分；未配置 API Key 时诚实标注「演示动画模式 · 评分非真实」，绝不伪造评分。
@@ -45,15 +45,17 @@ npm run build
 
 顶栏「🎨 Agent 画布」或深链 `?view=canvas` 进入（tldraw 懒加载独立 chunk，不影响带货/短剧主包）。画布规划详见 [CANVAS_PLAN.md](./CANVAS_PLAN.md)。
 
-**当前能力（一期 A+B 已交付）**：
+**当前能力（一期 A+B + 二期 A/B 已交付）**：
 - **自由创作空间**：9 种 Agent 节点（需求 Brief / 素材导入 / 脚本创编 / 分镜预演 / 视频生成 / 局部重绘 / 图像生成† / 3D 运镜台† / 成片交付）自由摆放连线，画布文档 localStorage 持久化 + 多标签页同步（† 为后续阶段占位，灰态诚实标注）
 - **🖌️ 指哪改哪（v2.2 新增 · 局部重绘）**：产物卡连入重绘节点 → 笔刷涂抹 / 矩形框选涂抹重绘区（与源图同尺寸 mask PNG 落档，刷新可恢复继续编辑）→ 输入重绘指令执行 inpaint：ComfyUI 在线走真实工作流（FLUX.1 Fill / SD inpainting 预设 + 自定义 JSON，新增图像 inpaint Provider 与视频链路完全隔离），离线自动兜底演示重绘（mask 区域马赛克变换，「🧪 演示重绘 · 非真实生成」诚实标注）；重绘产物以**版本堆叠**挂在产物卡（‹ v k/N › 切换回退，上限 20 版，回退后可继续叠加重绘）
 - **对话栏编排**：一句话或场景模板 → 无 Key 走确定性演示编排（「🧪 演示编排 · 非真实 LLM」标注），配置 Key 走真实 LLM 结构化拓扑（zod 校验 + 降级诚实标注）；整批节点支持「↩️ 撤销本次编排」与 Ctrl+Z 一次回滚
+- **🧩 Skill 沉淀与复用（v2.3 新增）**：画布框选 ≥2 节点 →「📦 导出 Skill」产出 manifest JSON（节点拓扑 + zod 校验的参数槽位白名单 + 输入/输出声明；产物引用、maskRef、导入历史等设备本地产物字段自动剥离，跨设备干净可用）→「📥 导入 Skill」在新画布重建节点组（节点 id 全量重映射与现有节点共存，Ctrl+Z 精确回滚导入批次），入口节点高亮「📥 填新输入」，其余参数延续——换张商品图/换句 brief 即可重跑同拓扑。预置 2 个官方 Skill：**六步爆款带货流**（brief→product→script→storyboard→generate→deliver）与**单图快速出片**（product→generate 直连，「⚡ 单图直出 · 演示引擎」单镜生成 + 诚实标注）
+- **🧠 记忆系统（v2.3 新增 · 结构化，不玄学）**：回流记录（结构与回流看板同源）经**同一 Laplace 聚合**（`computeWinRates`，全站只此一份，不另造）得出按结构/钩子/品类胜率，画布脚本创编节点采样时自动加权并展示「📊 本条建议来自你的历史数据」徽章（无历史数据如实不显示）。双模诚实运行：伴生服务 + `WLS_STORAGE=sqlite` 时记录走 `/api/memory/records`（healthz 能力位 `memory:'sqlite'`）；纯前端模式降级本机 IndexedDB 并标注「记忆仅存本地」。设置面板可查看（条数 + 三桶胜率 top）与一键清除（清除范围明示，清除后胜率回退 0.5 先验）
 - **节点即管线**：脚本创编复用 ScriptWriter+Critic（演示模式 Critic 评分标注「非真实」）、分镜预演内嵌 GSAP 9:16 舞台（零改动复用 sell 模式组件）、视频生成走 `useVideoPipeline` 全链路（钱包两阶段事务/熔断/幂等上画布，钱包账本与六步工作台同源）
 - **产物与交付**：出片产物自动成卡（视频转存 IndexedDB，`blob:` 拒绝持久化），素材导入三入口（图片上传/视频抽帧/链接存档），交付节点一键打包剪映草稿 zip（纯前端下载）+ 内嵌钱包余额显示
 - **数据流契约**：连线带类型兼容校验（如 `分镜预演→视频生成` 合法、逆向拒绝并提示原因），边 id 跨刷新稳定，刷新后箭头自动物化恢复
 
-**诚实边界**：可灵/即梦在画布模式暂未开放（请走带货工作台，未配 Key 时如实禁用）；Mock 引擎 0 灵感币；ComfyUI 离线时局部重绘自动降级演示模式（如实标注非真实生成）；图像生成/3D 运镜台为后续阶段占位；tldraw 免费版带 License 水印（商用 License 决策待定）。
+**诚实边界**：可灵/即梦在画布模式暂未开放（请走带货工作台，未配 Key 时如实禁用）；Mock 引擎 0 灵感币；ComfyUI 离线时局部重绘自动降级演示模式（如实标注非真实生成）；单图直出仅 Mock/演示引擎（真实引擎待真实环境）；记忆系统纯前端模式仅存本机且如实标注；图像生成/3D 运镜台为后续阶段占位；tldraw 免费版带 License 水印（商用 License 决策待定）。
 
 ## 🖥️ 本地伴生服务（npx 形态，可选）
 
@@ -286,13 +288,13 @@ WebLockShot/
 │   └── HOW_TO_USE.md                 # 完整使用指南与工业化实操手册
 ├── scripts/
 │   └── optimize-preset-images.mjs    # 预设图片瘦身工具 (sharp)
-├── server/                           # 零依赖伴生服务 (静态托管 + API 反代 + 剪映草稿落盘)
+├── server/                           # 零依赖伴生服务 (静态托管 + API 反代 + 剪映草稿落盘 + 记忆记录 API)
 ├── src/
 │   ├── ai/                           # AI 智体层 (ScriptWriter, ScriptCritic, PromptPolisher, Retry)
 │   ├── assets/
 │   │   ├── hooks/                    # 爆款结构与钩子句式 JSON 数据资产（品类/情绪轴/胜率元数据）
 │   │   └── presets/                  # 商业 Mock 预设资产与产品图源
-│   ├── canvas/                       # Agent 创意画布 (CanvasDoc 契约, tldraw shape, 序列化, 持久化, 节点 Body)
+│   ├── canvas/                       # Agent 创意画布 (CanvasDoc 契约, tldraw shape, 序列化, 持久化, 节点 Body, Skill manifest, 记忆源)
 │   ├── director/                     # 导演中枢与执行引擎 (ExecutorEngine, StoryboardNode, VisualizerNode)
 │   ├── domain/                       # 领域驱动核心 (Wallet, FSM, Idempotency, Feedback, PollingConfig, ShotJob)
 │   ├── export/                       # 导出引擎 (剪映草稿三轨对齐 + 零依赖 zip 打包)
@@ -310,7 +312,7 @@ WebLockShot/
 
 ## 🧪 自动化测试验证
 
-本项目拥有完善的自动化测试保障，执行 `npm test` 验证（node 单测 + vitest UI 冒烟，共 79 项）：
+本项目拥有完善的自动化测试保障，执行 `npm test` 验证（node 单测 234 项 + vitest UI 冒烟 18 项）：
 ```bash
 > weblockshot@0.1.0 test
 # 提示词智能润色 Agent（含 LLM 输出 zod 校验）
@@ -327,7 +329,7 @@ WebLockShot/
 # TTS 引擎自适应语速算法
 # ComfyUI / 可灵 / 即梦 Provider（含网络失败显式抛错、未就绪资产不伪造）
 # UI 冒烟（vitest + testing-library）：钱包交互 / 熔断徽章三态 / 共享管线
-# tests 68 (node) + 11 (vitest), fail 0
+# tests 234 (node) + 18 (vitest), fail 0
 ```
 
 ---
