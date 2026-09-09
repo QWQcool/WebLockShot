@@ -123,7 +123,7 @@ export const CANVAS_NODE_META: Record<
     icon: '🖌️',
     phase: '2',
     accent: '#ff7eb6',
-    hint: '二期开放：框选 / 笔刷出 mask，ComfyUI inpaint 指哪改哪',
+    hint: '连入产物卡（图片/视频单帧）后笔刷 / 框选涂抹重绘区，导出 mask PNG（重绘指令 A2 接通）',
   },
   stage3d: {
     label: '3D 运镜台',
@@ -143,14 +143,15 @@ export const CANVAS_NODE_META: Record<
 
 /** 一期 A 可用的节点（1B 节点可摆放但内容为「待接通」占位；2/3 期节点为灰态） */
 export function nodeAvailability(kind: CanvasNodeKind): 'ready' | 'pending' | 'locked' {
-  // B2 script / B3 storyboard / B4 generate+asset / B5 product+deliver 蜕壳接通
+  // B2 script / B3 storyboard / B4 generate+asset / B5 product+deliver / A1 edit 蜕壳接通
   if (
     kind === 'script' ||
     kind === 'storyboard' ||
     kind === 'generate' ||
     kind === 'asset' ||
     kind === 'product' ||
-    kind === 'deliver'
+    kind === 'deliver' ||
+    kind === 'edit'
   ) {
     return 'ready'
   }
@@ -529,6 +530,47 @@ export function writeDeliverMetaPayload(
   return { ...baseMeta, ...parsed.data }
 }
 
+/* ------------------------------------------------------------------ *
+ * A1：局部重绘（edit）节点契约（CANVAS_PLAN.md §9 A1）
+ * ------------------------------------------------------------------ */
+
+/** mask PNG 大资产引用：只允许 idbref://（blob: 跨刷新失效，禁止入档） */
+const maskRefSchema = z.string().refine((u) => u.startsWith('idbref://'), {
+  message: 'maskRef 只允许 idbref:// 引用（mask PNG 与源图同尺寸落 IndexedDB，blob: 禁止持久化）',
+})
+
+/**
+ * edit 节点 meta 载荷（A1）：
+ * - sourceRef = 涂抹时的源图引用（asset 卡 url，idbref/http(s)）；mask 与源图配对，
+ *   上游更换后旧 mask 不再适用（UI 据此提示重新涂抹）；
+ * - sourceType = 'image'（图片产物）| 'video-frame'（视频单帧定格，非时序修复，UI 诚实标注）；
+ * - instruction = A2 预留字段（自然语言修改指令），本片只做契约占位。
+ */
+export const editMetaPayloadSchema = z.object({
+  maskRef: maskRefSchema,
+  sourceRef: persistentUrlSchema,
+  sourceType: z.enum(['image', 'video-frame']),
+  instruction: z.string().max(500).optional(),
+})
+export type EditMetaPayload = z.infer<typeof editMetaPayloadSchema>
+
+/** 读取：从 shape meta 解析 edit 载荷（缺失/非法返回 null，不半渲染） */
+export function readEditMetaPayload(meta: unknown): EditMetaPayload | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  const parsed = editMetaPayloadSchema.safeParse(meta)
+  return parsed.success ? parsed.data : null
+}
+
+/** 写入：edit 载荷经 zod 校验后合并进 meta（校验失败返回 null 拒写，不合格则整体失败） */
+export function writeEditMetaPayload(
+  baseMeta: Record<string, unknown>,
+  payload: EditMetaPayload
+): Record<string, unknown> | null {
+  const parsed = editMetaPayloadSchema.safeParse(payload)
+  if (!parsed.success) return null
+  return { ...baseMeta, ...parsed.data }
+}
+
 const nodeIdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/)
 
 export const canvasNodeSchema = z.object({
@@ -764,7 +806,8 @@ export const CANVAS_EDGE_COMPAT: Record<CanvasNodeKind, readonly CanvasNodeKind[
   script: ['storyboard'],
   storyboard: ['generate'],
   generate: ['asset', 'deliver'],
-  asset: ['deliver'],
+  // A1：产物卡可连入局部重绘（源图 / 视频单帧定格）
+  asset: ['deliver', 'edit'],
   edit: ['deliver'],
   stage3d: ['storyboard', 'generate'],
   deliver: [],

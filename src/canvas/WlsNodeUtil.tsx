@@ -18,6 +18,7 @@ import { ScriptNodeBody } from './ScriptNodeBody.tsx'
 import { StoryboardNodeBody } from './StoryboardNodeBody.tsx'
 import { ProductNodeBody } from './ProductNodeBody.tsx'
 import { DeliverNodeBody } from './DeliverNodeBody.tsx'
+import { EditNodeBody } from './EditNodeBody.tsx'
 
 /**
  * 画布 Agent 节点 shape（CANVAS_PLAN.md §4.1-2）。
@@ -125,6 +126,9 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
             <ProductNodeBody shape={shape} />
           ) : shape.props.kind === 'deliver' ? (
             <DeliverNodeBody shape={shape} />
+          ) : shape.props.kind === 'edit' ? (
+            // A1 局部重绘：绘图区（stage）整体阻断 pointerdown，节点拖动走标题区
+            <EditNodeBody shape={shape} />
           ) : shape.props.kind === 'script' ? (
             // 内嵌交互节点约定（B4 generate / B5 product/deliver 同此）：
             // pointerdown 冒泡阻断必须收窄到【具体控件元素】（textarea/select/button 各自

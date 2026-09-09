@@ -286,7 +286,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
                 ? [300, 340]
                 : kind === 'deliver'
                   ? [300, 400]
-                  : [260, 160]
+                  : kind === 'edit'
+                    ? [300, 460]
+                    : [260, 160]
     // B4 任务 0：初始摆放避开底部对话栏浮层（避让带 150px），防止控件被遮挡
     const y = initialNodeY(
       bounds.center.y,

@@ -19,10 +19,12 @@ import {
   buildDemoOrchestrationPlan,
   filterOrchestrationParams,
   initialNodeY,
+  nodeAvailability,
   nodeIdToShapeId,
   parseOrchestrationPlan,
   readAssetMetaPayload,
   readDeliverMetaPayload,
+  readEditMetaPayload,
   readGenerateMetaPayload,
   readProductMetaPayload,
   readScriptMetaPayload,
@@ -36,6 +38,7 @@ import {
   validateEdgeKind,
   writeAssetMetaPayload,
   writeDeliverMetaPayload,
+  writeEditMetaPayload,
   writeGenerateMetaPayload,
   writeProductMetaPayload,
   writeScriptMetaPayload,
@@ -545,7 +548,8 @@ test('B4 边兼容：generate→asset、asset→deliver 合法，asset 无其它
   const out = validateEdgeKind('asset', 'script')
   assert.equal(out.ok, false)
   assert.ok(CANVAS_EDGE_COMPAT.generate.includes('asset'))
-  assert.deepEqual([...CANVAS_EDGE_COMPAT.asset], ['deliver'])
+  // A1：产物卡新增 edit 下游（源图/视频帧送局部重绘）
+  assert.deepEqual([...CANVAS_EDGE_COMPAT.asset], ['deliver', 'edit'])
   assert.ok(CANVAS_NODE_KINDS.includes('asset'))
 })
 
@@ -853,4 +857,74 @@ test('createEmptyCanvasDoc：id/version/时间戳合法且可被校验', () => {
   assert.equal(doc.version, 1)
   assert.equal(doc.nodes.length, 0)
   assert.ok(validateCanvasDoc(doc))
+})
+
+/* ---------------- A1：局部重绘（edit）节点契约 ---------------- */
+
+test('A1 edit 节点蜕壳：nodeAvailability 转 ready，hint 去掉「二期开放」', () => {
+  assert.equal(nodeAvailability('edit'), 'ready')
+})
+
+test('A1 edit meta：合法载荷往返（idbref maskRef + image/video-frame）', () => {
+  const payload = {
+    maskRef: 'idbref://canvas-mask-n1-abc',
+    sourceRef: 'idbref://canvas-asset-import-1',
+    sourceType: 'image' as const,
+  }
+  const merged = writeEditMetaPayload({ scriptScene: 'ecommerce' }, payload)
+  assert.ok(merged)
+  assert.equal(merged.scriptScene, 'ecommerce') // baseMeta 保留
+  const back = readEditMetaPayload(merged)
+  assert.ok(back)
+  assert.equal(back.maskRef, 'idbref://canvas-mask-n1-abc')
+  assert.equal(back.sourceType, 'image')
+
+  // 视频单帧定格类型 + A2 预留 instruction 字段
+  const videoPayload = writeEditMetaPayload(
+    {},
+    { ...payload, sourceType: 'video-frame' as const, instruction: '把背景换成大理石台面' }
+  )
+  assert.ok(videoPayload)
+  const videoBack = readEditMetaPayload(videoPayload)
+  assert.ok(videoBack)
+  assert.equal(videoBack.sourceType, 'video-frame')
+  assert.equal(videoBack.instruction, '把背景换成大理石台面')
+})
+
+test('A1 edit meta：blob: maskRef 拒绝 / 非法 sourceType 拒绝 / 缺字段拒读', () => {
+  // blob: URL 跨刷新失效，mask 契约拒绝持久化
+  assert.equal(
+    readEditMetaPayload({ maskRef: 'blob:https://x/m', sourceRef: 'idbref://s', sourceType: 'image' }),
+    null
+  )
+  // sourceRef 沿用产物 url 规则：blob: 也拒绝
+  assert.equal(
+    readEditMetaPayload({ maskRef: 'idbref://m', sourceRef: 'blob:https://x/s', sourceType: 'image' }),
+    null
+  )
+  // 非法 sourceType
+  assert.equal(
+    readEditMetaPayload({ maskRef: 'idbref://m', sourceRef: 'idbref://s', sourceType: 'audio' }),
+    null
+  )
+  // 缺 maskRef / 非 object
+  assert.equal(readEditMetaPayload({ sourceRef: 'idbref://s', sourceType: 'image' }), null)
+  assert.equal(readEditMetaPayload('x'), null)
+
+  // 写入侧同样拒写（不合格则整体失败）
+  assert.equal(
+    writeEditMetaPayload({}, {
+      maskRef: 'blob:https://x/m',
+      sourceRef: 'idbref://s',
+      sourceType: 'image',
+    }),
+    null
+  )
+})
+
+test('A1 边兼容：asset→edit 合法（产物卡送局部重绘）', () => {
+  assert.deepEqual(validateEdgeKind('asset', 'edit'), { ok: true })
+  assert.deepEqual(validateEdgeKind('image', 'edit'), { ok: true })
+  assert.equal(validateEdgeKind('edit', 'asset').ok, false)
+  assert.equal(validateEdgeKind('edit', 'edit').ok, false)
 })

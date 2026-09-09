@@ -1438,6 +1438,171 @@
   overflow: hidden;
 }
 
+/* ---------- A1：局部重绘（edit）节点 mask 编辑器 ---------- */
+/* body 定高不滚动：滚动收敛在绘图区 stage 内，工具条/导出按钮常驻可见 */
+.wls-node[data-kind='edit'] .wls-node-body {
+  overflow: hidden;
+  padding: 0.15rem 0.7rem 0.3rem;
+}
+
+.wls-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  height: 100%;
+  min-height: 0;
+}
+
+.wls-edit-empty {
+  color: var(--cv-mute);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.wls-edit-empty-sub {
+  color: var(--cv-mute);
+  opacity: 0.75;
+  font-size: 0.64rem;
+}
+
+.wls-edit-frame-note {
+  color: #8a6d1a;
+  font-size: 0.64rem;
+  line-height: 1.4;
+  background: #fdf6e3;
+  border: 1px solid #f0e2b6;
+  border-radius: 8px;
+  padding: 0.18rem 0.4rem;
+}
+
+.wls-edit-stale {
+  color: #8a6d1a;
+  font-size: 0.66rem;
+  line-height: 1.4;
+  background: #fdf6e3;
+  border-radius: 8px;
+  padding: 0.16rem 0.4rem;
+}
+
+.wls-edit-loading {
+  color: var(--cv-mute);
+  font-size: 0.7rem;
+}
+
+.wls-edit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.wls-edit-tool,
+.wls-edit-tier {
+  border: 1px solid var(--cv-line);
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  border-radius: 8px;
+  font-size: 0.66rem;
+  padding: 0.16rem 0.4rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.wls-edit-tool:hover:not(:disabled),
+.wls-edit-tier:hover:not(:disabled) {
+  border-color: var(--cv-pink);
+}
+
+.wls-edit-tool.active,
+.wls-edit-tier.active {
+  background: var(--cv-pink);
+  border-color: var(--cv-pink);
+  color: #fff;
+}
+
+.wls-edit-tool:disabled,
+.wls-edit-tier:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wls-edit-tiers {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: auto;
+}
+
+.wls-edit-clear {
+  color: #c2427c;
+}
+
+.wls-edit-stage {
+  border: 1px dashed var(--cv-pink);
+  border-radius: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #10222b;
+  flex: 1 1 auto;
+  min-height: 80px;
+}
+
+.wls-edit-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.wls-edit-canvas.rect-mode {
+  cursor: cell;
+}
+
+.wls-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.wls-edit-export {
+  flex: none;
+  border: none;
+  background: var(--cv-pink);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.26rem 0.6rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.wls-edit-export:hover:not(:disabled) {
+  background: #e8649f;
+}
+
+.wls-edit-export:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wls-edit-stored {
+  color: var(--cv-mute);
+  font-size: 0.62rem;
+}
+
+.wls-edit-error {
+  color: #c2427c;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.wls-edit-ok {
+  color: #1a8a6d;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
 /* ---------- 响应式（对齐项目断点：<768px 单栏） ---------- */
 @media (max-width: 768px) {
   .wls-canvas-body {
