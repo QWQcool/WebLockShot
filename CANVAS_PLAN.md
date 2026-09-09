@@ -1,6 +1,7 @@
 # CANVAS_PLAN.md — WebLockShot 「Agent 创意画布」规划（一期 ~ 三期）
 
-> 版本：**v1.1**（2026-09-08）· 基线：`main` 分支现状（sell / drama 双模式 + 工业化底座）
+> 版本：**v1.4**（2026-09-09）· 基线：`main` 分支现状（sell / drama 双模式 + 工业化底座）
+> **v1.4 变更**（二期 B 开工）：二期 B 按 B1~B6 / A1~A2 同款双 Agent 流水线执行，细化为三个子切片 S1~S3（见 §9）；S2 明确解锁 **product → generate 单图直出连线通道**（官方 Skill「单图快速出片」要求直连，见 §5.2 增补），其余连线契约不变。
 > **v1.1 变更**（一期 A 实机验收后反馈返工）：① 设计语言从深色夜舱改为 **初音青 × Miroa 浅色工作室风**（对齐参考稿：浅色画布/白卡/圆角/柔和阴影）；② 定位从电商带货扩为**多元化创意工作室**（节点改名「素材/脚本/视频生成」，新增 `image` 图像生成节点 + 5 类场景模板：带货短视频/品牌视觉/短剧分镜/游戏宣传/App 界面）；③ 新增**对话栏**（对齐 Miora 图1 底部大输入卡 + 模板快捷入口，一期 A 一句话落 Brief 节点，接 LLM 编排是一期 B）；④ 剧情短剧顶栏补画布切换入口。
 > 本文是画布模式的**唯一规格**，风格对齐 `PLAN.md` / `UPGRADE_PLAN.md`。未写进「要做」的一律不做。
 > 决策已锁定（用户拍板，不再讨论）：
@@ -146,6 +147,7 @@ type CanvasEdge = { id: string; from: string; to: string }
 1. **画布区域 → Skill 包**：框选一组节点 + 连线 + 参数，导出为 Skill manifest（JSON：节点拓扑 + zod 校验过的参数槽位 + 输入/输出声明）
 2. **一键复用**：导入 Skill 包 → 画布上重建节点组，只要求用户填新输入（换商品图/换 brief），其余参数延续
 3. 预置 2 个官方 Skill：**六步爆款带货流**（现有管线拓扑）、**单图快速出片**（product → generate 直连）
+   - **v1.4 增补（product → generate 直连通道）**：`CANVAS_EDGE_COMPAT` 扩展允许 `product → generate`；generate 节点在**仅有 product 上游（无 storyboard）**时进入「单图直出」模式——以商品标题为提示词走 Mock/演示引擎单镜生成，UI 如实标注「单图直出 · 演示引擎」，真实引擎（可灵/即梦）单图直出待真实环境（同主模式边界）。一期 §4.1-4 中「product → generate 拒绝」的示例自二期 B 起仅指**其他非法连线**场景
 
 ### 5.3 记忆系统（结构化，不玄学）
 
@@ -212,7 +214,29 @@ type CanvasEdge = { id: string; from: string; to: string }
 
 ---
 
-## 9. 实现阶段与开工口令（v1.2：一期 B 细化为 B1~B6 垂直切片）
+## 9. 实现阶段与开工口令（v1.4：二期 B 细化为 S1~S3 垂直切片）
+
+> v1.4 变更：二期 B 按 B1~B6 / A1~A2 同款双 Agent 流水线执行，细化为三个子切片。
+> 红线（二期 B 全程有效）：不做多人协作/画布分享；不改 sell / drama 行为；HOW_TO_USE 不动（README 由主控收官时统一更新）。
+
+| 切片 | 内容 | 验收标准 |
+|---|---|---|
+| **S1 Skill manifest 契约 + 导出** | contract.ts 新增 SkillManifest zod 契约（version / name / nodes[槽位id+kind+相对坐标+参数] / edges[下标] / inputs 输入槽位声明 / outputs 输出声明）；**参数槽位白名单**按 kind 收窄（brief.text / product.title / script.scriptScene，产物类字段一律不入 manifest）；**大资产剥离**（idbref:// / http(s) 产物引用、maskRef、imports 历史不入 manifest——设备本地引用跨设备无意义）；画布框选（tldraw 选中集）→ 提取子拓扑 → 导出 Skill JSON 下载 | ① 契约纯函数（extract/validate/参数槽位剥离/坐标归一化）node --test 单测全过：合法 manifest 通过、非法（缺 name/空 nodes/边下标越界/产物 url 混入）整体拒绝不半渲染；② 画布框选 2+ 节点连线后导出 → JSON 文件拓扑与画布一致、参数槽位正确、产物字段已剥离；③ 框选不含任何 wls-node 时导出按钮诚实禁用/提示；④ oxlint 0 errors + 实机冒烟（真实鼠标路径框选→导出） |
+| **S2 导入复用 + 预置 2 官方 Skill** | 导入 Skill JSON → validateSkillManifest → 画布重建节点组（**节点 id 全量重映射**，避免与现有画布冲突；相对坐标落位避开对话栏）；入口节点（inputs 声明）高亮提示「填新输入」，其余参数延续 manifest；产物/大资产字段为空即如实显示未生成；预置 **六步爆款带货流**（brief→product→script→storyboard→generate→deliver）与**单图快速出片**（product→generate 直连，走 §5.2 v1.4 增补的单图直出通道，generate 节点支持仅有 product 上游的单镜演示生成 + 诚实标注） | ① 导入六步 Skill → 新画布重建 6 节点 5 边，拓扑/场景参数与 manifest 一致；② 填新输入（换商品标题）→ script/storyboard/generate（Mock 单图直出/分镜链路）可跑通；③ 导入非法 JSON 整体拒绝并提示原因（zod 中文 reason）；④ 单图快速出片 Skill：product 填标题 → generate 单图直出演示出片 + 标注；⑤ 与现有画布节点共存不冲突（id 重映射）、Ctrl+Z 可整批撤销导入；⑥ 零回归（一期 B 全链路抽查）+ 契约单测 + 实机冒烟 |
+| **S3 记忆系统（结构化，不玄学）** | 伴生服务新增 `/api/memory/records`（GET/POST/DELETE，`WLS_STORAGE=sqlite` 时启用，非 sqlite 返回 501，/healthz 能力位 `memory: sqlite\|off`，对齐 tts/render 能力位模式）；记录结构复用 `FeedbackRecordSchema` 形状；**聚合层强制复用 src/domain/feedback.ts 的 `computeWinRates`（Laplace），不另造一套**；script 节点生成时注入 `getWinRateLookup()`（服务端模式：records 从伴生服务拉取后走同一聚合），命中历史数据时节点展示「📊 本条建议来自你的历史数据」徽章；纯前端模式降级本地（回流记录 IndexedDB + 偏好 localStorage）并如实标注能力边界；设置面板新增记忆区块：查看（条数/按结构·钩子·品类胜率）+ 清除（隐私诚实，清除范围明示） | ① 服务端单测：sqlite 模式 records 增/查/清 + 非 sqlite 501 + healthz 能力位；② 聚合复用验证：服务端模式与本地模式产出同一 `computeWinRates` 聚合（单测双路对拍）；③ script 节点注入回流记录后，生成的钩子加权可复现（与 sell 模式 ScriptWriter 采样同源），节点徽章按「有历史数据」如实显隐；④ 无伴生服务/非 sqlite 时 UI 标注「纯前端模式 · 记忆仅存本地」；⑤ 设置面板查看/清除真实可用（清除后胜率回退先验）；⑥ sell / drama 零回归（含回流看板）+ 契约单测 + 实机冒烟 |
+
+每片完成后：开发 Agent 自测（`npm run build` + `npm test` 全绿 + oxlint 0 errors + 真实鼠标路径 Playwright 实测）→ 汇报 → 测试 Agent 独立验收 → PASS 后由主控提交并推送该切片，再进下一片。全部完成后 README 画布能力清单统一更新。
+
+### 二期 A（已完成归档，A1~A2）
+
+| 切片 | 内容 | 验收标准 |
+|---|---|---|
+| **A1 mask 编辑器 + edit 节点蜕壳** | edit 节点接通 asset 上游（image/video 均可，视频取单帧定格）；节点内嵌 mask 覆盖层（Canvas2D：笔刷涂抹 + 矩形框选两种模式，粗细可调，可清空重涂）；「导出 mask」产白=重绘区的 mask PNG（与源图同尺寸）走 assetStore 落档 | ① asset 卡连入 edit 节点 → 节点内显示源图并可涂抹，笔刷/矩形/清空真实鼠标可用（控件级 stopPropagation 约定）；② 导出 mask 后 meta.maskRef（idbref）+ meta.sourceRef 落盘，F5 可恢复涂抹结果重新编辑；③ mask PNG 尺寸与源图一致、重绘区为白色；④ 视频/非图产物连入时单帧定格 + 诚实标注「单帧重绘回贴，非时序修复」；⑤ 契约单测 + 实机冒烟 |
+| **A2 重绘链路 + 版本堆叠卡** | mask + 指令 → ComfyUI 图像 inpaint 工作流（新增图像 Provider 路径：/upload/image 上传源图+mask → /prompt → 轮询 → /view 取回）；无 ComfyUI 时**演示重绘**兜底（客户端按 mask 区域做可见色彩变换，标「🧪 演示重绘 · 非真实生成」）；产物版本堆叠在 asset 卡（meta.versions 数组，可回退切换，当前版本高亮）；edit→asset（或直接更新原卡）回流 | ① 演示模式全链路：涂抹 → 输入指令 → 重绘 → 新版本入堆叠、版本间切换回退可用；② ComfyUI 在线（/healthz 或 testConnection 探测）时走真实 inpaint，离线时灰态+演示兜底诚实标注；③ 重绘产物 url 契约同 B4（idbref，blob: 拒）；④ 多轮重绘版本只增不乱、回退后可再重绘；⑤ 零回归（一期 B 全链路抽查）+ 实机冒烟 |
+
+二期 A 交付后 README 更新能力清单（HOW_TO_USE 仍不动）。
+
+### 一期 B（已完成归档，B1~B6）
 
 > 执行模式（用户拍板）：**双 Agent 流水线** —— 开发 Agent 逐片实现，每片完成即由测试 Agent 验收
 > （build + npm test 全绿 + Playwright 实机冒烟），验收通过后**提交并推送**该切片，再进下一片。
