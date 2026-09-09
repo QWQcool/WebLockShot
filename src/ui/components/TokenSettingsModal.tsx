@@ -6,6 +6,9 @@ import {
   COMFY_URL_STORAGE_KEY,
   COMFY_PRESET_STORAGE_KEY,
 } from '../../media/providers/comfyui.ts'
+import { resolveMemorySource, type MemorySource } from '../../canvas/memorySource.ts'
+import { clearMemoryRecords } from '../../services/companion/memoryClient.ts'
+import { clearAllFeedbackRecords } from '../../domain/feedback.ts'
 
 type Props = {
   isOpen: boolean
@@ -57,6 +60,50 @@ export const TokenSettingsModal: React.FC<Props> = ({
     msg?: string
   }>({ testing: false })
   const [saveSuccess, setSaveSuccess] = useState(false)
+
+  // S3 记忆区块：双模聚合源 + 清除状态
+  const [memory, setMemory] = useState<MemorySource | null>(null)
+  const [memoryBusy, setMemoryBusy] = useState(false)
+  const [memoryMsg, setMemoryMsg] = useState<string | null>(null)
+
+  const loadMemory = async () => {
+    setMemoryBusy(true)
+    setMemoryMsg(null)
+    try {
+      setMemory(await resolveMemorySource())
+    } finally {
+      setMemoryBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      void loadMemory()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
+  const handleClearMemory = async () => {
+    if (memoryBusy || !memory) return
+    setMemoryBusy(true)
+    setMemoryMsg(null)
+    try {
+      if (memory.mode === 'server') {
+        const r = await clearMemoryRecords()
+        setMemoryMsg(
+          r.ok
+            ? `✓ 已清除伴生服务端全部 ${r.cleared} 条回流记录（跨刷新持久化数据），胜率回退先验 0.5`
+            : `⚠️ 清除失败：${r.error}`
+        )
+      } else {
+        await clearAllFeedbackRecords()
+        setMemoryMsg('✓ 已清除本机 IndexedDB 全部回流记录（仅本机数据），胜率回退先验 0.5')
+      }
+      setMemory(await resolveMemorySource())
+    } finally {
+      setMemoryBusy(false)
+    }
+  }
 
   useEffect(() => {
     try {
@@ -406,6 +453,83 @@ export const TokenSettingsModal: React.FC<Props> = ({
                 </small>
               </div>
             )}
+          </div>
+
+          {/* 模块 C：S3 记忆系统（结构化，不玄学） */}
+          <div className="settings-section">
+            <div className="section-title-bar">
+              <h4>3. 记忆（回流偏好 · 结构化胜率）</h4>
+              <span className="section-tag">
+                {memory ? (memory.mode === 'server' ? '伴生服务 sqlite' : '纯前端模式') : '探测中…'}
+              </span>
+            </div>
+
+            <div className="security-notice-box">
+              <span className="security-icon">🧠</span>
+              <div className="security-text">
+                {memory?.mode === 'server' ? (
+                  <>
+                    <strong>服务端记忆模式：</strong>回流记录存于本地伴生服务（sqlite，跨刷新持久化）。
+                    script 节点生成时按你的历史胜率加权采样钩子。
+                  </>
+                ) : (
+                  <>
+                    <strong>纯前端模式 · 记忆仅存本地：</strong>
+                    回流记录存于本机 IndexedDB，不上传任何服务器；接入以 <code>WLS_STORAGE=sqlite</code>
+                    启动的伴生服务后可升级为服务端记忆。
+                  </>
+                )}
+              </div>
+            </div>
+
+            {memory && (
+              <div className="memory-stats">
+                <div className="hint-text" style={{ marginBottom: '0.4rem' }}>
+                  共 {memory.records.length} 条回流记录 · 胜率 = Laplace 平滑（(胜+1)/(试+2)，样本少自动趋近 0.5 先验）
+                </div>
+                {(['byTemplate', 'byHook', 'byCategory'] as const).map((bucket) => {
+                  const label =
+                    bucket === 'byTemplate' ? '按结构' : bucket === 'byHook' ? '按钩子' : '按品类'
+                  const top = [...memory.aggregate[bucket].entries()]
+                    .sort((a, b) => b[1].trials - a[1].trials)
+                    .slice(0, 3)
+                  return (
+                    <div key={bucket} className="memory-bucket">
+                      <strong>{label}：</strong>
+                      {top.length === 0 ? (
+                        <span className="hint-text">暂无数据</span>
+                      ) : (
+                        top.map(([key, stat]) => (
+                          <span key={key} className="memory-stat-chip" title={key}>
+                            {key}：{stat.wins}胜/{stat.trials}试 · {(stat.winRate * 100).toFixed(0)}%
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {memoryMsg && (
+              <div className="comfy-ping-banner success" role="status">
+                {memoryMsg}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ marginTop: '0.6rem' }}
+              disabled={memoryBusy || !memory || memory.records.length === 0}
+              onClick={() => void handleClearMemory()}
+            >
+              {memoryBusy ? '处理中…' : '🗑️ 清除全部记忆'}
+            </button>
+            <small className="hint-text" style={{ display: 'block', marginTop: '0.3rem' }}>
+              清除范围：{memory?.mode === 'server' ? '伴生服务端全部回流记录（sqlite 持久化数据）' : '本机 IndexedDB 全部回流记录'}。
+              清除后胜率回退 0.5 先验，钩子采样恢复均匀分布；不影响画布文档与已生成产物。
+            </small>
           </div>
         </div>
 

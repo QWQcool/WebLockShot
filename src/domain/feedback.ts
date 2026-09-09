@@ -131,6 +131,21 @@ export function computeWinRates(records: FeedbackRecord[]): WinRateAggregate {
 }
 
 /**
+ * 胜率查询器构建（纯函数）：注入 ScriptWriter 的钩子加权采样。
+ * S3 双模共用：server 模式（records 来自 /api/memory/records）与本地模式（IndexedDB）
+ * 产出同一聚合（computeWinRates），由此函数统一构建 lookup——不另造聚合。
+ */
+export function buildWinRateLookup(
+  records: FeedbackRecord[]
+): ((templateId: string, hookIndex: number) => number | undefined) | undefined {
+  if (records.length === 0) return undefined
+  const { byHook } = computeWinRates(records)
+  return (templateId: string, hookIndex: number) => {
+    return byHook.get(`${templateId}#${hookIndex}`)?.winRate
+  }
+}
+
+/**
  * 胜率查询器：注入 ScriptWriter 的钩子加权采样；
  * 无数据或非浏览器环境返回 undefined，采样自动回退先验。
  */
@@ -138,9 +153,20 @@ export async function getWinRateLookup(): Promise<
   ((templateId: string, hookIndex: number) => number | undefined) | undefined
 > {
   const records = await getAllFeedbackRecords()
-  if (records.length === 0) return undefined
-  const { byHook } = computeWinRates(records)
-  return (templateId: string, hookIndex: number) => {
-    return byHook.get(`${templateId}#${hookIndex}`)?.winRate
+  return buildWinRateLookup(records)
+}
+
+/** 清空全部回流记录（S3 设置面板「清除」纯前端路径；Node/无 IndexedDB 环境静默成功） */
+export async function clearAllFeedbackRecords(): Promise<void> {
+  try {
+    const db = await openDb()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite')
+      tx.objectStore(STORE_NAME).clear()
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error || new Error('清空回流数据失败'))
+    })
+  } catch {
+    // 非浏览器环境/存储不可用：静默成功（调用方 UI 会如实标注实际模式）
   }
 }

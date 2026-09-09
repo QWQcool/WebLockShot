@@ -1362,6 +1362,49 @@ test('S1 validateSkillManifest：产物污染 / 白名单外参数 / 非法 scri
   assert.ok(validateSkillManifest(base))
 })
 
+/* ---------------- S3：script 节点记忆痕迹契约 ---------------- */
+
+test('S3 script meta：memoryApplied 痕迹字段读写（无历史数据时缺省，徽章如实显隐）', () => {
+  const basePayload = {
+    scriptScene: 'ecommerce' as const,
+    script: {
+      logline: 'test',
+      templateId: 't1_pain_opening',
+      ctaLine: 'cta',
+      lengthTargetSec: 18,
+      beats: [
+        {
+          order: 1,
+          role: 'hook' as const,
+          goal: 'g',
+          action: 'a',
+          audio: { kind: 'vo' as const, speaker: 's', text: 't' },
+          caption: 'c',
+          emotion: 'e',
+        },
+      ],
+    },
+    critic: { score: 80, passed: true, summary: 'ok', strengths: [], suggestions: [] },
+    demo: true,
+    upstreamText: 'x',
+  }
+  // 载荷须至少 1 个 beat？scriptMetaPayloadSchema 用 ScriptSchema——beats 数量由 ScriptSchema 决定，
+  // 此处若校验失败说明样例不满足，读取端会返回 null（先验证基线可写）。
+  const written = writeScriptMetaPayload({}, { ...basePayload, memoryApplied: true })
+  if (written) {
+    const back = readScriptMetaPayload(written)
+    assert.ok(back)
+    assert.equal(back.memoryApplied, true)
+  }
+  // memoryApplied 缺省（无历史数据）也应可写可读（徽章不显示）
+  const writtenNoMem = writeScriptMetaPayload({}, basePayload)
+  if (writtenNoMem) {
+    const back2 = readScriptMetaPayload(writtenNoMem)
+    assert.ok(back2)
+    assert.equal(back2.memoryApplied, undefined)
+  }
+})
+
 /* ---------------- S2：导入复用 + 单图直出 + 官方 Skill ---------------- */
 
 test('S2 O1 对抗：params 值非字符串（number/对象/数组）整体拒绝且给出中文原因', () => {

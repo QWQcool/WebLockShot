@@ -220,6 +220,8 @@ export const scriptMetaPayloadSchema = z.object({
   demo: z.boolean(),
   /** 生成时使用的需求文本快照（上游 Brief 或手动输入），用于「上游已更新」同步提示 */
   upstreamText: z.string().max(2000),
+  /** S3：生成时注入了记忆胜率加权（有历史数据）——「📊 本条建议来自你的历史数据」徽章依据 */
+  memoryApplied: z.boolean().optional(),
 })
 export type ScriptMetaPayload = z.infer<typeof scriptMetaPayloadSchema>
 

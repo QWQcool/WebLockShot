@@ -17,6 +17,12 @@ export type ScriptWriterInput = {
   category?: string
   tokenConfig?: TokenConfig | null
   platform?: string
+  /**
+   * S3：显式注入钩子胜率查询器（画布 script 节点双模记忆：server records / IndexedDB 均由
+   * 调用方经 buildWinRateLookup 构建后传入）。未传时保持既有行为（内部走 IndexedDB），
+   * sell 模式零改动。
+   */
+  hookWinRateLookup?: WinRateLookup
 }
 
 /**
@@ -170,13 +176,15 @@ export async function writeScript(input: ScriptWriterInput): Promise<Script> {
     STRUCTURE_TEMPLATES.find((t) => t.id === routedTemplateId) ||
     STRUCTURE_TEMPLATES[0]
 
-  // 回流胜率查询器（IndexedDB 不可用时优雅降级为均匀先验）
-  let hookWinRateLookup: WinRateLookup | undefined
-  try {
-    const { getWinRateLookup } = await import('../../domain/feedback.ts')
-    hookWinRateLookup = await getWinRateLookup()
-  } catch {
-    // 测试/非浏览器环境：忽略
+  // 回流胜率查询器：显式注入优先（S3 画布双模记忆）；未传时走既有 IndexedDB 逻辑
+  let hookWinRateLookup = input.hookWinRateLookup
+  if (!hookWinRateLookup) {
+    try {
+      const { getWinRateLookup } = await import('../../domain/feedback.ts')
+      hookWinRateLookup = await getWinRateLookup()
+    } catch {
+      // 测试/非浏览器环境：忽略
+    }
   }
 
   // 如果没有配 key，走纯前端高质量规则扩写器（0 key 演示模式）

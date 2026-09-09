@@ -2327,6 +2327,34 @@ textarea:focus-visible {
   margin-bottom: 0.85rem;
 }
 
+/* S3：记忆区块（胜率 chips，紧凑排布） */
+.memory-stats {
+  margin: 0.5rem 0;
+}
+
+.memory-bucket {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+}
+
+.memory-stat-chip {
+  border: 1px solid var(--wls-border);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.08);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .section-title-bar h4 {
   margin: 0;
   font-size: 0.92rem;

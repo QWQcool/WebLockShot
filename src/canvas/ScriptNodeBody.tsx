@@ -16,6 +16,7 @@ import {
   type ScriptMetaPayload,
 } from './contract.ts'
 import type { WlsNodeShape } from './WlsNodeUtil.tsx'
+import { resolveMemorySource } from './memorySource.ts'
 
 /**
  * B2 脚本创编节点内嵌 UI（CANVAS_PLAN.md §9 B2）。
@@ -123,14 +124,20 @@ export function ScriptNodeBody({ shape }: { shape: WlsNodeShape }) {
     try {
       const token = readTokenConfig()
       const demo = !token?.apiKey?.trim()
+      // S3 双模记忆：server 模式（sqlite 伴生服务）/本地模式（IndexedDB）同一聚合构建 lookup
+      const memory = await resolveMemorySource()
       const { productTitle, sellingPoints } = briefTextToWriterInput(effectiveText)
       const script = await writeScript({
         productTitle,
         sellingPoints,
         templateId: SCRIPT_SCENE_TEMPLATE_ID[scene],
         tokenConfig: demo ? null : token,
+        hookWinRateLookup: memory.lookup,
       })
       const review = await critiqueScript(script, demo ? null : token)
+      // 注意：tldraw meta 的 T.jsonValue 不接受 undefined 键值——无历史数据时必须整键省略
+      //（不能写 memoryApplied: undefined），且从 baseMeta 剔除上一轮痕迹（清除记忆后徽章如实消失）
+      const { memoryApplied: _stale, ...baseMeta } = meta
       const payload: ScriptMetaPayload = {
         scriptScene: scene,
         script,
@@ -143,8 +150,9 @@ export function ScriptNodeBody({ shape }: { shape: WlsNodeShape }) {
         },
         demo,
         upstreamText: effectiveText,
+        ...(memory.lookup ? { memoryApplied: true } : {}),
       }
-      const nextMeta = writeScriptMetaPayload({ ...meta }, payload)
+      const nextMeta = writeScriptMetaPayload({ ...baseMeta }, payload)
       if (!nextMeta) {
         setError('脚本结果未通过契约校验，已拒绝写入（诚实失败，不半渲染）')
         return
@@ -241,6 +249,14 @@ export function ScriptNodeBody({ shape }: { shape: WlsNodeShape }) {
             ) : (
               <span className="wls-script-badge-real" title="真实 LLM 结构化脚本 + Critic 评分">
                 ✓ 真实 LLM
+              </span>
+            )}
+            {result.memoryApplied && (
+              <span
+                className="wls-script-badge-memory"
+                title="钩子采样已按你的回流历史胜率加权（无历史数据时此徽章不显示）"
+              >
+                📊 本条建议来自你的历史数据
               </span>
             )}
             <span className="wls-script-badge-scene">{SCRIPT_SCENE_LABEL[result.scriptScene]}</span>

@@ -420,6 +420,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       const orchestrationId = `orch-${Date.now().toString(36)}`
       const bounds = editor.getViewportPageBounds()
       const nodeShapeIds: TLShapeId[] = []
+      // S3（主控批准并入）：编程式 run 不自动打 history mark，对齐 S2 导入修复——
+      // 保证 Ctrl+Z 精确回滚本次编排批次，不连带撤销用户之前的操作
+      editor.markHistoryStoppingPoint()
       editor.run(() => {
         plan.nodes.forEach((node, index) => {
           const nodeId = createNodeId()

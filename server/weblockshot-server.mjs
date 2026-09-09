@@ -36,6 +36,7 @@ import { createLogger } from './logger.mjs'
 import { createStorage } from './storage.mjs'
 import { createTtsHandler, createTtsFileHandler } from './tts.mjs'
 import { createRenderHandler, createRenderFileHandler, detectFfmpeg, RENDER_DEFAULT_TIMEOUT_SEC } from './render.mjs'
+import { createMemoryHandler } from './memory.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const STARTED_AT = Date.now()
@@ -505,6 +506,10 @@ export async function startServer(opts = {}) {
   })
   const renderFileHandler = createRenderFileHandler({ renderDir })
 
+  // 记忆系统能力（S3）：仅 sqlite 存储模式启用（跨刷新持久化）；healthz 能力位 memory: sqlite|off
+  const memoryEnabled = opts.memory !== undefined ? opts.memory : storage.mode === 'sqlite'
+  const memoryHandler = createMemoryHandler({ enabled: memoryEnabled, storage, logger })
+
   const healthPayload = () => ({
     ok: true,
     version: PKG_VERSION,
@@ -518,6 +523,7 @@ export async function startServer(opts = {}) {
     // 能力位（P1 前端探测后才显示新按钮）
     tts: args.tts,
     ffmpeg: ffmpegEnabled && ffmpegPath ? 'on' : 'off',
+    memory: memoryEnabled ? 'sqlite' : 'off',
   })
 
   /** 校验共享 token：x-wls-token 头或 Authorization: Bearer <token> */
@@ -573,6 +579,19 @@ export async function startServer(opts = {}) {
       // 预留接口：未配置 WLS_LLM_TARGET 时明确 501，而非静默 404
       sendJson(res, 501, {
         error: 'LLM 反代未启用（预留接口）。设置 WLS_LLM_TARGET 后本路由将反向代理至目标 LLM API。',
+      })
+      return
+    }
+
+    // 记忆系统（S3）：/api/memory/records（GET/POST/DELETE，sqlite 存储模式启用，否则 501）
+    if (urlPath === '/api/memory/records') {
+      memoryHandler(req, res, urlPath).catch((err) => {
+        logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, 'memory 处理异常')
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: 'memory 内部错误' })
+        } else {
+          res.end()
+        }
       })
       return
     }
