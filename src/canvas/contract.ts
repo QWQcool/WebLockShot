@@ -415,6 +415,25 @@ export function writeGenerateMetaPayload(
   return { ...baseMeta, ...parsed.data }
 }
 
+/** 可持久化产物引用：idbref:// 或 http(s) 直链（blob: 跨刷新失效，禁止入档）——asset/product/版本条目共用 */
+const persistentUrlSchema = z
+  .string()
+  .refine(
+    (u) => u.startsWith('idbref://') || u.startsWith('http://') || u.startsWith('https://'),
+    { message: '产物 url 只允许 idbref:// 引用或 http(s) 直链（blob: 跨刷新失效，禁止持久化）' }
+  )
+
+/** A2：重绘版本条目（版本堆叠卡，最新在前） */
+export const assetVersionSchema = z.object({
+  url: persistentUrlSchema,
+  /** 产生该版本的重绘指令（如实记录版本链） */
+  instruction: z.string().max(500),
+  /** true = 离线演示重绘（客户端色彩变换），UI 必须标「🧪 演示重绘 · 非真实生成」 */
+  demo: z.boolean(),
+  createdAt: z.number().finite().positive(),
+})
+export type AssetVersion = z.infer<typeof assetVersionSchema>
+
 /** 产物卡（kind='asset'）meta 载荷：大资产只存引用（idbref://），blob URL 绝不入档 */
 export const assetMetaPayloadSchema = z.object({
   /** B5：扩展 'image'（素材导入产物：上传图片 / 视频抽帧） */
@@ -427,6 +446,10 @@ export const assetMetaPayloadSchema = z.object({
   shotId: z.string().min(1),
   createdAt: z.number().finite().positive(),
   title: z.string().max(120).optional(),
+  /** A2：原始素材 url（首次重绘时固化，作为版本回退终点） */
+  baseUrl: persistentUrlSchema.optional(),
+  /** A2：重绘版本堆叠（最新在前），上限 20 条，超出截断最旧并如实提示 */
+  versions: z.array(assetVersionSchema).max(20).optional(),
 })
 export type AssetMetaPayload = z.infer<typeof assetMetaPayloadSchema>
 
@@ -443,6 +466,70 @@ export function writeAssetMetaPayload(
   const parsed = assetMetaPayloadSchema.safeParse(payload)
   if (!parsed.success) return null
   return { ...baseMeta, ...parsed.data }
+}
+
+/* ------------------------------------------------------------------ *
+ * A2：重绘版本堆叠纯函数（node --test 可跑）
+ * ------------------------------------------------------------------ */
+
+/** 版本堆叠上限：超出截断最旧并如实提示（契约层同步 .max(20) 拒绝） */
+export const ASSET_VERSIONS_MAX = 20
+
+export type AssetVersionSlot = { url: string; demo: boolean; instruction: string | null }
+
+/** 版本槽位序列（时间序）：槽 0 = 原始素材（baseUrl，不可变），槽 1..N = 重绘版本由旧到新 */
+export function assetVersionSlots(payload: AssetMetaPayload): AssetVersionSlot[] {
+  const slots: AssetVersionSlot[] = [{ url: payload.baseUrl ?? payload.url, demo: false, instruction: null }]
+  for (const v of [...(payload.versions ?? [])].reverse()) {
+    slots.push({ url: v.url, demo: v.demo, instruction: v.instruction })
+  }
+  return slots
+}
+
+/** 当前显示槽位下标（meta.url 与槽位 url 匹配；不匹配时回退原始素材槽） */
+export function assetCurrentSlotIndex(payload: AssetMetaPayload): number {
+  const idx = assetVersionSlots(payload).findIndex((s) => s.url === payload.url)
+  return idx >= 0 ? idx : 0
+}
+
+/**
+ * 版本切换纯函数：dir = -1 向旧版本 / +1 向新版本；越界返回 null（不回绕，UI 禁用按钮）。
+ * 返回值直接作为新的 meta.url。
+ */
+export function switchAssetVersion(payload: AssetMetaPayload, dir: -1 | 1): string | null {
+  const slots = assetVersionSlots(payload)
+  const next = assetCurrentSlotIndex(payload) + dir
+  if (next < 0 || next >= slots.length) return null
+  return slots[next].url
+}
+
+/**
+ * 追加重绘版本（最新在前）：首次重绘固化 baseUrl（原始素材），meta.url 指向新版本。
+ * 超出 ASSET_VERSIONS_MAX 截断最旧并返回截断数（调用方如实提示）。
+ * 校验失败（如 blob: url）返回 null 拒写——不合格则整体失败。
+ */
+export function appendAssetVersion(
+  baseMeta: Record<string, unknown>,
+  entry: { url: string; instruction: string; demo: boolean; createdAt: number }
+): { meta: Record<string, unknown>; truncated: number } | null {
+  const current = readAssetMetaPayload(baseMeta)
+  if (!current) return null
+  const versions = [
+    { url: entry.url, instruction: entry.instruction, demo: entry.demo, createdAt: entry.createdAt },
+    ...(current.versions ?? []),
+  ]
+  const truncated = Math.max(0, versions.length - ASSET_VERSIONS_MAX)
+  const merged = writeAssetMetaPayload(
+    { ...baseMeta },
+    {
+      ...current,
+      baseUrl: current.baseUrl ?? current.url,
+      url: entry.url,
+      versions: versions.slice(0, ASSET_VERSIONS_MAX),
+    }
+  )
+  if (!merged) return null
+  return { meta: merged, truncated }
 }
 
 /**
@@ -464,14 +551,6 @@ export function initialNodeY(
 /* ------------------------------------------------------------------ *
  * B5：素材导入（product）+ 成片交付（deliver）节点契约
  * ------------------------------------------------------------------ */
-
-/** 可持久化产物引用：idbref:// 或 http(s) 直链（blob: 跨刷新失效，禁止入档）——与 asset url 规则一致 */
-const persistentUrlSchema = z
-  .string()
-  .refine(
-    (u) => u.startsWith('idbref://') || u.startsWith('http://') || u.startsWith('https://'),
-    { message: '产物 url 只允许 idbref:// 引用或 http(s) 直链（blob: 跨刷新失效，禁止持久化）' }
-  )
 
 /** product 节点单条导入记录 */
 export const productImportItemSchema = z.object({

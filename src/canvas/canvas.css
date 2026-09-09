@@ -1603,6 +1603,145 @@
   line-height: 1.4;
 }
 
+/* A2：重绘指令区 */
+.wls-edit-inpaint {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.wls-edit-instruction,
+.wls-edit-custom-json {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--cv-line);
+  border-radius: 8px;
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  font-size: 0.7rem;
+  padding: 0.3rem 0.45rem;
+  resize: vertical;
+  min-height: 2.4rem;
+  font-family: var(--body);
+}
+
+.wls-edit-custom-json {
+  min-height: 3.6rem;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+}
+
+.wls-edit-instruction:focus-visible,
+.wls-edit-custom-json:focus-visible {
+  outline: 2px solid var(--cv-pink);
+  outline-offset: 0;
+}
+
+.wls-edit-inpaint-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.wls-edit-probe {
+  flex: none;
+  font-size: 0.62rem;
+  border-radius: 999px;
+  padding: 0.08rem 0.45rem;
+  border: 1px solid var(--cv-line);
+  color: var(--cv-mute);
+}
+
+.wls-edit-probe-online {
+  color: #1a8a6d;
+  border-color: #9adbc8;
+  background: #ecf9f4;
+}
+
+.wls-edit-probe-offline {
+  color: #8a6d1a;
+  border-color: #f0e2b6;
+  background: #fdf6e3;
+}
+
+.wls-edit-preset {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--cv-line);
+  border-radius: 8px;
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  font-size: 0.66rem;
+  padding: 0.2rem 0.35rem;
+}
+
+.wls-edit-redraw {
+  flex: none;
+  border: none;
+  background: var(--cv-pink);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.wls-edit-redraw:hover:not(:disabled) {
+  background: #e8649f;
+}
+
+.wls-edit-redraw:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* A2：产物卡版本堆叠 */
+.wls-asset-versions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.wls-asset-ver-btn {
+  flex: none;
+  width: 1.5rem;
+  border: 1px solid var(--cv-line);
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  padding: 0.1rem 0;
+  cursor: pointer;
+}
+
+.wls-asset-ver-btn:hover:not(:disabled) {
+  border-color: var(--cv-miku);
+  color: var(--cv-miku-deep);
+}
+
+.wls-asset-ver-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.wls-asset-ver-pos {
+  flex: 1;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: #fff;
+  background: var(--cv-miku);
+  border-radius: 999px;
+  padding: 0.08rem 0.45rem;
+}
+
+.wls-asset-ver-demo {
+  background: var(--cv-pink);
+}
+
 /* ---------- 响应式（对齐项目断点：<768px 单栏） ---------- */
 @media (max-width: 768px) {
   .wls-canvas-body {

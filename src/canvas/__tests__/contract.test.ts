@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  ASSET_VERSIONS_MAX,
   CANVAS_DOC_KEY,
   CANVAS_EDGE_COMPAT,
   CANVAS_NODE_KINDS,
@@ -10,6 +11,9 @@ import {
   WLS_ARROW_SHAPE_PREFIX,
   arrowShapeIdToEdgeId,
   arrowSnapshotsToEdges,
+  appendAssetVersion,
+  assetCurrentSlotIndex,
+  assetVersionSlots,
   briefTextToWriterInput,
   canvasNodeToShapePartial,
   createEmptyCanvasDoc,
@@ -34,6 +38,7 @@ import {
   routeOrchestrationScene,
   shapeIdToNodeId,
   shapeSnapshotToCanvasNode,
+  switchAssetVersion,
   validateCanvasDoc,
   validateEdgeKind,
   writeAssetMetaPayload,
@@ -927,4 +932,165 @@ test('A1 边兼容：asset→edit 合法（产物卡送局部重绘）', () => {
   assert.deepEqual(validateEdgeKind('image', 'edit'), { ok: true })
   assert.equal(validateEdgeKind('edit', 'asset').ok, false)
   assert.equal(validateEdgeKind('edit', 'edit').ok, false)
+})
+
+/* ---------------- A2：重绘版本堆叠契约 ---------------- */
+
+/** 构造基础 asset meta（B5 形状） */
+function makeAssetMeta(): Record<string, unknown> {
+  return {
+    type: 'image',
+    url: 'idbref://canvas-asset-base',
+    shotId: 'import-1',
+    createdAt: 1000,
+    title: '吹风机',
+  }
+}
+
+test('A2 appendAssetVersion：首次重绘固化 baseUrl，meta.url 指向新版本，最新在前', () => {
+  const base = makeAssetMeta()
+  const r1 = appendAssetVersion(base, {
+    url: 'idbref://canvas-inpaint-v1',
+    instruction: '把背景换成大理石台面',
+    demo: true,
+    createdAt: 2000,
+  })
+  assert.ok(r1)
+  assert.equal(r1.truncated, 0)
+  const p1 = readAssetMetaPayload(r1.meta)
+  assert.ok(p1)
+  assert.equal(p1.baseUrl, 'idbref://canvas-asset-base')
+  assert.equal(p1.url, 'idbref://canvas-inpaint-v1')
+  assert.equal(p1.versions?.length, 1)
+  assert.equal(p1.versions?.[0]?.url, 'idbref://canvas-inpaint-v1')
+  assert.equal(p1.versions?.[0]?.demo, true)
+
+  // 第二轮基于当前显示版本叠加：versions 只增不乱
+  const r2 = appendAssetVersion(r1.meta, {
+    url: 'idbref://canvas-inpaint-v2',
+    instruction: '再加一杯咖啡',
+    demo: false,
+    createdAt: 3000,
+  })
+  assert.ok(r2)
+  const p2 = readAssetMetaPayload(r2.meta)
+  assert.ok(p2)
+  assert.equal(p2.url, 'idbref://canvas-inpaint-v2')
+  assert.deepEqual(
+    p2.versions?.map((v) => v.url),
+    ['idbref://canvas-inpaint-v2', 'idbref://canvas-inpaint-v1']
+  )
+  // baseUrl 保持原始素材不动
+  assert.equal(p2.baseUrl, 'idbref://canvas-asset-base')
+})
+
+test('A2 版本切换纯函数：槽位序列 + 边界越界返回 null（不回绕）', () => {
+  let meta = makeAssetMeta()
+  for (let i = 1; i <= 3; i++) {
+    const r = appendAssetVersion(meta, {
+      url: `idbref://canvas-inpaint-v${i}`,
+      instruction: `第 ${i} 版`,
+      demo: i % 2 === 1,
+      createdAt: 1000 + i,
+    })
+    assert.ok(r)
+    meta = r.meta
+  }
+  const payload = readAssetMetaPayload(meta)
+  assert.ok(payload)
+
+  // 槽位（时间序）：0=原始素材，1..3=版本由旧到新（v1,v2,v3）
+  const slots = assetVersionSlots(payload)
+  assert.deepEqual(
+    slots.map((s) => s.url),
+    [
+      'idbref://canvas-asset-base',
+      'idbref://canvas-inpaint-v1',
+      'idbref://canvas-inpaint-v2',
+      'idbref://canvas-inpaint-v3',
+    ]
+  )
+  assert.equal(assetCurrentSlotIndex(payload), 3) // 当前 = 最新 v3
+  assert.equal(slots[1].demo, true) // v1 demo（i=1 奇数）
+  assert.equal(slots[3].demo, true) // v3 demo（i=3 奇数）
+  assert.equal(slots[2].demo, false) // v2 真实
+
+  // 回退/前进：dir -1 向旧 / +1 向新
+  assert.equal(switchAssetVersion(payload, -1), 'idbref://canvas-inpaint-v2')
+  assert.equal(switchAssetVersion(payload, 1), null) // 已是最新
+  // 回退到 v1 后可继续回退到原始素材
+  const rolledMeta = { ...meta, url: 'idbref://canvas-inpaint-v1' }
+  const rolled = readAssetMetaPayload(rolledMeta)
+  assert.ok(rolled)
+  assert.equal(assetCurrentSlotIndex(rolled), 1) // v1 槽位 1
+  assert.equal(switchAssetVersion(rolled, -1), 'idbref://canvas-asset-base')
+  assert.equal(switchAssetVersion(rolled, 1), 'idbref://canvas-inpaint-v2')
+})
+
+test('A2 版本上限：>20 截断最旧并如实返回截断数；blob: url 拒写', () => {
+  let meta = makeAssetMeta()
+  for (let i = 1; i <= ASSET_VERSIONS_MAX + 3; i++) {
+    const r = appendAssetVersion(meta, {
+      url: `idbref://canvas-inpaint-v${i}`,
+      instruction: `第 ${i} 版`,
+      demo: false,
+      createdAt: 1000 + i,
+    })
+    assert.ok(r)
+    meta = r.meta
+    const expectedLen = Math.min(i, ASSET_VERSIONS_MAX)
+    const p = readAssetMetaPayload(meta)
+    assert.ok(p)
+    assert.equal(p.versions?.length, expectedLen)
+    if (i > ASSET_VERSIONS_MAX) {
+      assert.equal(r.truncated, 1) // 每轮只溢出 1 条
+    } else {
+      assert.equal(r.truncated, 0)
+    }
+  }
+  // 最旧的 v1/v2/v3 被截断，保留 v4..v23（最新在前）
+  const p = readAssetMetaPayload(meta)
+  assert.ok(p)
+  assert.deepEqual(p.versions?.[0]?.url, 'idbref://canvas-inpaint-v23')
+  assert.deepEqual(p.versions?.at(-1)?.url, 'idbref://canvas-inpaint-v4')
+
+  // blob: 产物 url 拒绝入档（整体失败）
+  const rejected = appendAssetVersion(makeAssetMeta(), {
+    url: 'blob:https://x/inpaint',
+    instruction: 'x',
+    demo: true,
+    createdAt: 1,
+  })
+  assert.equal(rejected, null)
+
+  // 非 asset meta 拒绝
+  assert.equal(
+    appendAssetVersion({ foo: 1 }, { url: 'idbref://x', instruction: 'x', demo: true, createdAt: 1 }),
+    null
+  )
+})
+
+test('A2 版本条目契约：非法 instruction 超长 / 缺 demo 拒读', () => {
+  const meta = makeAssetMeta()
+  const bad = {
+    ...meta,
+    baseUrl: 'idbref://canvas-asset-base',
+    url: 'idbref://v1',
+    versions: [
+      {
+        url: 'idbref://v1',
+        instruction: '长'.repeat(501),
+        demo: true,
+        createdAt: 1,
+      },
+    ],
+  }
+  assert.equal(readAssetMetaPayload(bad), null)
+
+  // blob: 版本 url 拒读
+  const badUrl = {
+    ...meta,
+    versions: [{ url: 'blob:https://x/1', instruction: 'x', demo: true, createdAt: 1 }],
+  }
+  assert.equal(readAssetMetaPayload(badUrl), null)
 })

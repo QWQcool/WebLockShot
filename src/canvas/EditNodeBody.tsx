@@ -7,6 +7,19 @@ import {
   putBlobAsset,
 } from '../persist/assetStore.ts'
 import {
+  demoInpaintPixels,
+} from '../media/providers/inpaintDemo.ts'
+import {
+  COMFY_IMAGE_CUSTOM_WORKFLOW_KEY,
+  COMFY_IMAGE_PRESETS,
+  COMFY_IMAGE_PRESET_STORAGE_KEY,
+  type ComfyUIImageWorkflowPreset,
+  probeComfyImage,
+  runInpaint,
+} from '../media/providers/comfyuiImage.ts'
+import {
+  ASSET_VERSIONS_MAX,
+  appendAssetVersion,
   CANVAS_NODE_SHAPE_TYPE,
   readAssetMetaPayload,
   readEditMetaPayload,
@@ -17,29 +30,70 @@ import {
 import type { WlsNodeShape } from './WlsNodeUtil.tsx'
 
 /**
- * A1 局部重绘（edit）节点内嵌 UI（CANVAS_PLAN.md §9 A1）。
+ * A1+A2 局部重绘（edit）节点内嵌 UI（CANVAS_PLAN.md §9 A1/A2）。
  *
+ * A1（mask 编辑器）：
  * - 上游：沿指入箭头取 asset 产物卡（image / video）；视频取单帧定格（Canvas 抽帧）
  *   并诚实标注「单帧重绘回贴，非时序修复」（时序级修复在明确不做清单）；
  * - mask 覆盖层：与源图同尺寸的离屏 Canvas2D（白色=重绘区），显示层叠半透明粉色高亮；
  *   笔刷（3 档粗细）/ 矩形框选 / 清空重涂三种操作；
  * - 导出 mask：黑底白区 PNG（与源图同尺寸）→ putBlobAsset 落 idbref →
  *   meta.maskRef/sourceRef/sourceType 经 zod 契约写入（blob: 拒绝入档）；
- * - F5 恢复：从 idbref 读回 mask PNG，阈值化重放覆盖层（黑→透明，白→白色笔画+粉色高亮），
- *   可继续编辑重涂（sourceRef 与上游不匹配时提示重新涂抹）；
- * - 交互冲突取舍：绘图区（stage）整体阻断 pointerdown（不让位给节点拖动/画线），
- *   节点标题区/工具条之外区域保持 tldraw 原生拖拽；工具条按钮各自控件级 stopPropagation。
+ * - F5 恢复：从 idbref 读回 mask PNG，阈值化重放覆盖层（黑→透明，白→白色笔画+粉色高亮）；
+ * - 交互冲突取舍：绘图区（stage）整体阻断 pointerdown，节点标题区保持 tldraw 原生拖拽。
+ *
+ * A2（重绘链路 + 版本堆叠）：
+ * - 重绘指令（≤500）+ 预设选择（flux-fill / sd-inpaint / custom 占位符工作流）；
+ * - ComfyUI 探测（/system_stats）：在线 → runInpaint 真实 inpaint（media 层组装）；
+ *   离线 → 演示重绘兜底（mask 区域马赛克+通道轮换，标「🧪 演示重绘 · 非真实生成」）；
+ * - 产物落 idbref → appendAssetVersion 推入源 asset 卡 meta.versions（最新在前，
+ *   meta.url 指向当前版本），上限 20 截断最旧并如实提示；edit meta.sourceRef 同步
+ *   指向新版本（mask 几何仍与图像对齐，可继续涂抹）；
+ * - 版本切换/回退在 AssetNodeBody（‹ k/N ›），回退后再重绘基于当前显示版本叠加。
  */
 
-/** 涂抹中的源图（图片元素或视频单帧画布，统一 CanvasImageSource） */
-type EditSource = { el: CanvasImageSource; w: number; h: number; kind: 'image' | 'video-frame' }
+/** 涂抹中的源图（图片元素或视频单帧画布，统一 CanvasImageSource；url 用于过期派生） */
+type EditSource = {
+  el: CanvasImageSource
+  w: number
+  h: number
+  kind: 'image' | 'video-frame'
+  url: string
+}
 
 type MaskMode = 'brush' | 'rect'
+type ComfyProbe = 'checking' | 'online' | 'offline'
 
 /** 笔刷三档 = 源图短边占比（小/中/大），下限 6px 保证可见 */
 const BRUSH_FRACTIONS = [0.03, 0.07, 0.14] as const
 
 const MASK_HIGHLIGHT = 'rgba(255, 126, 182, 0.5)'
+
+const PRESET_LABEL: Record<ComfyUIImageWorkflowPreset, string> = {
+  'flux-fill': 'FLUX Fill',
+  'sd-inpaint': 'SD1.5 inpaint',
+  custom: '自定义工作流',
+}
+
+function readStoredPreset(): ComfyUIImageWorkflowPreset {
+  try {
+    const stored = sessionStorage.getItem(COMFY_IMAGE_PRESET_STORAGE_KEY)
+    if (stored && (COMFY_IMAGE_PRESETS as readonly string[]).includes(stored)) {
+      return stored as ComfyUIImageWorkflowPreset
+    }
+  } catch {
+    // 受限环境回退默认
+  }
+  return 'flux-fill'
+}
+
+function readStoredCustomWorkflow(): string {
+  try {
+    return sessionStorage.getItem(COMFY_IMAGE_CUSTOM_WORKFLOW_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
 
 /** 加载图片元素（objectURL / 直链通用） */
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -51,8 +105,26 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   })
 }
 
-/** 上游 asset 产物卡 payload（沿指入箭头，tldraw 响应式） */
-function useUpstreamAsset(editor: ReturnType<typeof useEditor>, shapeId: TLShapeId) {
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+}
+
+/** 源图统一转 PNG Blob（真实 inpaint 上传用） */
+async function editSourceToBlob(src: EditSource): Promise<Blob | null> {
+  const canvas = document.createElement('canvas')
+  canvas.width = src.w
+  canvas.height = src.h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(src.el, 0, 0)
+  return canvasToBlob(canvas)
+}
+
+/** 上游 asset 产物卡（沿指入箭头，tldraw 响应式；含 shapeId 供 A2 版本回写） */
+function useUpstreamAsset(
+  editor: ReturnType<typeof useEditor>,
+  shapeId: TLShapeId
+): { payload: AssetMetaPayload; shapeId: TLShapeId } | null {
   return useValue(
     'editUpstreamAsset',
     () => {
@@ -68,7 +140,7 @@ function useUpstreamAsset(editor: ReturnType<typeof useEditor>, shapeId: TLShape
         if ((src.props as { kind?: unknown }).kind !== 'asset') continue
         const meta = (src.props as { meta?: unknown }).meta
         const payload = readAssetMetaPayload(meta)
-        if (payload) return payload as AssetMetaPayload
+        if (payload) return { payload, shapeId: start.toId }
       }
       return null
     },
@@ -76,7 +148,7 @@ function useUpstreamAsset(editor: ReturnType<typeof useEditor>, shapeId: TLShape
   )
 }
 
-/** 指针事件 → mask 自然坐标（显示层 CSS 缩放换算） */
+/** 指针事件 → mask 自然坐标（显示层 CSS 缩放换算；非等比缩放时 x/y 各自映射仍精确） */
 function pointFromEvent(
   e: React.PointerEvent<HTMLCanvasElement>,
   w: number,
@@ -137,7 +209,7 @@ function fillRectOnBoth(
   }
 }
 
-/** mask 是否涂过任何区域（全空时禁止导出，诚实提示） */
+/** mask 是否涂过任何区域（全空时禁止导出/重绘，诚实提示） */
 function maskHasPaint(mask: HTMLCanvasElement): boolean {
   const ctx = mask.getContext('2d')
   if (!ctx) return false
@@ -192,7 +264,7 @@ function replayMaskToCanvases(
 export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
   const editor = useEditor()
   const upstream = useUpstreamAsset(editor, shape.id)
-  const upstreamUrl = upstream?.url ?? null
+  const upstreamUrl = upstream?.payload.url ?? null
   const metaPayload = readEditMetaPayload(shape.props.meta)
 
   // hooks 必须在所有 early return 之前（B4 P1 教训）
@@ -207,18 +279,39 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
   const [srcErr, setSrcErr] = useState<string | null>(null)
   const [mode, setMode] = useState<MaskMode>('brush')
   const [tier, setTier] = useState(0)
-  const [maskVersion, setMaskVersion] = useState(0)
   const [exporting, setExporting] = useState(false)
   const [errMsg, setErrMsg] = useState<string | null>(null)
   const [okMsg, setOkMsg] = useState<string | null>(null)
 
+  // A2：重绘指令（完整契约或轻量合并均可恢复）/ 预设 / ComfyUI 探测 / 重绘 busy
+  const [instruction, setInstruction] = useState(() => {
+    const raw = shape.props.meta.instruction
+    if (typeof raw === 'string') return raw
+    return ''
+  })
+  const [preset, setPreset] = useState<ComfyUIImageWorkflowPreset>(readStoredPreset)
+  const [customJson, setCustomJson] = useState(readStoredCustomWorkflow)
+  const [probe, setProbe] = useState<ComfyProbe>('checking')
+  const [redrawing, setRedrawing] = useState(false)
+
+  /** 源图是否指向当前上游（上游切换时旧源图渲染为加载态，避免闪烁错图） */
+  const sourceStale = source !== null && source.url !== upstreamUrl
+
+  /* ComfyUI 探测（异步完成，探测失败 = 演示模式兜底并如实标注） */
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const ok = await probeComfyImage()
+      if (!cancelled) setProbe(ok ? 'online' : 'offline')
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   /* 源图加载：image 直读；video 单帧定格（seek 至 min(1s, 半长) 抽帧） */
   useEffect(() => {
-    if (!upstreamUrl) {
-      setSource(null)
-      setSrcErr(null)
-      return
-    }
+    if (!upstreamUrl) return
     let cancelled = false
     let revoked: string | null = null
     void (async () => {
@@ -234,7 +327,7 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
           revoked = u
           objectUrl = u
         }
-        if (upstream?.type === 'video') {
+        if (upstream?.payload.type === 'video') {
           const video = document.createElement('video')
           video.src = objectUrl
           video.muted = true
@@ -261,11 +354,11 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
           const ctx = frame.getContext('2d')
           if (!ctx) throw new Error('Canvas 不可用，无法抽帧')
           ctx.drawImage(video, 0, 0)
-          setSource({ el: frame, w: frame.width, h: frame.height, kind: 'video-frame' })
+          setSource({ el: frame, w: frame.width, h: frame.height, kind: 'video-frame', url: upstreamUrl })
         } else {
           const img = await loadImage(objectUrl)
           if (cancelled) return
-          setSource({ el: img, w: img.naturalWidth, h: img.naturalHeight, kind: 'image' })
+          setSource({ el: img, w: img.naturalWidth, h: img.naturalHeight, kind: 'image', url: upstreamUrl })
         }
         setSrcErr(null)
       } catch (err) {
@@ -278,67 +371,7 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
       cancelled = true
       if (revoked) URL.revokeObjectURL(revoked)
     }
-  }, [upstreamUrl, upstream?.type])
-
-  /* mask 覆盖层初始化 + F5 恢复（sourceRef 与当前上游配对才重放） */
-  useEffect(() => {
-    if (!source) {
-      maskCanvasRef.current = null
-      pinkCanvasRef.current = null
-      setMaskVersion((v) => v + 1)
-      return
-    }
-    const mask = document.createElement('canvas')
-    mask.width = source.w
-    mask.height = source.h
-    const pink = document.createElement('canvas')
-    pink.width = source.w
-    pink.height = source.h
-    maskCanvasRef.current = mask
-    pinkCanvasRef.current = pink
-    setMaskVersion((v) => v + 1)
-
-    const payload = readEditMetaPayload(shape.props.meta)
-    if (!payload || payload.sourceRef !== upstreamUrl || !isIdbRef(payload.maskRef)) return
-    let cancelled = false
-    void (async () => {
-      const u = await getAssetObjectUrl(idbRefToId(payload.maskRef))
-      if (cancelled || !u) return
-      try {
-        const img = await loadImage(u)
-        replayMaskToCanvases(img, mask, pink, source.w, source.h)
-        setMaskVersion((v) => v + 1)
-      } catch {
-        // mask 读取失败按空白层处理，不阻断编辑
-      } finally {
-        URL.revokeObjectURL(u)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [source, upstreamUrl, shape.props.meta])
-
-  /* 显示层重绘：源图 + 粉色高亮（maskVersion 驱动；绘制过程走直接 blit 不经 state） */
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view || !source) return
-    view.width = source.w
-    view.height = source.h
-    const ctx = view.getContext('2d')
-    if (!ctx) return
-    ctx.clearRect(0, 0, view.width, view.height)
-    ctx.drawImage(source.el, 0, 0, view.width, view.height)
-    if (pinkCanvasRef.current) {
-      ctx.drawImage(pinkCanvasRef.current, 0, 0, view.width, view.height)
-    }
-  }, [source, maskVersion])
-
-  const brushSize = useCallback(
-    (src: EditSource) =>
-      Math.max(6, Math.round(Math.min(src.w, src.h) * BRUSH_FRACTIONS[Math.min(tier, BRUSH_FRACTIONS.length - 1)])),
-    [tier]
-  )
+  }, [upstreamUrl, upstream?.payload.type])
 
   const redrawView = useCallback(() => {
     const view = viewRef.current
@@ -351,11 +384,66 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
     ctx.drawImage(pink, 0, 0, view.width, view.height)
   }, [source])
 
+  /* mask 覆盖层初始化 + F5 恢复（sourceRef 与当前上游配对才重放） */
+  useEffect(() => {
+    if (!source || source.url !== upstreamUrl) return
+    const mask = document.createElement('canvas')
+    mask.width = source.w
+    mask.height = source.h
+    const pink = document.createElement('canvas')
+    pink.width = source.w
+    pink.height = source.h
+    maskCanvasRef.current = mask
+    pinkCanvasRef.current = pink
+    redrawView()
+
+    const payload = readEditMetaPayload(shape.props.meta)
+    if (!payload || payload.sourceRef !== upstreamUrl || !isIdbRef(payload.maskRef)) return
+    let cancelled = false
+    void (async () => {
+      const u = await getAssetObjectUrl(idbRefToId(payload.maskRef))
+      if (cancelled || !u) return
+      try {
+        const img = await loadImage(u)
+        replayMaskToCanvases(img, mask, pink, source.w, source.h)
+        redrawView()
+      } catch {
+        // mask 读取失败按空白层处理，不阻断编辑
+      } finally {
+        URL.revokeObjectURL(u)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [source, upstreamUrl, shape.props.meta, redrawView])
+
+  /* 显示层重绘（绘制过程走直接 blit 不经 state；mask 恢复重放由 init effect 内 redrawView 驱动） */
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view || !source || sourceStale) return
+    view.width = source.w
+    view.height = source.h
+    const ctx = view.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, view.width, view.height)
+    ctx.drawImage(source.el, 0, 0, view.width, view.height)
+    if (pinkCanvasRef.current) {
+      ctx.drawImage(pinkCanvasRef.current, 0, 0, view.width, view.height)
+    }
+  }, [source, sourceStale])
+
+  const brushSize = useCallback(
+    (src: EditSource) =>
+      Math.max(6, Math.round(Math.min(src.w, src.h) * BRUSH_FRACTIONS[Math.min(tier, BRUSH_FRACTIONS.length - 1)])),
+    [tier]
+  )
+
   /* mask 绘制：stage 已整体阻断 pointerdown（不与节点拖动/画线冲突），此处自由捕获指针 */
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const mask = maskCanvasRef.current
     const pink = pinkCanvasRef.current
-    if (!mask || !pink || !source) return
+    if (!mask || !pink || !source || sourceStale) return
     const p = pointFromEvent(e, source.w, source.h)
     if (!p) return
     e.preventDefault()
@@ -434,7 +522,7 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, out.width, out.height)
       ctx.drawImage(mask, 0, 0)
-      const blob = await new Promise<Blob | null>((resolve) => out.toBlob(resolve, 'image/png'))
+      const blob = await canvasToBlob(out)
       if (!blob) throw new Error('mask PNG 编码失败')
       const id = `canvas-mask-${shape.id.replace('shape:wls-', '')}-${Date.now().toString(36)}`
       const stored = await putBlobAsset(id, blob)
@@ -459,6 +547,122 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
     }
   }
 
+  /* A2：执行重绘（在线真实 inpaint / 离线演示兜底），产物版本推入源 asset 卡 */
+  const handleRedraw = async () => {
+    const mask = maskCanvasRef.current
+    if (!source || !mask || redrawing || sourceStale) return
+    const instructionText = instruction.trim()
+    if (!instructionText) {
+      setErrMsg('请输入重绘指令（想改哪里、改成什么）')
+      return
+    }
+    if (!maskHasPaint(mask)) {
+      setErrMsg('请先涂抹重绘区域（笔刷或框选），再执行重绘')
+      return
+    }
+    if (preset === 'custom' && !customJson.trim()) {
+      setErrMsg('custom 预设需要填写自定义工作流 JSON（含 {{SOURCE}}/{{MASK}}/{{PROMPT}} 占位符）')
+      return
+    }
+    setRedrawing(true)
+    setErrMsg(null)
+    setOkMsg(null)
+    try {
+      const demo = probe !== 'online'
+      let outBlob: Blob
+      if (demo) {
+        // 演示重绘：mask 区域马赛克 + 通道轮换（确定性纯函数，如实标注非真实生成）
+        const canvas = document.createElement('canvas')
+        canvas.width = source.w
+        canvas.height = source.h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) throw new Error('Canvas 不可用')
+        ctx.drawImage(source.el, 0, 0)
+        const imageData = ctx.getImageData(0, 0, source.w, source.h)
+        const maskData = mask.getContext('2d')?.getImageData(0, 0, source.w, source.h) ?? null
+        demoInpaintPixels(imageData.data, maskData?.data ?? null, source.w, source.h)
+        ctx.putImageData(imageData, 0, 0)
+        const blob = await canvasToBlob(canvas)
+        if (!blob) throw new Error('演示重绘 PNG 编码失败')
+        outBlob = blob
+      } else {
+        const sourceBlob = await editSourceToBlob(source)
+        const maskOut = document.createElement('canvas')
+        maskOut.width = source.w
+        maskOut.height = source.h
+        const mctx = maskOut.getContext('2d')
+        if (!mctx || !sourceBlob) throw new Error('Canvas 不可用')
+        mctx.fillStyle = '#000000'
+        mctx.fillRect(0, 0, maskOut.width, maskOut.height)
+        mctx.drawImage(mask, 0, 0)
+        const maskBlob = await canvasToBlob(maskOut)
+        if (!maskBlob) throw new Error('mask PNG 编码失败')
+        outBlob = await runInpaint({
+          sourceImage: sourceBlob,
+          maskImage: maskBlob,
+          prompt: instructionText,
+          preset,
+          customWorkflowJson: preset === 'custom' ? customJson : undefined,
+          filenamePrefix: `WebLockShot_inpaint_${shape.id.replace('shape:wls-', '')}`,
+        })
+      }
+
+      const id = `canvas-inpaint-${shape.id.replace('shape:wls-', '')}-${Date.now().toString(36)}`
+      const stored = await putBlobAsset(id, outBlob)
+      if (!stored) throw new Error('重绘产物写入 IndexedDB 失败，请重试')
+      if (!upstream) throw new Error('上游产物卡已断开，无法堆叠版本')
+
+      // 版本堆叠进源 asset 卡（最新在前；上限 20 截断最旧并如实提示）
+      const upstreamProps = editor.getShape(upstream.shapeId)?.props as
+        | { meta?: Record<string, unknown> }
+        | undefined
+      const appended = appendAssetVersion(
+        { ...(upstreamProps?.meta ?? {}) },
+        { url: stored, instruction: instructionText, demo, createdAt: Date.now() }
+      )
+      if (!appended) throw new Error('重绘版本未通过契约校验，已拒绝写入（blob: 拒绝持久化）')
+      editor.updateShape({
+        id: upstream.shapeId,
+        type: CANVAS_NODE_SHAPE_TYPE,
+        props: { meta: appended.meta as JsonObject },
+      })
+
+      // edit meta 同步：指令持久化（未导出 mask 时轻量合并，不触发 A1 必填契约）；
+      // 已导出 mask 时走完整契约并让 sourceRef 跟随新版本（mask 几何仍对齐，可继续涂抹）
+      const latestProps = editor.getShape(shape.id)?.props as
+        | { meta?: Record<string, unknown> }
+        | undefined
+      const latestMeta = { ...(latestProps?.meta ?? {}) }
+      const latestPayload = readEditMetaPayload(latestMeta)
+      const nextEditMeta = latestPayload
+        ? writeEditMetaPayload(latestMeta, {
+            ...latestPayload,
+            instruction: instructionText,
+            sourceRef: stored,
+          })
+        : { ...latestMeta, instruction: instructionText }
+      if (nextEditMeta) {
+        editor.updateShape({
+          id: shape.id,
+          type: shape.type,
+          props: { meta: nextEditMeta as JsonObject },
+        })
+      }
+
+      const truncateNote =
+        appended.truncated > 0 ? `（超出 ${ASSET_VERSIONS_MAX} 版上限，已截断最旧 ${appended.truncated} 版）` : ''
+      setOkMsg(
+        demo
+          ? `🧪 演示重绘完成 · 非真实生成，版本已堆叠到产物卡${truncateNote}`
+          : `✅ ComfyUI 真实重绘完成，版本已堆叠到产物卡${truncateNote}`
+      )
+    } catch (err) {
+      setErrMsg(err instanceof Error ? err.message : '重绘失败')
+    } finally {
+      setRedrawing(false)
+    }
+  }
+
   /* 渲染分支（所有 hooks 已在上方调用） */
   if (!upstream) {
     return (
@@ -466,7 +670,7 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
         <div className="wls-edit-empty">
           连入产物卡（🖼️ 图片 / 🎬 视频）后在此涂抹重绘区域。
           <br />
-          <span className="wls-edit-empty-sub">mask 导出与重绘指令为二期 A 能力</span>
+          <span className="wls-edit-empty-sub">涂抹 → 指令 → 重绘（无 ComfyUI 时演示重绘兜底）</span>
         </div>
       </div>
     )
@@ -493,7 +697,7 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
         </div>
       )}
 
-      {!source ? (
+      {!source || sourceStale ? (
         <div className="wls-edit-loading">源图加载中…</div>
       ) : (
         <>
@@ -574,6 +778,76 @@ export function EditNodeBody({ shape }: { shape: WlsNodeShape }) {
                 mask 已落档
               </span>
             )}
+          </div>
+
+          {/* A2：重绘指令 + 执行（探测两态如实标注） */}
+          <div className="wls-edit-inpaint">
+            <textarea
+              className="wls-edit-instruction"
+              value={instruction}
+              maxLength={500}
+              placeholder="重绘指令：例：把背景换成大理石台面"
+              aria-label="重绘指令"
+              onPointerDown={(e) => e.stopPropagation()}
+              onChange={(e) => setInstruction(e.target.value)}
+            />
+            <div className="wls-edit-inpaint-row">
+              <span
+                className={`wls-edit-probe wls-edit-probe-${probe}`}
+                title={probe === 'online' ? 'ComfyUI 在线，将执行真实 inpaint' : '未检测到 ComfyUI，将执行客户端演示重绘（非真实生成）'}
+              >
+                {probe === 'checking' ? '⏳ 探测 ComfyUI…' : probe === 'online' ? '🟢 ComfyUI 在线' : '⚪ 演示模式'}
+              </span>
+              <select
+                className="wls-edit-preset"
+                value={preset}
+                aria-label="重绘工作流预设"
+                disabled={probe !== 'online' || redrawing}
+                onPointerDown={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const next = e.target.value as ComfyUIImageWorkflowPreset
+                  setPreset(next)
+                  try {
+                    sessionStorage.setItem(COMFY_IMAGE_PRESET_STORAGE_KEY, next)
+                  } catch {
+                    // 受限环境忽略
+                  }
+                }}
+              >
+                {COMFY_IMAGE_PRESETS.map((p) => (
+                  <option key={p} value={p}>
+                    {PRESET_LABEL[p]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {preset === 'custom' && probe === 'online' && (
+              <textarea
+                className="wls-edit-custom-json"
+                value={customJson}
+                maxLength={20000}
+                placeholder='自定义工作流 JSON，占位符：{{SOURCE}} {{MASK}} {{PROMPT}} {{NEGATIVE}} {{SEED}}'
+                aria-label="自定义重绘工作流 JSON"
+                onPointerDown={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  setCustomJson(e.target.value)
+                  try {
+                    sessionStorage.setItem(COMFY_IMAGE_CUSTOM_WORKFLOW_KEY, e.target.value)
+                  } catch {
+                    // 受限环境忽略
+                  }
+                }}
+              />
+            )}
+            <button
+              type="button"
+              className="wls-edit-redraw"
+              disabled={redrawing || probe === 'checking'}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => void handleRedraw()}
+            >
+              {redrawing ? '🖌️ 重绘中…' : '🖌️ 开始重绘'}
+            </button>
           </div>
 
           {errMsg && <div className="wls-edit-error">⚠️ {errMsg}</div>}

@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
+import { useEditor, type JsonObject } from 'tldraw'
 import {
   getAssetObjectUrl,
   idbRefToId,
   isIdbRef,
 } from '../persist/assetStore.ts'
-import { readAssetMetaPayload } from './contract.ts'
+import {
+  assetCurrentSlotIndex,
+  assetVersionSlots,
+  readAssetMetaPayload,
+  switchAssetVersion,
+} from './contract.ts'
 import type { WlsNodeShape } from './WlsNodeUtil.tsx'
 
 /**
@@ -14,9 +20,12 @@ import type { WlsNodeShape } from './WlsNodeUtil.tsx'
  *   blob objectURL 播放（卸载时回收）；
  * - blob: URL 不持久化（跨刷新失效），契约层已拒写；
  * - 控件级 stopPropagation（B2 标准）：video 播放控件阻断，卡片其余区域放行拖拽/画线；
- * - 双击全屏播放留 B5。
+ * - A2 版本堆叠卡：meta.versions（最新在前）+ meta.baseUrl（原始素材），
+ *   ‹ k/N › 切换/回退，当前版本高亮；回退只改 meta.url（versions 只增不乱），
+ *   回退后再重绘基于当前显示版本叠加（版本链如实记录）。
  */
 export function AssetNodeBody({ shape }: { shape: WlsNodeShape }) {
+  const editor = useEditor()
   // hooks 必须在所有 early return 之前（P1：条件调用会触发 rules-of-hooks 白屏崩溃）
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [src, setSrc] = useState<string | null>(null)
@@ -25,6 +34,25 @@ export function AssetNodeBody({ shape }: { shape: WlsNodeShape }) {
 
   const payload = readAssetMetaPayload(shape.props.meta)
   const missingUrl = !payload?.url
+
+  // A2：版本槽位（0 = 原始素材，1..N = 重绘版本最新在前）与当前显示下标
+  const slots = payload ? assetVersionSlots(payload) : []
+  const slotIndex = payload ? assetCurrentSlotIndex(payload) : 0
+  const currentSlot = slots[slotIndex] ?? null
+  const canPrev = payload !== null && slotIndex > 0
+  const canNext = payload !== null && slotIndex < slots.length - 1
+
+  /** 版本切换/回退：纯函数算出目标 url，直接改 meta.url（versions 数组不动） */
+  const switchVersion = (dir: -1 | 1) => {
+    if (!payload) return
+    const nextUrl = switchAssetVersion(payload, dir)
+    if (!nextUrl) return
+    editor.updateShape({
+      id: shape.id,
+      type: shape.type,
+      props: { meta: { ...shape.props.meta, url: nextUrl } as JsonObject },
+    })
+  }
 
   useEffect(() => {
     if (missingUrl || !payload?.url) return
@@ -90,6 +118,38 @@ export function AssetNodeBody({ shape }: { shape: WlsNodeShape }) {
           {playing ? '⏸ 暂停' : '▶️ 播放'}
         </button>
       </div>
+      {/* A2：版本堆叠卡（‹ k/N ›，当前版本高亮；演示重绘版本如实标注） */}
+      {slots.length > 1 && currentSlot && (
+        <div className="wls-asset-versions" data-testid="wls-asset-versions">
+          <button
+            type="button"
+            className="wls-asset-ver-btn"
+            disabled={!canPrev}
+            aria-label="上一版本"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => switchVersion(-1)}
+          >
+            ‹
+          </button>
+          <span
+            className={`wls-asset-ver-pos${currentSlot.demo ? ' wls-asset-ver-demo' : ''}`}
+            title={currentSlot.instruction ?? '原始素材'}
+          >
+            v{slotIndex + 1}/{slots.length}
+            {currentSlot.demo && ' 🧪'}
+          </span>
+          <button
+            type="button"
+            className="wls-asset-ver-btn"
+            disabled={!canNext}
+            aria-label="下一版本"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => switchVersion(1)}
+          >
+            ›
+          </button>
+        </div>
+      )}
       <div className="wls-asset-meta">
         <span className="wls-asset-shot">{payload.shotId.split('-s').pop()?.toUpperCase() ?? 'S'} 镜</span>
         {payload.title && <span className="wls-asset-title">{payload.title}</span>}
