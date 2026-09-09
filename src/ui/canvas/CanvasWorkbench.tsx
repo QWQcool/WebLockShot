@@ -11,6 +11,7 @@ import {
   CANVAS_SCENE_TEMPLATES,
   buildDemoOrchestrationPlan,
   createNodeId,
+  extractSkillManifest,
   filterOrchestrationParams,
   initialNodeY,
   nodeIdToShapeId,
@@ -19,6 +20,7 @@ import {
   shapeIdToNodeId,
   validateCanvasDoc,
   validateEdgeKind,
+  validateSkillManifest,
   type CanvasDoc,
   type CanvasNodeKind,
   type OrchestrationPlan,
@@ -186,6 +188,23 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     }, 0)
   }, [showEdgeNotice])
 
+  // S1：tldraw 选中集里的 wls-node 数量（session scope 变更；导出 Skill 按钮的可用条件）
+  const [selectedNodeCount, setSelectedNodeCount] = useState(0)
+
+  // S1：导出 Skill 提示条（复用 B1 toast 样式，3 秒自动消失）
+  const [skillNotice, setSkillNotice] = useState<string | null>(null)
+  const skillNoticeTimerRef = useRef<number | null>(null)
+  const showSkillNotice = useCallback((msg: string) => {
+    setSkillNotice(msg)
+    if (skillNoticeTimerRef.current !== null) {
+      window.clearTimeout(skillNoticeTimerRef.current)
+    }
+    skillNoticeTimerRef.current = window.setTimeout(() => {
+      skillNoticeTimerRef.current = null
+      setSkillNotice(null)
+    }, 3000)
+  }, [])
+
   useEffect(() => {
     return () => {
       if (edgeNoticeTimerRef.current !== null) {
@@ -193,6 +212,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       }
       if (compatCheckTimerRef.current !== null) {
         window.clearTimeout(compatCheckTimerRef.current)
+      }
+      if (skillNoticeTimerRef.current !== null) {
+        window.clearTimeout(skillNoticeTimerRef.current)
       }
     }
   }, [])
@@ -247,8 +269,21 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
         { scope: 'document' }
       )
 
+      // S1：选中集变化（session scope）→ 统计 wls-node 数量，驱动「导出 Skill」按钮可用态
+      const unsubSession = editor.store.listen(
+        () => {
+          let count = 0
+          for (const id of editor.getSelectedShapeIds()) {
+            if (editor.getShape(id)?.type === CANVAS_NODE_SHAPE_TYPE) count++
+          }
+          setSelectedNodeCount((prev) => (prev === count ? prev : count))
+        },
+        { scope: 'session' }
+      )
+
       return () => {
         unsub()
+        unsubSession()
         editorRef.current = null
       }
     },
@@ -587,6 +622,50 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     setSavedAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }))
   }, [getDoc])
 
+  // S1：导出 Skill 包（CANVAS_PLAN.md §9 S1）：框选 ≥2 个 wls-node → 提取子拓扑 → manifest JSON 浏览器下载。
+  // 参数走白名单过滤（brief.text / product.title / script.scriptScene），产物 url / maskRef / imports 等设备本地引用剥离。
+  const handleExportSkill = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    const selectedNodeIds: string[] = []
+    for (const id of editor.getSelectedShapeIds()) {
+      const nodeId = shapeIdToNodeId(id)
+      if (nodeId && editor.getShape(id)?.type === CANVAS_NODE_SHAPE_TYPE) {
+        selectedNodeIds.push(nodeId)
+      }
+    }
+    if (selectedNodeCount < 2 || selectedNodeIds.length < 2) {
+      showSkillNotice('导出 Skill 需先框选至少 2 个画布节点')
+      return
+    }
+    const draft = editorPageToCanvasDraft(editor, {
+      id: 'skill-export',
+      name: docName || '未命名画布',
+      updatedAt: Date.now(),
+    })
+    const manifest = extractSkillManifest(draft, selectedNodeIds, docName)
+    if (!manifest || !validateSkillManifest(manifest)) {
+      showSkillNotice('导出失败：选中子拓扑不满足 Skill 契约（参数槽位非法或边不兼容）')
+      return
+    }
+    try {
+      const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${manifest.name.replace(/[\\/:*?"<>|]/g, '_')}.wls-skill.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      showSkillNotice(
+        `✓ 已导出 Skill「${manifest.name}」：${manifest.nodes.length} 节点 / ${manifest.edges.length} 边（产物与大资产字段已剥离）`
+      )
+    } catch (err) {
+      showSkillNotice(`导出失败：${err instanceof Error ? err.message : '未知错误'}`)
+    }
+  }, [docName, selectedNodeCount, showSkillNotice])
+
   const paletteItems = useMemo(
     () => CANVAS_NODE_KINDS.map((kind) => ({ kind, ...CANVAS_NODE_META[kind] })),
     []
@@ -650,6 +729,20 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               aria-label="画布名称"
               onChange={(e) => onRename(e.target.value)}
             />
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="export-skill"
+              disabled={selectedNodeCount < 2}
+              title={
+                selectedNodeCount < 2
+                  ? '框选 ≥2 个画布节点后可导出 Skill 包（产物/大资产字段自动剥离）'
+                  : `导出选中的 ${selectedNodeCount} 个节点为 Skill 包（JSON 下载）`
+              }
+              onClick={handleExportSkill}
+            >
+              📦 导出 Skill{selectedNodeCount >= 2 ? `（${selectedNodeCount}）` : ''}
+            </button>
             <button type="button" className="wls-canvas-btn" onClick={onClear}>
               🧹 清空画布
             </button>
@@ -664,6 +757,13 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             {edgeNotice && (
               <div className="wls-edge-toast" role="alert" data-testid="edge-notice">
                 ⛔ {edgeNotice}
+              </div>
+            )}
+
+            {/* S1：导出 Skill 提示条（3 秒自动消失） */}
+            {skillNotice && (
+              <div className="wls-edge-toast" role="status" data-testid="skill-notice">
+                {skillNotice}
               </div>
             )}
 

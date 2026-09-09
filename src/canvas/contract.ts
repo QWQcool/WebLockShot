@@ -1039,3 +1039,225 @@ export function buildDemoOrchestrationPlan(
     ],
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * S1：Skill manifest 契约（CANVAS_PLAN.md §5.2 / §9 S1）
+ * ------------------------------------------------------------------ */
+
+export const SKILL_MANIFEST_VERSION = 1
+
+/** 槽位 id 前缀：manifest 节点用槽位 id（slot-1、slot-2…）而非画布节点 id（跨设备可复用） */
+export const SKILL_SLOT_ID_PREFIX = 'slot-'
+
+/**
+ * Skill 参数槽位白名单（按 kind 收窄）：与 ORCHESTRATION_PARAM_KEYS 同源语义但更严格——
+ * manifest 只允许这三类参数槽位，其余 meta 字段（产物 url / maskRef / imports / upstreamText
+ * 等设备本地引用与运行痕迹）一律剥离或拒绝，绝不入 manifest。
+ */
+export const SKILL_PARAM_KEYS: Record<string, readonly string[]> = {
+  brief: ['text'],
+  product: ['title'],
+  script: ['scriptScene'],
+  storyboard: [],
+  generate: [],
+  deliver: [],
+  asset: [],
+  edit: [],
+  image: [],
+  stage3d: [],
+}
+
+/** 参数槽位展示名（inputs 声明的 label 用） */
+export const SKILL_PARAM_LABELS: Record<string, string> = {
+  text: '需求文本',
+  title: '商品标题',
+  scriptScene: '脚本场景',
+}
+
+/** manifest 节点：槽位 id + kind（仅 ready 节点）+ 相对坐标（左上角归一化到 0,0）+ 白名单参数 */
+export const skillNodeSchema = z.object({
+  slot: z.string().regex(/^slot-[1-9]\d*$/, { message: '槽位 id 必须形如 slot-1、slot-2' }),
+  kind: z.enum(READY_NODE_KINDS as unknown as [CanvasNodeKind, ...CanvasNodeKind[]]),
+  x: z.number().finite().min(0),
+  y: z.number().finite().min(0),
+  w: z.number().finite().positive(),
+  h: z.number().finite().positive(),
+  params: z.record(z.string(), z.unknown()).default({}),
+})
+
+export const skillManifestSchema = z.object({
+  version: z.literal(SKILL_MANIFEST_VERSION),
+  name: z.string().min(1).max(120),
+  nodes: z.array(skillNodeSchema).min(2).max(50),
+  edges: z
+    .array(z.object({ from: z.number().int().min(0), to: z.number().int().min(0) }))
+    .max(100),
+  /** 输入槽位声明：入口节点中需要用户填新内容的参数（S2 导入时高亮提示「填新输入」） */
+  inputs: z.array(
+    z.object({
+      slot: z.string().min(1),
+      paramKey: z.string().min(1),
+      label: z.string().min(1).max(60),
+    })
+  ),
+  /** 输出声明：子拓扑的终点节点（无出边） */
+  outputs: z.array(z.object({ slot: z.string().min(1), label: z.string().min(1).max(60) })),
+})
+export type SkillNode = z.infer<typeof skillNodeSchema>
+export type SkillInput = z.infer<typeof skillManifestSchema>['inputs'][number]
+export type SkillOutput = z.infer<typeof skillManifestSchema>['outputs'][number]
+export type SkillManifest = z.infer<typeof skillManifestSchema>
+
+/** 产物引用污染判定（纯函数）：manifest 参数值中出现的设备本地引用一律视为非法 */
+function paramValueContaminated(v: unknown): boolean {
+  if (typeof v !== 'string') return false
+  return v.includes('idbref://') || v.startsWith('blob:')
+}
+
+/**
+ * Skill manifest 深度校验（整体拒绝，不半渲染）：
+ * 1. zod 形状校验（缺 name / 空 nodes / 非法 slot 格式直接拒）；
+ * 2. slot id 唯一且恰好为 slot-1..N；
+ * 3. params 严格白名单：键必须在 SKILL_PARAM_KEYS[kind] 内、值不得含 idbref:// / blob: 产物引用、
+ *    scriptScene 必须是合法枚举；
+ * 4. 边下标有效、无自环、无重复、两端 kind 兼容（复用 validateEdgeKind）；
+ * 5. inputs/outputs 的 slot 引用有效。
+ * 校验失败返回 null（调用方如实提示，不静默半渲染）。
+ */
+export function validateSkillManifest(raw: unknown): SkillManifest | null {
+  const parsed = skillManifestSchema.safeParse(raw)
+  if (!parsed.success) return null
+  const m = parsed.data
+
+  // slot 唯一且恰好 slot-1..N（与 nodes 顺序无关，集合必须精确匹配）
+  const slotSet = new Set(m.nodes.map((n) => n.slot))
+  if (slotSet.size !== m.nodes.length) return null
+  for (let i = 0; i < m.nodes.length; i++) {
+    if (!slotSet.has(`${SKILL_SLOT_ID_PREFIX}${i + 1}`)) return null
+  }
+
+  // params 严格白名单 + 产物污染 + scriptScene 枚举
+  for (const node of m.nodes) {
+    const allowed = SKILL_PARAM_KEYS[node.kind] ?? []
+    for (const key of Object.keys(node.params)) {
+      if (!allowed.includes(key)) return null
+      if (paramValueContaminated(node.params[key])) return null
+    }
+    const scene = node.params['scriptScene']
+    if (scene !== undefined && !CANVAS_SCRIPT_SCENES.includes(scene as CanvasScriptScene)) {
+      return null
+    }
+  }
+
+  // 边：下标有效、无自环、无重复、kind 兼容
+  const kindByIndex = m.nodes.map((n) => n.kind)
+  const seen = new Set<string>()
+  for (const e of m.edges) {
+    if (e.from >= kindByIndex.length || e.to >= kindByIndex.length) return null
+    if (e.from === e.to) return null
+    const key = `${e.from}->${e.to}`
+    if (seen.has(key)) return null
+    seen.add(key)
+    if (!validateEdgeKind(kindByIndex[e.from], kindByIndex[e.to]).ok) return null
+  }
+
+  // inputs/outputs slot 引用有效
+  for (const input of m.inputs) {
+    if (!slotSet.has(input.slot)) return null
+  }
+  for (const output of m.outputs) {
+    if (!slotSet.has(output.slot)) return null
+  }
+  return m
+}
+
+/**
+ * 从画布文档提取选中节点子拓扑 → Skill manifest（纯函数，node --test 可跑）。
+ *
+ * - 槽位分配：按 (x, y, id) 升序排序后依次 slot-1..N（确定性，同选集导出字节级一致）；
+ * - 坐标归一化：减去选集包围盒左上角，相对坐标 ≥0；
+ * - 参数过滤：复用 filterOrchestrationParams 白名单（brief.text / product.title / script.scriptScene），
+ *   产物 url / maskRef / imports / 运行痕迹等字段天然被剥离，不入 manifest；
+ * - 边：只保留两端都在选中的边，映射为槽位下标，按 from->to 去重；
+ * - inputs：入口节点（子拓扑内无入边）的可填参数槽；outputs：终点节点（无出边）。
+ * 少于 2 个合法节点或超出 50 个节点时返回 null（调用方禁用按钮/如实提示）。
+ */
+export function extractSkillManifest(
+  doc: Pick<CanvasDoc, 'nodes' | 'edges'>,
+  selectedNodeIds: readonly string[],
+  name: string
+): SkillManifest | null {
+  const selected = new Set(selectedNodeIds)
+  const picked = doc.nodes
+    .filter((n) => selected.has(n.id) && READY_NODE_KINDS.includes(n.kind))
+    .sort((a, b) => a.x - b.x || a.y - b.y || a.id.localeCompare(b.id))
+  if (picked.length < 2 || picked.length > 50) return null
+
+  const minX = Math.min(...picked.map((n) => n.x))
+  const minY = Math.min(...picked.map((n) => n.y))
+  const slotOfNode = new Map<string, string>()
+  const skillNodes: SkillNode[] = picked.map((n, index) => {
+    const slot = `${SKILL_SLOT_ID_PREFIX}${index + 1}`
+    slotOfNode.set(n.id, slot)
+    return {
+      slot,
+      kind: n.kind,
+      x: Math.round(n.x - minX),
+      y: Math.round(n.y - minY),
+      w: n.w,
+      h: n.h,
+      params: filterOrchestrationParams(n.kind, n.meta),
+    }
+  })
+
+  // 子拓扑边：两端都在选集内，按槽位下标映射并去重
+  const indexOfNode = new Map<string, number>()
+  picked.forEach((n, index) => indexOfNode.set(n.id, index))
+  const edgeSeen = new Set<string>()
+  const skillEdges: { from: number; to: number }[] = []
+  for (const edge of doc.edges) {
+    const from = indexOfNode.get(edge.from)
+    const to = indexOfNode.get(edge.to)
+    if (from === undefined || to === undefined) continue
+    const key = `${from}->${to}`
+    if (edgeSeen.has(key)) continue
+    edgeSeen.add(key)
+    skillEdges.push({ from, to })
+  }
+
+  // inputs：入口节点（无入边）的可填参数槽；outputs：终点节点（无出边）
+  const hasIncoming = new Set(skillEdges.map((e) => e.to))
+  const hasOutgoing = new Set(skillEdges.map((e) => e.from))
+  const inputs: SkillInput[] = []
+  const outputs: SkillOutput[] = []
+  for (const node of skillNodes) {
+    const kind = node.kind
+    const idx = nodeIndexIn(skillNodes, node.slot)
+    if (!hasIncoming.has(idx)) {
+      for (const key of SKILL_PARAM_KEYS[kind] ?? []) {
+        inputs.push({
+          slot: node.slot,
+          paramKey: key,
+          label: `${CANVAS_NODE_META[kind].label} · ${SKILL_PARAM_LABELS[key] ?? key}`,
+        })
+      }
+    }
+    if (!hasOutgoing.has(idx)) {
+      outputs.push({ slot: node.slot, label: CANVAS_NODE_META[kind].label })
+    }
+  }
+
+  const manifest: SkillManifest = {
+    version: SKILL_MANIFEST_VERSION,
+    name: name.trim().slice(0, 120) || '未命名 Skill',
+    nodes: skillNodes,
+    edges: skillEdges,
+    inputs,
+    outputs,
+  }
+  return validateSkillManifest(manifest) ? manifest : null
+}
+
+function nodeIndexIn(nodes: SkillNode[], slot: string): number {
+  return nodes.findIndex((n) => n.slot === slot)
+}

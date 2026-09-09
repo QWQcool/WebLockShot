@@ -21,6 +21,7 @@ import {
   edgeIdToArrowShapeId,
   edgeToArrowMaterial,
   buildDemoOrchestrationPlan,
+  extractSkillManifest,
   filterOrchestrationParams,
   initialNodeY,
   nodeAvailability,
@@ -41,6 +42,7 @@ import {
   switchAssetVersion,
   validateCanvasDoc,
   validateEdgeKind,
+  validateSkillManifest,
   writeAssetMetaPayload,
   writeDeliverMetaPayload,
   writeEditMetaPayload,
@@ -1093,4 +1095,263 @@ test('A2 版本条目契约：非法 instruction 超长 / 缺 demo 拒读', () =
     versions: [{ url: 'blob:https://x/1', instruction: 'x', demo: true, createdAt: 1 }],
   }
   assert.equal(readAssetMetaPayload(badUrl), null)
+})
+
+/* ---------------- S1：Skill manifest 契约 ---------------- */
+
+/** 构造六节点带货链画布（meta 故意混入产物/大资产/运行痕迹字段，验证导出剥离） */
+function makeSkillDoc(): CanvasDoc {
+  return {
+    version: 1,
+    id: 'canvas-skill',
+    name: '技能画布',
+    nodes: [
+      {
+        id: 'n1',
+        kind: 'brief',
+        x: 0,
+        y: 0,
+        w: 260,
+        h: 160,
+        meta: { text: '冰博克奶茶带货', junk: 'idbref://should-not-export' },
+      },
+      {
+        id: 'n2',
+        kind: 'product',
+        x: 300,
+        y: 0,
+        w: 300,
+        h: 340,
+        meta: {
+          title: '冰博克奶茶',
+          upstreamText: '运行痕迹应剥离',
+          imports: [{ kind: 'image', url: 'idbref://img-1', createdAt: 1 }],
+        },
+      },
+      {
+        id: 'n3',
+        kind: 'script',
+        x: 640,
+        y: 0,
+        w: 300,
+        h: 220,
+        meta: { scriptScene: 'ecommerce', upstreamText: 'y' },
+      },
+      { id: 'n4', kind: 'storyboard', x: 980, y: 0, w: 300, h: 560, meta: { story: 'should-strip' } },
+      {
+        id: 'n5',
+        kind: 'generate',
+        x: 1320,
+        y: 0,
+        w: 300,
+        h: 320,
+        meta: {
+          artifacts: [{ shotId: 's1', order: 1, status: 'succeeded', url: 'idbref://video-1' }],
+        },
+      },
+      { id: 'n6', kind: 'deliver', x: 1660, y: 0, w: 300, h: 400, meta: { videoCount: 3 } },
+    ],
+    edges: [
+      { id: 'e1', from: 'n1', to: 'n2' },
+      { id: 'e2', from: 'n2', to: 'n3' },
+      { id: 'e3', from: 'n3', to: 'n4' },
+      { id: 'e4', from: 'n4', to: 'n5' },
+      { id: 'e5', from: 'n5', to: 'n6' },
+    ],
+    updatedAt: 1000,
+  }
+}
+
+test('S1 extractSkillManifest：六节点链提取 → 槽位/坐标归一化/参数白名单/产物剥离', () => {
+  const doc = makeSkillDoc()
+  const manifest = extractSkillManifest(
+    doc,
+    doc.nodes.map((n) => n.id),
+    '六步爆款带货流'
+  )
+  assert.ok(manifest)
+  assert.equal(manifest.version, 1)
+  assert.equal(manifest.name, '六步爆款带货流')
+  assert.equal(manifest.nodes.length, 6)
+
+  // 槽位按 (x,y) 升序 = slot-1..6
+  assert.deepEqual(
+    manifest.nodes.map((n) => n.slot),
+    ['slot-1', 'slot-2', 'slot-3', 'slot-4', 'slot-5', 'slot-6']
+  )
+  assert.deepEqual(
+    manifest.nodes.map((n) => n.kind),
+    ['brief', 'product', 'script', 'storyboard', 'generate', 'deliver']
+  )
+  // 坐标归一化：minX=0,minY=0 → 首节点在原点，其余保留相对间距
+  assert.deepEqual(
+    manifest.nodes.map((n) => n.x),
+    [0, 300, 640, 980, 1320, 1660]
+  )
+  assert.ok(manifest.nodes.every((n) => n.y === 0 && n.w > 0 && n.h > 0))
+
+  // 参数槽位白名单：只留 brief.text / product.title / script.scriptScene，产物与痕迹全剥离
+  assert.deepEqual(manifest.nodes[0].params, { text: '冰博克奶茶带货' })
+  assert.deepEqual(manifest.nodes[1].params, { title: '冰博克奶茶' })
+  assert.deepEqual(manifest.nodes[2].params, { scriptScene: 'ecommerce' })
+  for (const node of manifest.nodes.slice(3)) {
+    assert.deepEqual(node.params, {})
+  }
+
+  // 边：下标化 + 顺序保持
+  assert.deepEqual(manifest.edges, [
+    { from: 0, to: 1 },
+    { from: 1, to: 2 },
+    { from: 2, to: 3 },
+    { from: 3, to: 4 },
+    { from: 4, to: 5 },
+  ])
+
+  // inputs：入口节点（无入边）可填参数槽——链式拓扑中仅 slot-1（brief）为入口
+  assert.deepEqual(
+    manifest.inputs.map((i) => [i.slot, i.paramKey]),
+    [['slot-1', 'text']]
+  )
+  assert.ok(manifest.inputs.every((i) => i.label.length > 0))
+  assert.deepEqual(manifest.outputs, [{ slot: 'slot-6', label: '成片交付' }])
+
+  // 产物剥离：整份 manifest 序列化后不含任何设备本地引用
+  const json = JSON.stringify(manifest)
+  assert.ok(!json.includes('idbref://'))
+  assert.ok(!json.includes('imports'))
+  assert.ok(!json.includes('maskRef'))
+
+  // 深度校验通过 + 双次提取确定性（字节级一致）
+  assert.ok(validateSkillManifest(manifest))
+  const again = extractSkillManifest(doc, doc.nodes.map((n) => n.id), '六步爆款带货流')
+  assert.equal(JSON.stringify(again), json)
+})
+
+test('S1 extractSkillManifest：子拓扑边只保留两端都在选集（换商品重跑场景）', () => {
+  const doc = makeSkillDoc()
+  const manifest = extractSkillManifest(doc, ['n2', 'n3', 'n5'], '子拓扑')
+  assert.ok(manifest)
+  assert.equal(manifest.nodes.length, 3)
+  // n2(x=300) → slot-1、n3(x=640) → slot-2、n5(x=1320) → slot-3
+  assert.deepEqual(
+    manifest.nodes.map((n) => n.slot),
+    ['slot-1', 'slot-2', 'slot-3']
+  )
+  // 只有 n2→n3 两端都在选集；n4→n5 / n5→n6 被丢弃
+  assert.deepEqual(manifest.edges, [{ from: 0, to: 1 }])
+  // 入口：n2（product.title）、n5（无参数槽则无 input 声明）；终点：n3、n5
+  assert.deepEqual(
+    manifest.inputs.map((i) => [i.slot, i.paramKey]),
+    [['slot-1', 'title']]
+  )
+  assert.deepEqual(
+    manifest.outputs.map((o) => o.slot),
+    ['slot-2', 'slot-3']
+  )
+})
+
+test('S1 extractSkillManifest：少于 2 节点 / 灰态 kind 被过滤后不足 2 → null', () => {
+  const doc = makeSkillDoc()
+  assert.equal(extractSkillManifest(doc, ['n1'], '单节点'), null)
+  assert.equal(extractSkillManifest(doc, [], '空选集'), null)
+  // 灰态节点（image / stage3d 非 ready）不计入
+  const withLocked: CanvasDoc = {
+    ...doc,
+    nodes: [
+      ...doc.nodes,
+      { id: 'n7', kind: 'image', x: 2000, y: 0, w: 260, h: 160, meta: {} },
+      { id: 'n8', kind: 'stage3d', x: 2300, y: 0, w: 260, h: 160, meta: {} },
+    ],
+    edges: [...doc.edges, { id: 'e6', from: 'n1', to: 'n7' }],
+  }
+  assert.equal(extractSkillManifest(withLocked, ['n1', 'n7', 'n8'], '只选灰态'), null)
+})
+
+test('S1 validateSkillManifest：非法形状整体拒绝（缺 name / 空节点 / slot 异常 / 边异常）', () => {
+  const base = extractSkillManifest(makeSkillDoc(), ['n1', 'n2'], '最小包')
+  assert.ok(base)
+
+  const expectNull = (label: string, raw: unknown) => {
+    assert.equal(validateSkillManifest(raw), null, label)
+  }
+  expectNull('缺 name', { ...base, name: '' })
+  expectNull('版本错误', { ...base, version: 2 })
+  expectNull('节点不足', { ...base, nodes: [base.nodes[0]] })
+  expectNull('非法 slot 格式', { ...base, nodes: [{ ...base.nodes[0], slot: 'node-1' }, base.nodes[1]] })
+  expectNull('slot 重复', { ...base, nodes: [base.nodes[0], { ...base.nodes[1], slot: 'slot-1' }] })
+  expectNull('slot 不连续', { ...base, nodes: [base.nodes[0], { ...base.nodes[1], slot: 'slot-9' }] })
+  expectNull('灰态 kind（image）', {
+    ...base,
+    nodes: [
+      base.nodes[0],
+      { ...base.nodes[1], slot: 'slot-2', kind: 'image' },
+    ],
+  })
+  expectNull('边下标越界', { ...base, edges: [{ from: 0, to: 5 }] })
+  expectNull('自环边', { ...base, edges: [{ from: 1, to: 1 }] })
+  expectNull('重复边', { ...base, edges: [{ from: 0, to: 1 }, { from: 0, to: 1 }] })
+  expectNull('inputs 引用未知 slot', { ...base, inputs: [{ slot: 'slot-9', paramKey: 'title', label: 'x' }] })
+  expectNull('outputs 引用未知 slot', { ...base, outputs: [{ slot: 'slot-9', label: 'x' }] })
+  expectNull('非对象输入', 'not-an-object')
+})
+
+test('S1 validateSkillManifest：产物污染 / 白名单外参数 / 非法 scriptScene / 边 kind 不兼容拒绝', () => {
+  const base = extractSkillManifest(makeSkillDoc(), ['n1', 'n2'], '污染测试包')
+  assert.ok(base)
+
+  // 白名单外键（storyboard 不允许任何参数）
+  assert.equal(
+    validateSkillManifest({
+      ...base,
+      nodes: [
+        base.nodes[0],
+        { slot: 'slot-2', kind: 'storyboard', x: 300, y: 0, w: 300, h: 560, params: { url: 'idbref://x' } },
+      ],
+    }),
+    null
+  )
+  // 白名单键值混入产物引用（idbref://）
+  assert.equal(
+    validateSkillManifest({
+      ...base,
+      nodes: [
+        { ...base.nodes[0], params: { text: '看这个 idbref://video-1' } },
+        base.nodes[1],
+      ],
+    }),
+    null
+  )
+  // 白名单键值混入 blob: 引用
+  assert.equal(
+    validateSkillManifest({
+      ...base,
+      nodes: [{ ...base.nodes[0], params: { text: 'blob:https://x/1' } }, base.nodes[1]],
+    }),
+    null
+  )
+  // scriptScene 非法枚举
+  assert.equal(
+    validateSkillManifest({
+      ...base,
+      nodes: [
+        base.nodes[0],
+        { ...base.nodes[1], kind: 'script', params: { scriptScene: 'hacker' } },
+      ],
+    }),
+    null
+  )
+  // 边 kind 不兼容（brief → deliver）
+  assert.equal(
+    validateSkillManifest({
+      ...base,
+      nodes: [
+        base.nodes[0],
+        { ...base.nodes[1], kind: 'deliver', params: {} },
+      ],
+      edges: [{ from: 0, to: 1 }],
+    }),
+    null
+  )
+  // 合法对照仍通过
+  assert.ok(validateSkillManifest(base))
 })
