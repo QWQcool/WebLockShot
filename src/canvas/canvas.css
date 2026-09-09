@@ -498,6 +498,39 @@
   padding: 0.5rem 0.6rem 0.3rem;
 }
 
+/* S2：Skill 导入「填新输入」高亮条（halo 信息色，纯展示不阻断交互） */
+.wls-node-input-hint {
+  margin: 0 0.6rem 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(126, 200, 227, 0.14);
+  border: 1px dashed rgba(126, 200, 227, 0.55);
+  color: var(--mute, #5b7a86);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+/* S2：Brief 内联编辑器（Skill 导入待填输入态） */
+.wls-brief-editor {
+  margin: 0 0.6rem 0.4rem;
+  width: calc(100% - 1.2rem);
+  resize: none;
+  border: 1px solid var(--line, #dbe9ee);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--ink, #16323f);
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.wls-brief-editor:focus {
+  outline: 2px solid var(--miku, #39c5bb);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
 .wls-node-icon {
   font-size: 0.95rem;
 }

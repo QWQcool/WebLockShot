@@ -9,6 +9,7 @@ import {
   CANVAS_NODE_META,
   CANVAS_NODE_SHAPE_TYPE,
   CANVAS_SCENE_TEMPLATES,
+  OFFICIAL_SKILLS,
   buildDemoOrchestrationPlan,
   createNodeId,
   extractSkillManifest,
@@ -18,12 +19,15 @@ import {
   parseOrchestrationPlan,
   routeOrchestrationScene,
   shapeIdToNodeId,
+  skillManifestToNodes,
   validateCanvasDoc,
   validateEdgeKind,
   validateSkillManifest,
+  validateSkillManifestDetailed,
   type CanvasDoc,
   type CanvasNodeKind,
   type OrchestrationPlan,
+  type SkillManifest,
 } from '../../canvas/contract.ts'
 import {
   clearCanvasDoc,
@@ -666,6 +670,78 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     }
   }, [docName, selectedNodeCount, showSkillNotice])
 
+  // S2：Skill 导入布置（CANVAS_PLAN.md §9 S2）：单一 editor.run batch（节点+箭头整体，
+  // Ctrl+Z 一次回滚），撤销按钮复用 B6 编排的 orchestrationIdsRef 快照机制。
+  const applySkillImport = useCallback(
+    (manifest: SkillManifest) => {
+      const editor = editorRef.current
+      if (!editor) return
+      const bounds = editor.getViewportPageBounds()
+      const plan = skillManifestToNodes(manifest, {
+        minX: bounds.minX,
+        maxX: bounds.maxX,
+        centerY: bounds.center.y,
+        bottomY: bounds.maxY,
+      })
+      if (!plan || plan.nodes.length === 0) {
+        showSkillNotice('导入失败：Skill 包没有任何可布置节点')
+        return
+      }
+      const doc = {
+        version: 1 as const,
+        id: 'skill-import',
+        name: manifest.name,
+        nodes: plan.nodes,
+        edges: plan.edges,
+        updatedAt: Date.now(),
+      }
+      const shapes = docToShapePartials(doc)
+      const { arrowPartials, bindingCreates } = docEdgesToArrowCreations(doc)
+      const created: TLShapeId[] = []
+      // 编程式 run 不会自动打 history mark（实测 tldraw v5 连续编程操作并入同一段历史），
+      // 显式打点保证 Ctrl+Z 精确回滚「本次导入」而不连带撤销用户之前的操作
+      editor.markHistoryStoppingPoint()
+      editor.run(() => {
+        if (shapes.length > 0) editor.createShapes(shapes)
+        if (arrowPartials.length > 0) {
+          editor.createShapes(arrowPartials)
+          editor.createBindings(bindingCreates)
+        }
+      })
+      for (const s of shapes) created.push(s.id as TLShapeId)
+      for (const a of arrowPartials) created.push(a.id)
+      orchestrationIdsRef.current = created
+      setHasUndoable(true)
+      showOrchestrationNotice(
+        `✓ 已导入 Skill「${manifest.name}」：${plan.nodes.length} 节点 / ${plan.edges.length} 边 · ` +
+          '入口节点请「填新输入」（其余参数延续），产物需重新生成'
+      )
+      editor.zoomToFit()
+    },
+    [showOrchestrationNotice, showSkillNotice]
+  )
+
+  // S2：文件导入（非法 JSON / 不合格 manifest 整体拒绝并给中文原因，不半渲染）
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const handleImportFile = useCallback(
+    async (file: File) => {
+      try {
+        const raw: unknown = JSON.parse(await file.text())
+        const check = validateSkillManifestDetailed(raw)
+        if (!check.ok) {
+          showSkillNotice(`⛔ 导入失败：${check.reason}`)
+          return
+        }
+        applySkillImport(check.manifest)
+      } catch (err) {
+        showSkillNotice(
+          `⛔ 导入失败：${err instanceof Error ? err.message : '文件不是合法 JSON'}`
+        )
+      }
+    },
+    [applySkillImport, showSkillNotice]
+  )
+
   const paletteItems = useMemo(
     () => CANVAS_NODE_KINDS.map((kind) => ({ kind, ...CANVAS_NODE_META[kind] })),
     []
@@ -743,6 +819,39 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             >
               📦 导出 Skill{selectedNodeCount >= 2 ? `（${selectedNodeCount}）` : ''}
             </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              aria-label="选择 Skill 包文件"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void handleImportFile(file)
+                e.target.value = ''
+              }}
+            />
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="import-skill"
+              title="导入 Skill 包 JSON：校验通过后整批上画布（可一键撤销），入口节点高亮「填新输入」"
+              onClick={() => importInputRef.current?.click()}
+            >
+              📥 导入 Skill
+            </button>
+            {OFFICIAL_SKILLS.map((skill) => (
+              <button
+                key={skill.id}
+                type="button"
+                className="wls-canvas-btn"
+                data-testid={`official-skill-${skill.id}`}
+                title={`${skill.description}（官方预置，导入后填新输入即可运行）`}
+                onClick={() => applySkillImport(skill.manifest)}
+              >
+                {skill.icon} {skill.label}
+              </button>
+            ))}
             <button type="button" className="wls-canvas-btn" onClick={onClear}>
               🧹 清空画布
             </button>

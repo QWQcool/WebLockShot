@@ -44,7 +44,10 @@ export function ScriptNodeBody({ shape }: { shape: WlsNodeShape }) {
   const result = readScriptMetaPayload(meta)
   const scene = scriptSceneOf(meta)
 
-  // 上游 Brief 文本：沿指入箭头找 brief 节点 meta.text（tldraw 响应式，连线变化即刷新）
+  // 上游注入：沿指入箭头找需求文本（tldraw 响应式，连线变化即刷新）。
+  // 1) 直连 brief → meta.text（B2 原语义）；
+  // 2) S2：product 上游（六步链 brief→product→script / 换商品路径）→ 链式透传其上游
+  //    brief 的 meta.text；无 brief 时回退商品标题（title 即需求核心）。
   const upstreamText = useValue(
     'upstreamBriefText',
     () => {
@@ -57,13 +60,44 @@ export function ScriptNodeBody({ shape }: { shape: WlsNodeShape }) {
         if (!start || start.toId === shape.id) continue
         const src = editor.getShape(start.toId)
         if (!src || src.type !== CANVAS_NODE_SHAPE_TYPE) continue
-        if ((src.props as { kind?: unknown }).kind !== 'brief') continue
+        const kind = (src.props as { kind?: unknown }).kind
         const srcMeta = (src.props as { meta?: unknown }).meta
-        const text =
-          srcMeta && typeof srcMeta === 'object' && !Array.isArray(srcMeta)
-            ? (srcMeta as Record<string, unknown>).text
-            : undefined
-        if (typeof text === 'string' && text.trim()) return text.trim()
+        const readText = (m: unknown): string | null => {
+          const text =
+            m && typeof m === 'object' && !Array.isArray(m)
+              ? (m as Record<string, unknown>).text
+              : undefined
+          return typeof text === 'string' && text.trim() ? text.trim() : null
+        }
+        if (kind === 'brief') {
+          const text = readText(srcMeta)
+          if (text) return text
+        }
+        if (kind === 'product') {
+          // 链式透传：product 的上游 brief 文本优先（完整需求），否则商品标题兜底
+          for (const b2 of editor.getBindingsToShape(src.id, 'arrow')) {
+            const arrow2 = editor.getShape(b2.fromId)
+            if (!arrow2) continue
+            const start2 = editor
+              .getBindingsFromShape(arrow2, 'arrow')
+              .find((b) => (b.props as { terminal?: unknown }).terminal === 'start')
+            if (!start2 || start2.toId === src.id) continue
+            const briefShape = editor.getShape(start2.toId)
+            if (
+              !briefShape ||
+              briefShape.type !== CANVAS_NODE_SHAPE_TYPE ||
+              (briefShape.props as { kind?: unknown }).kind !== 'brief'
+            )
+              continue
+            const text = readText((briefShape.props as { meta?: unknown }).meta)
+            if (text) return text
+          }
+          const title =
+            srcMeta && typeof srcMeta === 'object' && !Array.isArray(srcMeta)
+              ? (srcMeta as Record<string, unknown>).title
+              : undefined
+          if (typeof title === 'string' && title.trim()) return title.trim()
+        }
       }
       return null
     },

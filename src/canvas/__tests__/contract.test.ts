@@ -21,8 +21,11 @@ import {
   edgeIdToArrowShapeId,
   edgeToArrowMaterial,
   buildDemoOrchestrationPlan,
+  buildDirectShotPlans,
   extractSkillManifest,
   filterOrchestrationParams,
+  OFFICIAL_SKILLS,
+  skillManifestToNodes,
   initialNodeY,
   nodeAvailability,
   nodeIdToShapeId,
@@ -43,6 +46,7 @@ import {
   validateCanvasDoc,
   validateEdgeKind,
   validateSkillManifest,
+  validateSkillManifestDetailed,
   writeAssetMetaPayload,
   writeDeliverMetaPayload,
   writeEditMetaPayload,
@@ -240,6 +244,8 @@ test('validateEdgeKind：合法连线全部通过', () => {
     ['brief', 'image'],
     ['product', 'script'],
     ['product', 'image'],
+    // S2（§5.2 v1.4 增补）：解锁 product → generate 单图直出通道（原为非法连线用例，见 v1.4 变更说明）
+    ['product', 'generate'],
     ['script', 'storyboard'],
     ['storyboard', 'generate'],
     ['image', 'edit'],
@@ -264,7 +270,7 @@ test('validateEdgeKind：合法连线全部通过', () => {
 test('validateEdgeKind：非法连线 / 自环 / 终点回流被拒且 reason 为非空中文', () => {
   const illegal: [string, string][] = [
     ['storyboard', 'product'], // 典型回连
-    ['product', 'generate'],
+    // S2 起 product→generate 已解锁（单图直出通道），原非法用例移入合法列表
     ['brief', 'deliver'],
     ['script', 'deliver'],
     ['generate', 'script'],
@@ -1354,4 +1360,174 @@ test('S1 validateSkillManifest：产物污染 / 白名单外参数 / 非法 scri
   )
   // 合法对照仍通过
   assert.ok(validateSkillManifest(base))
+})
+
+/* ---------------- S2：导入复用 + 单图直出 + 官方 Skill ---------------- */
+
+test('S2 O1 对抗：params 值非字符串（number/对象/数组）整体拒绝且给出中文原因', () => {
+  const base = extractSkillManifest(makeSkillDoc(), ['n1', 'n2'], 'O1 对抗包')
+  assert.ok(base)
+
+  const textNode = base.nodes[0]
+  const withParams = (params: Record<string, unknown>) => ({
+    ...base,
+    nodes: [{ ...textNode, params }, base.nodes[1]],
+  })
+
+  // number 值
+  const num = validateSkillManifestDetailed(withParams({ text: 123 }))
+  assert.equal(num.ok, false)
+  if (!num.ok) assert.ok(/字符串/.test(num.reason), `reason 应含「字符串」：${num.reason}`)
+  // 对象值
+  assert.equal(validateSkillManifest(withParams({ text: { evil: 1 } })), null)
+  // 数组值
+  assert.equal(validateSkillManifest(withParams({ text: ['a'] })), null)
+  // null 值
+  assert.equal(validateSkillManifest(withParams({ text: null })), null)
+  // 合法字符串仍通过（含空串——空输入 = 等用户「填新输入」）
+  assert.ok(validateSkillManifest(withParams({ text: '' })))
+  assert.ok(validateSkillManifest(withParams({ text: '正常文本' })))
+})
+
+test('S2 O2：name 纯空白被拒绝（validateSkillManifestDetailed 给中文原因）', () => {
+  const base = extractSkillManifest(makeSkillDoc(), ['n1', 'n2'], 'O2 包')
+  assert.ok(base)
+  const blank = validateSkillManifestDetailed({ ...base, name: '   ' })
+  assert.equal(blank.ok, false)
+  if (!blank.ok) assert.ok(/名称/.test(blank.reason), `reason 应含「名称」：${blank.reason}`)
+  assert.equal(validateSkillManifest({ ...base, name: '' }), null)
+})
+
+test('S2 单图直出连线：product→generate 合法（compat 表 + validateEdgeKind 一致）', () => {
+  assert.ok(CANVAS_EDGE_COMPAT.product.includes('generate'))
+  assert.deepEqual(validateEdgeKind('product', 'generate'), { ok: true })
+  // 其余非法连线语义不变
+  assert.equal(validateEdgeKind('generate', 'product').ok, false)
+  assert.equal(validateEdgeKind('product', 'asset').ok, false)
+})
+
+test('S2 buildDirectShotPlans：单镜演示计划（商品标题作提示词）确定性', () => {
+  const plans = buildDirectShotPlans('  冰博克奶茶  ')
+  assert.equal(plans.length, 1)
+  assert.equal(plans[0].shotId, 'direct-s1')
+  assert.equal(plans[0].order, 1)
+  assert.equal(plans[0].durationSec, 3)
+  assert.ok(plans[0].positive.startsWith('冰博克奶茶'))
+  assert.equal(plans[0].caption, '冰博克奶茶')
+  // 确定性：同输入同输出
+  assert.equal(JSON.stringify(buildDirectShotPlans('冰博克奶茶')), JSON.stringify(plans))
+  // 空标题 → 空数组（调用方禁用按钮）
+  assert.deepEqual(buildDirectShotPlans('   '), [])
+  // 超长标题截断 120
+  const long = buildDirectShotPlans('长'.repeat(200))
+  assert.ok(long[0].positive.startsWith('长'.repeat(120)))
+})
+
+test('S2 官方 Skill：两包均通过深度校验且拓扑/输入/输出正确', () => {
+  assert.equal(OFFICIAL_SKILLS.length, 2)
+  for (const skill of OFFICIAL_SKILLS) {
+    const check = validateSkillManifestDetailed(skill.manifest)
+    assert.ok(check.ok, `官方 Skill「${skill.manifest.name}」应通过校验：${check.ok ? '' : check.reason}`)
+  }
+  const six = OFFICIAL_SKILLS[0].manifest
+  assert.equal(six.nodes.length, 6)
+  assert.deepEqual(
+    six.nodes.map((n) => n.kind),
+    ['brief', 'product', 'script', 'storyboard', 'generate', 'deliver']
+  )
+  assert.deepEqual(six.edges, [
+    { from: 0, to: 1 },
+    { from: 1, to: 2 },
+    { from: 2, to: 3 },
+    { from: 3, to: 4 },
+    { from: 4, to: 5 },
+  ])
+  assert.deepEqual(
+    six.inputs.map((i) => [i.slot, i.paramKey]),
+    [
+      ['slot-1', 'text'],
+      ['slot-2', 'title'],
+    ]
+  )
+  assert.deepEqual(six.outputs, [{ slot: 'slot-6', label: '成片交付' }])
+  // script 场景参数延续
+  assert.deepEqual(six.nodes[2].params, { scriptScene: 'ecommerce' })
+
+  const single = OFFICIAL_SKILLS[1].manifest
+  assert.equal(single.nodes.length, 2)
+  assert.deepEqual(single.edges, [{ from: 0, to: 1 }])
+  assert.deepEqual(
+    single.nodes.map((n) => n.kind),
+    ['product', 'generate']
+  )
+  assert.deepEqual(
+    single.inputs.map((i) => [i.slot, i.paramKey]),
+    [['slot-1', 'title']]
+  )
+  assert.deepEqual(single.outputs, [{ slot: 'slot-2', label: '视频生成' }])
+})
+
+test('S2 skillManifestToNodes：id 全量重映射 + 相对坐标落位避开对话栏 + 边重映射', () => {
+  const single = OFFICIAL_SKILLS[1].manifest
+  const viewport = { minX: 0, maxX: 1500, centerY: 400, bottomY: 900, safeBandPx: 150 }
+  const plan = skillManifestToNodes(single, viewport)
+  assert.ok(plan)
+  assert.equal(plan.nodes.length, 2)
+  assert.equal(plan.edges.length, 1)
+
+  // id 重映射：两次导入 id 不同（与现有画布节点不冲突）
+  const again = skillManifestToNodes(single, viewport)
+  assert.ok(again)
+  assert.notEqual(plan.nodes[0].id, again.nodes[0].id)
+  assert.notEqual(plan.nodes[1].id, again.nodes[1].id)
+  assert.notEqual(plan.edges[0].id, again.edges[0].id)
+
+  // 相对坐标落位：offsetX = minX+40；垂直居中优先，底边不进避让带
+  // totalH = max(y+h) = 340 → idealOffsetY = 400-170 = 230；maxOffsetY = 900-150-340 = 410 → 取 230
+  assert.equal(plan.nodes[0].x, 40)
+  assert.equal(plan.nodes[0].y, 230)
+  assert.equal(plan.nodes[1].x, 40 + 360)
+  assert.equal(plan.nodes[1].y, 230)
+  assert.ok(plan.nodes.every((n) => n.y + n.h <= viewport.bottomY - 150), '底边不得进入对话栏避让带')
+
+  // 边重映射到新节点 id；边 id 规则 eimp-<导入盐>-N（每次导入唯一，箭头物化跨刷新稳定）
+  assert.match(plan.edges[0].id, /^eimp-[A-Za-z0-9_-]+-1$/)
+  assert.notEqual(plan.edges[0].id, again.edges[0].id) // 同画布多次导入边 id 不冲突
+  assert.equal(plan.edges[0].from, plan.nodes[0].id)
+  assert.equal(plan.edges[0].to, plan.nodes[1].id)
+
+  // 重映射计划经 validateCanvasDoc 兼容（节点/边 schema、边引用完整性）
+  const doc = validateCanvasDoc({
+    version: 1,
+    id: 'canvas-import',
+    name: '导入测试',
+    nodes: plan.nodes,
+    edges: plan.edges,
+    updatedAt: 1,
+  })
+  assert.ok(doc)
+  assert.equal(doc.nodes.length, 2)
+  assert.equal(doc.edges.length, 1)
+})
+
+test('S2 skillManifestToNodes：inputs 映射为 skillInputKeys（仅白名单内）+ 空串参数丢弃如实未生成', () => {
+  const six = OFFICIAL_SKILLS[0].manifest
+  const plan = skillManifestToNodes(six, { minX: 0, maxX: 2400, centerY: 300, bottomY: 1000 })
+  assert.ok(plan)
+  assert.equal(plan.nodes.length, 6)
+  const byKind = new Map(plan.nodes.map((n) => [n.kind, n]))
+  // 入口 brief 高亮「填新输入」
+  assert.deepEqual(byKind.get('brief')?.meta.skillInputKeys, ['text'])
+  // product 虽有入边，官方包 inputs 显式声明换商品图 → 同样高亮
+  assert.deepEqual(byKind.get('product')?.meta.skillInputKeys, ['title'])
+  // script 参数延续（无输入声明 → 无标记）
+  assert.equal(byKind.get('script')?.meta.scriptScene, 'ecommerce')
+  assert.equal(byKind.get('script')?.meta.skillInputKeys, undefined)
+  // brief/product 的空输入参数被丢弃 → 如实显示未生成
+  assert.equal(byKind.get('brief')?.meta.text, undefined)
+  assert.equal(byKind.get('product')?.meta.title, undefined)
+  // storyboard/generate/deliver 无参数槽
+  for (const kind of ['storyboard', 'generate', 'deliver'] as const) {
+    assert.deepEqual(byKind.get(kind)?.meta, {})
+  }
 })

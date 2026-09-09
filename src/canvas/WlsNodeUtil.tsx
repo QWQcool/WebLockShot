@@ -1,14 +1,17 @@
+import { useState } from 'react'
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
   Rectangle2d,
   T,
+  useEditor,
   type JsonObject,
   type TLResizeInfo,
   type TLShape,
 } from 'tldraw'
 import {
   CANVAS_NODE_META,
+  SKILL_PARAM_LABELS,
   nodeAvailability,
   type CanvasNodeKind,
 } from './contract.ts'
@@ -101,6 +104,12 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
       typeof shape.props.meta.text === 'string' && shape.props.meta.text.trim().length > 0
         ? shape.props.meta.text.trim()
         : null
+    // S2：Skill 导入的「填新输入」高亮（meta.skillInputKeys 由导入落位纯函数写入，仅白名单内键）
+    const skillInputKeys = Array.isArray(shape.props.meta.skillInputKeys)
+      ? (shape.props.meta.skillInputKeys as unknown[]).filter(
+          (k): k is string => typeof k === 'string'
+        )
+      : []
 
     return (
       <HTMLContainer
@@ -117,6 +126,11 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
             {availabilityLabel}
           </span>
         </div>
+        {skillInputKeys.length > 0 && (
+          <div className="wls-node-input-hint" title="Skill 导入：此节点的输入未填写，请补全后再运行">
+            📥 填新输入：{skillInputKeys.map((k) => SKILL_PARAM_LABELS[k] ?? k).join('、')}
+          </div>
+        )}
         <div className="wls-node-body">
           {shape.props.kind === 'asset' ? (
             <AssetNodeBody shape={shape} />
@@ -137,6 +151,9 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
             <ScriptNodeBody shape={shape} />
           ) : shape.props.kind === 'storyboard' ? (
             <StoryboardNodeBody shape={shape} />
+          ) : shape.props.kind === 'brief' && skillInputKeys.includes('text') ? (
+            // S2：Skill 导入的 Brief 需填输入——内联编辑（原 brief 文本只由对话栏写入，导入场景必须可填）
+            <BriefInlineEditor shape={shape} />
           ) : (
             <>
               {briefText ? (
@@ -156,4 +173,35 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
       </HTMLContainer>
     )
   }
+}
+
+/**
+ * S2：Brief 内联编辑器（Skill 导入「填新输入」场景）。
+ * 输入实时写回 meta.text（对话栏同键，script 节点沿边读取）；本地 draft 为准避免受控抖动。
+ * 控件级 stopPropagation（B2 约定）：仅 textarea 本体阻断，不挂容器级。
+ */
+function BriefInlineEditor({ shape }: { shape: WlsNodeShape }) {
+  const editor = useEditor()
+  const [draft, setDraft] = useState(() =>
+    typeof shape.props.meta.text === 'string' ? shape.props.meta.text : ''
+  )
+  return (
+    <textarea
+      className="wls-brief-editor"
+      value={draft}
+      rows={3}
+      maxLength={2000}
+      placeholder="填写需求：想做什么、给谁看、突出什么"
+      aria-label="需求 Brief 文本"
+      onPointerDown={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        setDraft(e.target.value)
+        editor.updateShape({
+          id: shape.id,
+          type: shape.type,
+          props: { meta: { ...shape.props.meta, text: e.target.value } as JsonObject },
+        })
+      }}
+    />
+  )
 }

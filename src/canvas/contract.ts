@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ScriptSchema } from '../domain/script.ts'
+import { VisualPlanSchema, type VisualPlan } from '../domain/sellVisual.ts'
 import { MOTION_IDS, PROP_IDS, SHOT_SIZES } from '../types.ts'
 
 /**
@@ -880,7 +881,9 @@ export function edgeToArrowMaterial(
  */
 export const CANVAS_EDGE_COMPAT: Record<CanvasNodeKind, readonly CanvasNodeKind[]> = {
   brief: ['product', 'script', 'image'],
-  product: ['script', 'image'],
+  // S2（§5.2 v1.4 增补）：解锁 product → generate 单图直出通道——generate 节点在
+  // 仅有 product 上游（无 storyboard）时进入「单图直出 · 演示引擎」模式（商品标题作提示词）
+  product: ['script', 'image', 'generate'],
   image: ['edit', 'deliver'],
   script: ['storyboard'],
   storyboard: ['generate'],
@@ -1115,37 +1118,78 @@ function paramValueContaminated(v: unknown): boolean {
 }
 
 /**
- * Skill manifest 深度校验（整体拒绝，不半渲染）：
+ * Skill manifest 深度校验（整体拒绝，不半渲染），失败时给中文原因（S2 导入 UI 直接展示）：
  * 1. zod 形状校验（缺 name / 空 nodes / 非法 slot 格式直接拒）；
- * 2. slot id 唯一且恰好为 slot-1..N；
- * 3. params 严格白名单：键必须在 SKILL_PARAM_KEYS[kind] 内、值不得含 idbref:// / blob: 产物引用、
- *    scriptScene 必须是合法枚举；
- * 4. 边下标有效、无自环、无重复、两端 kind 兼容（复用 validateEdgeKind）；
- * 5. inputs/outputs 的 slot 引用有效。
- * 校验失败返回 null（调用方如实提示，不静默半渲染）。
+ * 2. name 不得纯空白（O2）；
+ * 3. slot id 唯一且恰好为 slot-1..N；
+ * 4. params 严格白名单：键必须在 SKILL_PARAM_KEYS[kind] 内、**值必须是字符串（O1：数值/对象一律拒）**、
+ *    值不得含 idbref:// / blob: 产物引用、scriptScene 必须是合法枚举；
+ *    （text/title 的 trim 非空与截断由导入落 meta 层 filterOrchestrationParams 兜底，空串允许=等用户填）
+ * 5. 边下标有效、无自环、无重复、两端 kind 兼容（复用 validateEdgeKind）；
+ * 6. inputs/outputs 的 slot 引用有效。
  */
-export function validateSkillManifest(raw: unknown): SkillManifest | null {
+export type SkillManifestCheck =
+  | { ok: true; manifest: SkillManifest }
+  | { ok: false; reason: string }
+
+export function validateSkillManifestDetailed(raw: unknown): SkillManifestCheck {
   const parsed = skillManifestSchema.safeParse(raw)
-  if (!parsed.success) return null
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    const path = issue && issue.path.length > 0 ? issue.path.join('.') : ''
+    return {
+      ok: false,
+      reason: `Skill 包结构不合法${path ? `（字段 ${path}）` : ''}：${issue?.message ?? '未知错误'}`,
+    }
+  }
   const m = parsed.data
+
+  // O2：name 纯空白拒绝（导出路径已 trim，导入路径由本检查兜底）
+  if (!m.name.trim()) return { ok: false, reason: 'Skill 包缺少有效名称（name 为纯空白）' }
 
   // slot 唯一且恰好 slot-1..N（与 nodes 顺序无关，集合必须精确匹配）
   const slotSet = new Set(m.nodes.map((n) => n.slot))
-  if (slotSet.size !== m.nodes.length) return null
+  if (slotSet.size !== m.nodes.length) {
+    return { ok: false, reason: 'Skill 包节点槽位 id 重复' }
+  }
   for (let i = 0; i < m.nodes.length; i++) {
-    if (!slotSet.has(`${SKILL_SLOT_ID_PREFIX}${i + 1}`)) return null
+    if (!slotSet.has(`${SKILL_SLOT_ID_PREFIX}${i + 1}`)) {
+      return { ok: false, reason: `Skill 包槽位不连续：缺少 ${SKILL_SLOT_ID_PREFIX}${i + 1}` }
+    }
   }
 
-  // params 严格白名单 + 产物污染 + scriptScene 枚举
+  // params 严格白名单 + 值类型 + 产物污染 + scriptScene 枚举
   for (const node of m.nodes) {
+    const kindLabel = CANVAS_NODE_META[node.kind].label
     const allowed = SKILL_PARAM_KEYS[node.kind] ?? []
     for (const key of Object.keys(node.params)) {
-      if (!allowed.includes(key)) return null
-      if (paramValueContaminated(node.params[key])) return null
+      if (!allowed.includes(key)) {
+        return {
+          ok: false,
+          reason: `节点 ${node.slot}（${kindLabel}）的参数「${key}」不在该节点类型的白名单内`,
+        }
+      }
+      // O1：值必须字符串，杜绝 number/object 进 meta
+      if (typeof node.params[key] !== 'string') {
+        return {
+          ok: false,
+          reason: `节点 ${node.slot}（${kindLabel}）的参数「${key}」必须是字符串`,
+        }
+      }
+      const value = node.params[key] as string
+      if (paramValueContaminated(value)) {
+        return {
+          ok: false,
+          reason: `节点 ${node.slot}（${kindLabel}）的参数「${key}」携带设备本地产物引用（idbref/blob），禁止导入`,
+        }
+      }
     }
     const scene = node.params['scriptScene']
     if (scene !== undefined && !CANVAS_SCRIPT_SCENES.includes(scene as CanvasScriptScene)) {
-      return null
+      return {
+        ok: false,
+        reason: `节点 ${node.slot}（${kindLabel}）的脚本场景非法（只允许 ecommerce / drama / brand）`,
+      }
     }
   }
 
@@ -1153,22 +1197,43 @@ export function validateSkillManifest(raw: unknown): SkillManifest | null {
   const kindByIndex = m.nodes.map((n) => n.kind)
   const seen = new Set<string>()
   for (const e of m.edges) {
-    if (e.from >= kindByIndex.length || e.to >= kindByIndex.length) return null
-    if (e.from === e.to) return null
+    if (e.from >= kindByIndex.length || e.to >= kindByIndex.length) {
+      return { ok: false, reason: `Skill 包连线引用了不存在的节点下标（${e.from} → ${e.to}）` }
+    }
+    if (e.from === e.to) {
+      return { ok: false, reason: `Skill 包连线存在自环（节点下标 ${e.from}）` }
+    }
     const key = `${e.from}->${e.to}`
-    if (seen.has(key)) return null
+    if (seen.has(key)) {
+      return { ok: false, reason: `Skill 包连线重复（${e.from} → ${e.to}）` }
+    }
     seen.add(key)
-    if (!validateEdgeKind(kindByIndex[e.from], kindByIndex[e.to]).ok) return null
+    if (!validateEdgeKind(kindByIndex[e.from], kindByIndex[e.to]).ok) {
+      return {
+        ok: false,
+        reason: `Skill 包连线类型不兼容：${CANVAS_NODE_META[kindByIndex[e.from]].label} → ${CANVAS_NODE_META[kindByIndex[e.to]].label}`,
+      }
+    }
   }
 
   // inputs/outputs slot 引用有效
   for (const input of m.inputs) {
-    if (!slotSet.has(input.slot)) return null
+    if (!slotSet.has(input.slot)) {
+      return { ok: false, reason: `Skill 包输入声明引用了不存在的槽位（${input.slot}）` }
+    }
   }
   for (const output of m.outputs) {
-    if (!slotSet.has(output.slot)) return null
+    if (!slotSet.has(output.slot)) {
+      return { ok: false, reason: `Skill 包输出声明引用了不存在的槽位（${output.slot}）` }
+    }
   }
-  return m
+  return { ok: true, manifest: m }
+}
+
+/** 校验 Skill manifest（整体拒绝）：合法返回 manifest，非法返回 null（原因走 validateSkillManifestDetailed） */
+export function validateSkillManifest(raw: unknown): SkillManifest | null {
+  const check = validateSkillManifestDetailed(raw)
+  return check.ok ? check.manifest : null
 }
 
 /**
@@ -1260,4 +1325,170 @@ export function extractSkillManifest(
 
 function nodeIndexIn(nodes: SkillNode[], slot: string): number {
   return nodes.findIndex((n) => n.slot === slot)
+}
+
+/* ------------------------------------------------------------------ *
+ * S2：单图直出（product → generate）+ 导入复用（CANVAS_PLAN.md §9 S2）
+ * ------------------------------------------------------------------ */
+
+/** 单图直出产物的固定镜号（generate meta.artifacts.shotId / 产物卡 shotId 共用） */
+export const DIRECT_OUT_SHOT_ID = 'direct-s1'
+
+/**
+ * 单图直出演示计划（纯函数，node --test 可跑）：
+ * 仅有 product 上游（无 storyboard）时，以商品标题为提示词生成单镜 VisualPlan，
+ * 走 Mock/演示引擎单镜出片（UI 必须标注「单图直出 · 演示引擎」）。
+ * 商品标题为空（trim 后）返回空数组（调用方禁用按钮）。
+ */
+export function buildDirectShotPlans(productTitle: string): VisualPlan[] {
+  const t = productTitle.trim().slice(0, 120)
+  if (!t) return []
+  return [
+    VisualPlanSchema.parse({
+      shotId: DIRECT_OUT_SHOT_ID,
+      order: 1,
+      positive: `${t}。高质量商品单镜展示：主体居中、光感干净、构图克制`,
+      caption: t,
+      durationSec: 3,
+    }),
+  ]
+}
+
+/** 官方预置 Skill（§5.2-3）：随包内置，导入走与文件导入完全相同的校验与布置链路 */
+export type OfficialSkill = {
+  id: string
+  icon: string
+  label: string
+  description: string
+  manifest: SkillManifest
+}
+
+/** 六步爆款带货流的标准节点尺寸（与 addNode 各 kind 默认尺寸一致） */
+const SIX_STEP_SIZES: Record<
+  'brief' | 'product' | 'script' | 'storyboard' | 'generate' | 'deliver',
+  [number, number]
+> = {
+  brief: [260, 160],
+  product: [300, 340],
+  script: [300, 220],
+  storyboard: [300, 560],
+  generate: [300, 320],
+  deliver: [300, 400],
+}
+
+export const OFFICIAL_SKILLS: OfficialSkill[] = [
+  {
+    id: 'six-step-ecommerce',
+    icon: '📦',
+    label: '六步爆款带货流',
+    description: 'brief→product→script→storyboard→generate→deliver 标准带货链',
+    manifest: {
+      version: SKILL_MANIFEST_VERSION,
+      name: '六步爆款带货流',
+      nodes: (
+        [
+          ['brief', 0, 0],
+          ['product', 300, 0],
+          ['script', 640, 0],
+          ['storyboard', 980, 0],
+          ['generate', 1320, 0],
+          ['deliver', 1660, 0],
+        ] as [keyof typeof SIX_STEP_SIZES, number, number][]
+      ).map(([kind, x, y], index) => {
+        const [w, h] = SIX_STEP_SIZES[kind]
+        const params: Record<string, string> = {}
+        if (kind === 'script') params.scriptScene = 'ecommerce'
+        return { slot: `slot-${index + 1}`, kind, x, y, w, h, params }
+      }),
+      edges: [0, 1, 2, 3, 4].map((i) => ({ from: i, to: i + 1 })),
+      inputs: [
+        { slot: 'slot-1', paramKey: 'text', label: '需求 Brief · 需求文本' },
+        { slot: 'slot-2', paramKey: 'title', label: '素材导入 · 商品标题' },
+      ],
+      outputs: [{ slot: 'slot-6', label: '成片交付' }],
+    },
+  },
+  {
+    id: 'single-image-out',
+    icon: '⚡',
+    label: '单图快速出片',
+    description: 'product→generate 直连，商品标题作提示词单镜演示出片',
+    manifest: {
+      version: SKILL_MANIFEST_VERSION,
+      name: '单图快速出片',
+      nodes: [
+        { slot: 'slot-1', kind: 'product', x: 0, y: 0, w: 300, h: 340, params: {} },
+        { slot: 'slot-2', kind: 'generate', x: 360, y: 0, w: 300, h: 320, params: {} },
+      ],
+      edges: [{ from: 0, to: 1 }],
+      inputs: [{ slot: 'slot-1', paramKey: 'title', label: '素材导入 · 商品标题' }],
+      outputs: [{ slot: 'slot-2', label: '视频生成' }],
+    },
+  },
+]
+
+/** 导入落位的视口参数（从 editor.getViewportPageBounds 提取） */
+export type SkillImportViewport = {
+  minX: number
+  maxX: number
+  centerY: number
+  bottomY: number
+  /** 对话栏避让带（与 initialNodeY 同语义，默认 150） */
+  safeBandPx?: number
+}
+
+export type SkillImportPlan = { nodes: CanvasNode[]; edges: CanvasEdge[] }
+
+/**
+ * Skill manifest → 画布重建计划（纯函数，node --test 可跑）：
+ * - 节点 id 全量重映射（createNodeId，与现有画布天然不冲突）；
+ * - 相对坐标整体平移落位：水平贴视口左侧内缩 40px，垂直优先居中、
+ *   底边不进对话栏避让带（min(理想, 上限)，与 initialNodeY 同语义）；
+ * - params 经 filterOrchestrationParams 二次收窄（O1：值类型/trim/截断兜底，
+ *   空串参数丢弃 = 节点如实显示未生成，等用户「填新输入」）；
+ * - inputs 声明映射为各节点 meta.skillInputKeys（仅保留白名单内的键，供 UI 高亮提示）；
+ * - 边重映射为新节点 id，边 id 规则 eimp-1..N（经 edgeIdToArrowShapeId 物化后跨刷新稳定）。
+ */
+export function skillManifestToNodes(
+  manifest: SkillManifest,
+  viewport: SkillImportViewport
+): SkillImportPlan | null {
+  if (manifest.nodes.length === 0) return null
+  const totalH = Math.max(...manifest.nodes.map((n) => n.y + n.h))
+  const offsetX = viewport.minX + 40
+  const maxOffsetY = viewport.bottomY - (viewport.safeBandPx ?? 150) - totalH
+  const offsetY = Math.min(viewport.centerY - totalH / 2, maxOffsetY)
+
+  const slotToId = new Map<string, string>()
+  const nodes: CanvasNode[] = manifest.nodes.map((n) => {
+    const id = createNodeId()
+    slotToId.set(n.slot, id)
+    // O1 兜底：导入落 meta 前按白名单再收窄一次（值必须 string + trim 非空 + 截断）
+    const meta: Record<string, unknown> = { ...filterOrchestrationParams(n.kind, n.params) }
+    const inputKeys = manifest.inputs
+      .filter(
+        (i) => i.slot === n.slot && (SKILL_PARAM_KEYS[n.kind] ?? []).includes(i.paramKey)
+      )
+      .map((i) => i.paramKey)
+    if (inputKeys.length > 0) meta.skillInputKeys = inputKeys
+    return {
+      id,
+      kind: n.kind,
+      x: Math.round(offsetX + n.x),
+      y: Math.round(offsetY + n.y),
+      w: n.w,
+      h: n.h,
+      meta,
+    }
+  })
+  const edges: CanvasEdge[] = []
+  // 每次导入独立盐值：同画布多次导入同 Skill 时边 id 不冲突（节点 id 经 createNodeId 天然唯一）
+  const importSalt = createNodeId().slice(1)
+  manifest.edges.forEach((e, i) => {
+    const from = slotToId.get(manifest.nodes[e.from]?.slot ?? '')
+    const to = slotToId.get(manifest.nodes[e.to]?.slot ?? '')
+    if (!from || !to) return
+    edges.push({ id: `eimp-${importSalt}-${i + 1}`, from, to })
+  })
+  return { nodes, edges }
 }

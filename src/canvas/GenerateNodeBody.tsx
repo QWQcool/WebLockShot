@@ -12,7 +12,9 @@ import {
   putBlobAsset,
 } from '../persist/assetStore.ts'
 import {
+  buildDirectShotPlans,
   readGenerateMetaPayload,
+  readProductMetaPayload,
   readStoryboardMetaPayload,
   scriptDigest,
   writeGenerateMetaPayload,
@@ -74,11 +76,37 @@ function useUpstreamStoryboard(editor: ReturnType<typeof useEditor>, shapeId: TL
   )
 }
 
+/** S2：沿指入箭头找 product 节点的 meta.title（单图直出通道，tldraw 响应式） */
+function useUpstreamProduct(editor: ReturnType<typeof useEditor>, shapeId: TLShapeId) {
+  return useValue(
+    'upstreamProduct',
+    () => {
+      for (const binding of editor.getBindingsToShape(shapeId, 'arrow')) {
+        const arrow = editor.getShape(binding.fromId)
+        if (!arrow) continue
+        const start = editor
+          .getBindingsFromShape(arrow, 'arrow')
+          .find((b) => (b.props as { terminal?: unknown }).terminal === 'start')
+        if (!start || start.toId === shapeId) continue
+        const src = editor.getShape(start.toId)
+        if (!src || src.type !== 'wls-node') continue
+        if ((src.props as { kind?: unknown }).kind !== 'product') continue
+        const payload = readProductMetaPayload((src.props as { meta?: unknown }).meta)
+        if (payload) return payload
+      }
+      return null
+    },
+    [editor, shapeId]
+  )
+}
+
 export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   const editor = useEditor()
   const meta = shape.props.meta
   const result = readGenerateMetaPayload(meta)
   const upstream = useUpstreamStoryboard(editor, shape.id)
+  // S2：单图直出通道——仅有 product 上游（无 storyboard）时以商品标题作提示词单镜演示出片
+  const upstreamProduct = useUpstreamProduct(editor, shape.id)
 
   // 每节点独立引擎实例：复用 ExecutorEngine 全部队列/钱包/FSM 语义，不碰 sell 单例
   const engineRef = useRef<ExecutorEngine | null>(null)
@@ -98,6 +126,11 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   upstreamRef.current = upstream
 
   const story = upstream?.story ?? null
+  // S2：单图直出模式判定——无 storyboard 上游且 product 上游标题非空；有 storyboard 时优先分镜链路
+  const directTitle = !upstream && upstreamProduct ? upstreamProduct.title.trim() : ''
+  const directMode = directTitle.length > 0
+  const directTitleRef = useRef('')
+  directTitleRef.current = directTitle
   const costPerShot = walletManager.getCost('mock', 1)
   const totalCost = costPerShot * (story?.shots.length ?? 0)
 
@@ -134,6 +167,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     if (!self || self.type !== 'wls-node') return
     const story = upstreamRef.current?.story
     const shot = story?.shots.find((s) => `${story.id}-${s.id}` === shotId)
+    // S2 单图直出：无 shot.line 时用商品标题作产物卡标题
+    const directTitle = directTitleRef.current
     upsertAssetCard(
       editor,
       { shapeId: shape.id, x: self.x, y: self.y, w: self.props.w },
@@ -142,7 +177,11 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         url,
         shotId,
         createdAt: Date.now(),
-        ...(shot?.line ? { title: shot.line.slice(0, 40) } : {}),
+        ...(shot?.line
+          ? { title: shot.line.slice(0, 40) }
+          : directTitle
+            ? { title: directTitle.slice(0, 40) }
+            : {}),
       }
     )
   }
@@ -192,9 +231,22 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   }, [engine, handleJobSucceeded])
 
   const handleGenerate = async () => {
-    if (busy || !story) return
+    if (busy) return
     setBusy(true)
     setError(null)
+    // S2：单图直出分支——商品标题作提示词单镜 Mock 出片（无 story 快照，meta.story 不写）
+    if (directMode) {
+      storyDigestRef.current = scriptDigest(directTitle)
+      storyRef.current = null
+      try {
+        await engine.enqueueShots(buildDirectShotPlans(directTitle), 'mock')
+      } catch (err) {
+        setError(`任务入队失败：${err instanceof Error ? err.message : '未知错误'}`)
+        setBusy(false)
+      }
+      return
+    }
+    if (!story) return
     storyDigestRef.current = scriptDigest(story)
     storyRef.current = story
     try {
@@ -232,8 +284,14 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         <div className="wls-generate-upstream" title={story.title}>
           🔗 上游分镜就绪：{story.shots.length} 镜 · {story.title}
         </div>
+      ) : directMode ? (
+        <div className="wls-generate-upstream" title={directTitle}>
+          🔗 上游素材就绪：{directTitle}
+        </div>
       ) : (
-        <div className="wls-generate-hint">连入 storyboard 节点并生成分镜后，可逐镜出片</div>
+        <div className="wls-generate-hint">
+          连入 storyboard 节点逐镜出片，或连入 product 节点单图直出（演示引擎）
+        </div>
       )}
 
       {staleStory && (
@@ -242,11 +300,15 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         </div>
       )}
 
-      {/* 引擎与成本（诚实标注）：Mock 本身是合法引擎，非演示；可灵/即梦画布本期未接通 */}
+      {/* 引擎与成本（诚实标注）：Mock 本身是合法引擎；单图直出走演示引擎必须如实标注 */}
       <div className="wls-generate-engine">
-        <span className="wls-generate-engine-tag">Mock 实验画布</span>
+        <span className="wls-generate-engine-tag">{directMode ? '⚡ 单图直出 · 演示引擎' : 'Mock 实验画布'}</span>
         <span className="wls-generate-cost">
-          {story ? `${story.shots.length} 镜 · ${totalCost} 灵感币` : '— 灵感币'}
+          {story
+            ? `${story.shots.length} 镜 · ${totalCost} 灵感币`
+            : directMode
+              ? `1 镜 · ${costPerShot} 灵感币`
+              : '— 灵感币'}
         </span>
       </div>
       <div className="wls-generate-engine-note">
@@ -256,11 +318,19 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
       <button
         type="button"
         className="wls-generate-run"
-        disabled={busy || !story}
+        disabled={busy || (!story && !directMode)}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => void handleGenerate()}
       >
-        {busy ? '⚙️ 串行出片中…' : result ? '🔄 重新生成全部' : '⚙️ 开始逐镜出片'}
+        {busy
+          ? '⚙️ 串行出片中…'
+          : directMode
+            ? result
+              ? '🔄 重新直出单镜'
+              : '⚡ 单图直演出片'
+            : result
+              ? '🔄 重新生成全部'
+              : '⚙️ 开始逐镜出片'}
       </button>
       <div className="wls-generate-cancel-note">
         生成不支持中途取消；刷新页面会中断任务，未完成镜不扣费（冻结款由钱包孤儿回收兜底）
@@ -272,7 +342,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
       {(jobs.length > 0 || artifacts.length > 0) && (
         <div className="wls-generate-artifacts">
           <div className="wls-generate-artifacts-head">
-            产物 {succeededCount}/{(story?.shots.length ?? 0)} 已出片
+            产物 {succeededCount}/{directMode ? 1 : (story?.shots.length ?? 0)} 已出片
           </div>
           {(jobs.length > 0
             ? jobs.map((j) => ({
