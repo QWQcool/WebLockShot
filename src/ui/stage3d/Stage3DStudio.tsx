@@ -9,6 +9,15 @@ import {
   type Stage3DMetaPayload,
   type Stage3DObject,
 } from '../../canvas/stage3dMeta.ts'
+import {
+  STAGE3D_POSE_LABELS,
+  type Stage3DPoseId,
+} from '../../canvas/stage3dPose.ts'
+import {
+  keyframesDuration,
+  normalizeKeyframes,
+  type Stage3DKeyframe,
+} from '../../canvas/stage3dKeyframes.ts'
 import { getAssetObjectUrl, putBlobAsset } from '../../persist/assetStore.ts'
 import './stage3d.css'
 
@@ -49,8 +58,12 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
   const [cameras, setCameras] = useState<Stage3DCamera[]>(payload.cameras)
   const [env, setEnv] = useState<Stage3DMetaPayload['env']>(payload.env)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null)
   const [tool, setTool] = useState<ToolKey>('move')
   const [tab, setTab] = useState<'basic' | 'pose'>('basic')
+  // D2 关键帧播放（预览态：playhead 由视口 useFrame 回写；结束信号 -1）
+  const [playing, setPlaying] = useState(false)
+  const [playhead, setPlayhead] = useState(0)
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [sceneSearch, setSceneSearch] = useState('')
   const [scaleLock, setScaleLock] = useState(true)
@@ -59,7 +72,7 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [webglOk] = useState(detectWebGL)
   const objectUrlRef = useRef<string[]>([])
-  const controlsRef = useRef<{ reset: () => void; getCameraState?: () => { position: [number, number, number]; target: [number, number, number]; fov: number } } | null>(null)
+  const controlsRef = useRef<{ reset: () => void; getCameraState?: () => { position: [number, number, number]; target: [number, number, number]; fov: number }; flyTo?: (camera: { position: [number, number, number]; target: [number, number, number]; fov: number }) => void } | null>(null)
   const modelInputRef = useRef<HTMLInputElement>(null)
   const panoramaInputRef = useRef<HTMLInputElement>(null)
 
@@ -209,10 +222,79 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
       position: captured?.position ?? [5, 3.2, 7],
       target: captured?.target ?? [0, 0.9, 0],
       fov: Math.round(captured?.fov ?? 45),
+      keyframes: [],
     }
     commit({ cameras: [...cameras, cam] })
-    setNotice({ kind: 'ok', text: `✓ 已新增「${cam.name}」（导演视角参数已捕捉）· 视角切换 D2 开放` })
+    setNotice({ kind: 'ok', text: `✓ 已新增「${cam.name}」（导演视角参数已捕捉）· 点击左栏机位可飞至该视角` })
   }, [cameras, commit])
+
+  /** D2：飞至机位视角（平滑飞行），并选中该机位进入编辑态 */
+  const selectedCamera = useMemo(
+    () => cameras.find((c) => c.id === selectedCameraId) ?? null,
+    [cameras, selectedCameraId]
+  )
+  const handleFlyToCamera = useCallback(
+    (cam: Stage3DCamera) => {
+      setSelectedId(null)
+      setSelectedCameraId(cam.id)
+      controlsRef.current?.flyTo?.({ position: cam.position, target: cam.target, fov: cam.fov })
+    },
+    [controlsRef]
+  )
+  const updateCamera = useCallback(
+    (id: string, patch: Partial<Stage3DCamera>) => {
+      commit({ cameras: cameras.map((c) => (c.id === id ? { ...c, ...patch } : c)) })
+    },
+    [cameras, commit]
+  )
+  const handleDeleteCamera = useCallback(
+    (id: string) => {
+      commit({ cameras: cameras.filter((c) => c.id !== id) })
+      if (selectedCameraId === id) setSelectedCameraId(null)
+      setNotice({ kind: 'ok', text: '✓ 机位已删除（含其关键帧轨迹）' })
+    },
+    [cameras, commit, selectedCameraId]
+  )
+
+  /** D2 关键帧：在播放头位置（或末帧 +1000ms）插入当前导演视角快照 */
+  const handleRecordKeyframe = useCallback(() => {
+    if (!selectedCamera) return
+    const captured = controlsRef.current?.getCameraState?.()
+    if (!captured) return
+    const kfs = normalizeKeyframes(selectedCamera.keyframes ?? [])
+    const lastT = kfs.length > 0 ? kfs[kfs.length - 1].t : 0
+    const t = playhead > 0 && playhead > lastT ? Math.round(playhead) : lastT + 1000
+    if (kfs.length >= 60) {
+      setNotice({ kind: 'err', text: '关键帧已达上限（60 帧）' })
+      return
+    }
+    const next: Stage3DKeyframe = {
+      t,
+      position: captured.position,
+      target: captured.target,
+      fov: Math.round(captured.fov),
+    }
+    updateCamera(selectedCamera.id, { keyframes: normalizeKeyframes([...kfs, next]) })
+    setPlayhead(t)
+    setNotice({ kind: 'ok', text: `✓ 已在 ${t}ms 记录关键帧（当前导演视角快照 · 结构化轨迹入库）` })
+  }, [selectedCamera, playhead, updateCamera])
+
+  const handleClearKeyframes = useCallback(() => {
+    if (!selectedCamera) return
+    updateCamera(selectedCamera.id, { keyframes: [] })
+    setPlayhead(0)
+    setNotice({ kind: 'ok', text: '✓ 关键帧轨迹已清空' })
+  }, [selectedCamera, updateCamera])
+
+  const handleTogglePlay = useCallback(() => {
+    if (!selectedCamera) return
+    const kfs = selectedCamera.keyframes ?? []
+    if (kfs.length < 2) {
+      setNotice({ kind: 'err', text: '播放需要至少 2 个关键帧（用「+ 录制关键帧」添加）' })
+      return
+    }
+    setPlaying((v) => !v)
+  }, [selectedCamera])
 
   const updateObject = useCallback(
     (id: string, patch: Partial<Stage3DObject>) => {
@@ -344,6 +426,7 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
                       data-testid="s3-tree-item"
                       onClick={() => {
                         setSelectedId(o.id)
+                        setSelectedCameraId(null)
                         setTool('move')
                       }}
                     >
@@ -383,9 +466,26 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
                   <div className="s3-tree-empty">无机位（顶中「＋ 新增机位」）</div>
                 ) : (
                   cameras.map((c) => (
-                    <div key={c.id} className="s3-tree-item static" title={`${c.name} · FOV ${c.fov}°`}>
-                      <span className="s3-tree-dot" style={{ background: '#7ec8e3' }} aria-hidden />
-                      {c.name} · FOV {c.fov}°
+                    <div key={c.id} className="s3-camera-row">
+                      <button
+                        type="button"
+                        className={`s3-tree-item${c.id === selectedCameraId ? ' active' : ''}`}
+                        data-testid="s3-camera-item"
+                        title={`点击飞至「${c.name}」视角（平滑飞行）`}
+                        onClick={() => handleFlyToCamera(c)}
+                      >
+                        <span className="s3-tree-dot" style={{ background: '#7ec8e3' }} aria-hidden />
+                        {c.name} · FOV {c.fov}°
+                      </button>
+                      <button
+                        type="button"
+                        className="s3-camera-del"
+                        aria-label={`删除 ${c.name}`}
+                        title={`删除「${c.name}」`}
+                        onClick={() => handleDeleteCamera(c.id)}
+                      >
+                        🗑
+                      </button>
                     </div>
                   ))
                 )}
@@ -446,9 +546,28 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
                 panoramaUrl={panoramaUrl}
                 selectedId={selectedId}
                 tool={tool}
-                onSelect={setSelectedId}
+                onSelect={(id) => {
+                  setSelectedId(id)
+                  if (id) setSelectedCameraId(null)
+                }}
                 onTransform={(id, t) => updateObject(id, t)}
                 controlsRef={controlsRef}
+                playback={
+                  selectedCamera
+                    ? {
+                        kfs: selectedCamera.keyframes ?? [],
+                        playing,
+                        onPlayhead: (t) => {
+                          if (t < 0) {
+                            setPlaying(false)
+                            setPlayhead(0)
+                          } else {
+                            setPlayhead(t)
+                          }
+                        },
+                      }
+                    : null
+                }
               />
             </Suspense>
           ) : (
@@ -502,6 +621,86 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
 
       {/* 右属性面板 */}
       <aside className="s3-right" data-testid="s3-right">
+        {selectedCamera ? (
+          <div className="s3-prop-body" data-testid="s3-camera-panel">
+            <div className="s3-prop-row">
+              <label htmlFor="s3-cam-name">机位名称</label>
+              <input
+                id="s3-cam-name"
+                type="text"
+                className="s3-input"
+                value={selectedCamera.name}
+                maxLength={60}
+                onChange={(e) => updateCamera(selectedCamera.id, { name: e.target.value })}
+              />
+            </div>
+            <div className="s3-prop-row">
+              <label htmlFor="s3-cam-fov">视场角 FOV（度）</label>
+              <input
+                id="s3-cam-fov"
+                type="number"
+                min={20}
+                max={120}
+                className="s3-input"
+                value={selectedCamera.fov}
+                onChange={(e) => updateCamera(selectedCamera.id, { fov: Math.max(20, Math.min(120, Number(e.target.value) || 45)) })}
+              />
+            </div>
+            <button
+              type="button"
+              className="s3-model-btn"
+              data-testid="s3-cam-capture"
+              title="把当前导演视角写入该机位（位置/朝向/FOV）"
+              onClick={() => {
+                const s = controlsRef.current?.getCameraState?.()
+                if (s) {
+                  updateCamera(selectedCamera.id, { position: s.position, target: s.target, fov: Math.round(s.fov) })
+                  setNotice({ kind: 'ok', text: '✓ 机位参数已更新为当前导演视角' })
+                }
+              }}
+            >
+              📌 设为当前导演视角
+            </button>
+
+            {/* D2 关键帧时间轴（结构化轨迹从第一天入库——D3 C 升级口） */}
+            <div className="s3-timeline" data-testid="s3-timeline">
+              <div className="s3-left-title">运镜关键帧（{normalizeKeyframes(selectedCamera.keyframes ?? []).length}/60）</div>
+              <div className="s3-track" data-testid="s3-track">
+                <div
+                  className="s3-track-progress"
+                  style={{ width: `${Math.min(100, (playhead / Math.max(1, keyframesDuration(selectedCamera.keyframes ?? []))) * 100)}%` }}
+                />
+                {normalizeKeyframes(selectedCamera.keyframes ?? []).map((k) => (
+                  <span
+                    key={k.t}
+                    className="s3-kf-mark"
+                    title={`关键帧 ${k.t}ms`}
+                    style={{ left: `${Math.min(100, (k.t / Math.max(1, keyframesDuration(selectedCamera.keyframes ?? []))) * 100)}%` }}
+                  />
+                ))}
+              </div>
+              <div className="s3-timeline-meta">
+                时长 {keyframesDuration(selectedCamera.keyframes ?? [])}ms · 播放头 {Math.max(0, playhead)}ms
+              </div>
+              <div className="s3-timeline-actions">
+                <button type="button" className="s3-card-btn sm-primary-like" data-testid="s3-kf-record" onClick={handleRecordKeyframe}>
+                  ＋ 录制关键帧
+                </button>
+                <button type="button" className="s3-card-btn" data-testid="s3-kf-play" onClick={handleTogglePlay}>
+                  {playing ? '⏹ 停止' : '▶ 播放轨迹'}
+                </button>
+                <button type="button" className="s3-card-btn" data-testid="s3-kf-clear" onClick={handleClearKeyframes}>
+                  🗑 清空
+                </button>
+              </div>
+              <small className="s3-prop-hint">
+                「＋ 录制关键帧」= 把当前导演视角作为快照插入时间轴；播放 = 关键帧 Catmull-Rom 平滑插值（预览不落盘）。
+                轨迹为结构化数据（D3 出片衔接的升级口）。
+              </small>
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="s3-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'basic'} className={`s3-tab${tab === 'basic' ? ' active' : ''}`} onClick={() => setTab('basic')}>
             基础
@@ -512,11 +711,35 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
         </div>
 
         {tab === 'pose' ? (
-          <div className="s3-pose-locked" data-testid="s3-pose-locked">
-            <span aria-hidden>🧍</span>
-            <p>预置姿势切换将在 D2 开放</p>
-            <small>当前版本为摆台基座：素体以默认站姿渲染；骨骼数据已就绪（53 骨）。</small>
-          </div>
+          selected && selected.type === 'character' ? (
+            <div className="s3-pose-body" data-testid="s3-pose-body">
+              <div className="s3-pose-hint">预置姿势 = 骨骼旋转参数集（一次性应用，非动画编辑）</div>
+              {(Object.keys(STAGE3D_POSE_LABELS) as Stage3DPoseId[]).map((pid) => (
+                <button
+                  key={pid}
+                  type="button"
+                  className={`s3-pose-btn${(selected.pose ?? 'tpose') === pid ? ' active' : ''}`}
+                  data-testid={`s3-pose-${pid}`}
+                  onClick={() => updateObject(selected.id, { pose: pid })}
+                >
+                  🧍 {STAGE3D_POSE_LABELS[pid]}
+                </button>
+              ))}
+              {selected.modelRef ? (
+                <small className="s3-prop-hint">
+                  自定义模型：骨骼名与预置库不匹配时姿势不生效（如实跳过，不报错）
+                </small>
+              ) : (
+                <small className="s3-prop-hint">内置素体 rig：DEF- 前缀 53 骨（Blender metarig）</small>
+              )}
+            </div>
+          ) : (
+            <div className="s3-pose-locked" data-testid="s3-pose-locked">
+              <span aria-hidden>🧍</span>
+              <p>先选中一个素体角色</p>
+              <small>姿势仅对 character 类型对象可用（几何体占位无骨骼）。</small>
+            </div>
+          )
         ) : selected ? (
           <div className="s3-prop-body" data-testid="s3-prop-body">
             <div className="s3-prop-row">
@@ -619,6 +842,8 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
             <p>未选中对象</p>
             <small>点击视口对象 / 左栏对象树，或从底部工具条添加</small>
           </div>
+        )}
+          </>
         )}
 
         {notice && (

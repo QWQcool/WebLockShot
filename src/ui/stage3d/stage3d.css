@@ -476,3 +476,114 @@
     width: 240px;
   }
 }
+
+/* ---------- D2：姿势 tab / 机位编辑 / 关键帧时间轴 ---------- */
+.s3-pose-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.s3-pose-hint {
+  font-size: 11px;
+  color: #7b8a94;
+}
+.s3-pose-btn {
+  padding: 10px 12px;
+  border: 1px solid #dde3e8;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  color: #2c3e49;
+  cursor: pointer;
+  text-align: left;
+}
+.s3-pose-btn:hover {
+  border-color: #39c5bb;
+  background: #f2fbfa;
+}
+.s3-pose-btn.active {
+  background: #39c5bb;
+  border-color: #39c5bb;
+  color: #fff;
+  font-weight: 600;
+}
+
+.s3-camera-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.s3-camera-row .s3-tree-item {
+  flex: 1;
+  min-width: 0;
+}
+.s3-camera-del {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+.s3-camera-del:hover {
+  opacity: 1;
+}
+
+.s3-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e4e9ed;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+.s3-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: #e8edf1;
+  overflow: visible;
+}
+.s3-track-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: #39c5bb;
+  opacity: 0.4;
+  transition: width 0.08s linear;
+}
+.s3-kf-mark {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #e8721e;
+  border: 1px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.s3-timeline-meta {
+  font-size: 11px;
+  color: #7b8a94;
+}
+.s3-timeline-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sm-primary-like {
+  background: #39c5bb;
+  border-color: #39c5bb;
+  color: #fff;
+  font-weight: 600;
+}
+.sm-primary-like:hover {
+  background: #2aa8a0;
+  border-color: #2aa8a0;
+}

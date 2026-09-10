@@ -1,8 +1,11 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Grid, OrbitControls, TransformControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { Stage3DObject } from '../../canvas/stage3dMeta.ts'
+import { STAGE3D_POSE_PRESETS, sanitizeBoneName } from '../../canvas/stage3dPose.ts'
+import { sampleCameraPose, type Stage3DKeyframe } from '../../canvas/stage3dKeyframes.ts'
 
 /**
  * D1 3D 运镜台 · R3F 渲染层（本组件是唯一 import three/R3F 的文件，
@@ -25,11 +28,15 @@ export type Stage3DViewportProps = {
   tool: 'move' | 'select'
   onSelect(id: string | null): void
   onTransform(id: string, t: { position: [number, number, number]; rotation: [number, number, number]; scale: [number, number, number] }): void
-  /** 相机控制句柄（重置视角 / 新增机位捕捉当前导演视角参数） */
+  /** 相机控制句柄（重置视角 / 新增机位捕捉当前导演视角参数 / D2 机位飞行） */
   controlsRef: React.MutableRefObject<{
     reset: () => void
     getCameraState?: () => { position: [number, number, number]; target: [number, number, number]; fov: number }
+    /** D2：平滑飞行至指定机位（ease-in-out，600ms） */
+    flyTo?: (camera: { position: [number, number, number]; target: [number, number, number]; fov: number }) => void
   } | null>
+  /** D2：关键帧播放（kfs 来自选中机位；playing=true 时 useFrame 驱动导演相机） */
+  playback: { kfs: Stage3DKeyframe[]; playing: boolean; onPlayhead(t: number): void } | null
 }
 
 export const DEFAULT_CHARACTER_MODEL_URL = '/models/quaternius-universal-character.glb'
@@ -82,7 +89,7 @@ function SceneContent(props: Stage3DViewportProps) {
     }
   }, [props.panoramaUrl, scene])
 
-  // 相机控制句柄：重置视角 / 捕捉当前导演视角参数（新增机位用）
+  // 相机控制句柄：重置视角 / 捕捉当前导演视角参数 / D2 机位平滑飞行
   useEffect(() => {
     // oxlint-disable-next-line react/immutability -- 命令式 ref 句柄：R3F OrbitControls 命令式 API 的标准桥接
     props.controlsRef.current = {
@@ -102,6 +109,30 @@ function SceneContent(props: Stage3DViewportProps) {
           target: [round4(tgt?.x ?? 0), round4(tgt?.y ?? 0.9), round4(tgt?.z ?? 0)] as [number, number, number],
           fov: (c?.object as THREE.PerspectiveCamera | undefined)?.fov ?? 45,
         }
+      },
+      flyTo: (cam) => {
+        const c = orbitRef.current
+        if (!c) return
+        const fromPos = c.object.position.clone()
+        const fromTgt = c.target.clone()
+        const fromFov = (c.object as THREE.PerspectiveCamera).fov
+        const toPos = new THREE.Vector3(...cam.position)
+        const toTgt = new THREE.Vector3(...cam.target)
+        const dur = 600
+        const start = performance.now()
+        const ease = (u: number): number => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2)
+        const step = (now: number) => {
+          const u = Math.min(1, (now - start) / dur)
+          const k = ease(u)
+          c.object.position.lerpVectors(fromPos, toPos, k)
+          c.target.lerpVectors(fromTgt, toTgt, k)
+          const persp = c.object as THREE.PerspectiveCamera
+          persp.fov = fromFov + (cam.fov - fromFov) * k
+          persp.updateProjectionMatrix()
+          c.update()
+          if (u < 1) requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
       },
     }
   }, [props.controlsRef])
@@ -145,8 +176,63 @@ function SceneContent(props: Stage3DViewportProps) {
         enableDamping
         dampingFactor={0.08}
       />
+      {props.playback && props.playback.kfs.length > 0 && (
+        <PlaybackDriver
+          kfs={props.playback.kfs}
+          playing={props.playback.playing}
+          orbitRef={orbitRef}
+          onPlayhead={props.playback.onPlayhead}
+        />
+      )}
     </>
   )
+}
+
+/** D2 关键帧播放驱动：useFrame 推进播放头，采样关键帧驱动导演相机（预览不落盘） */
+function PlaybackDriver({
+  kfs,
+  playing,
+  orbitRef,
+  onPlayhead,
+}: {
+  kfs: Stage3DKeyframe[]
+  playing: boolean
+  orbitRef: React.MutableRefObject<React.ComponentRef<typeof OrbitControls> | null>
+  onPlayhead(t: number): void
+}) {
+  const headRef = useRef(0)
+  useEffect(() => {
+    if (!playing) headRef.current = 0
+  }, [playing])
+
+  useFrame((_, delta) => {
+    const c = orbitRef.current
+    if (!playing || !c) return
+    headRef.current += delta * 1000
+    // 结束判定：sampleCameraPose 超范围钳制端点（永不返回 null），
+    // 必须显式对比轨迹时长，否则播放头无限推进（实测 10s+ 不停）
+    const duration = kfs.length > 0 ? kfs[kfs.length - 1].t : 0
+    if (headRef.current >= duration) {
+      onPlayhead(-1)
+      headRef.current = 0
+      return
+    }
+    const sample = sampleCameraPose(kfs, headRef.current)
+    if (!sample) {
+      // -1 = 播放结束信号（与起始 0 区分，Studio 收到后停止并归零播放头）
+      onPlayhead(-1)
+      headRef.current = 0
+      return
+    }
+    c.object.position.set(...sample.position)
+    c.target.set(...sample.target)
+    const persp = c.object as THREE.PerspectiveCamera
+    persp.fov = sample.fov
+    persp.updateProjectionMatrix()
+    c.update()
+    onPlayhead(Math.round(headRef.current))
+  })
+  return null
 }
 
 function SceneObject({
@@ -203,7 +289,7 @@ function SceneObject({
   )
 }
 
-/** 素体模型：GLB 懒加载 + 包围盒归一（~1.8 单位高）+ 色板覆色 */
+/** 素体模型：GLB 懒加载 + 包围盒归一（~1.8 单位高）+ 色板覆色 + D2 预置姿势 */
 function CharacterModel({ object, url }: { object: Stage3DObject; url: string | null }) {
   if (!url) {
     // 自定义模型 blob url 尚未水合：占位体如实显示
@@ -214,35 +300,90 @@ function CharacterModel({ object, url }: { object: Stage3DObject; url: string | 
       </mesh>
     )
   }
-  return <GLBModel key={url} url={url} color={object.color} />
+  return <GLBModel key={url} url={url} color={object.color} pose={object.pose ?? 'tpose'} />
 }
 
-function GLBModel({ url, color }: { url: string; color: string }) {
+function GLBModel({ url, color, pose }: { url: string; color: string; pose: Stage3DObject['pose'] }) {
   const { scene } = useGLTF(url)
+  // 多实例关键：useGLTF 缓存返回的是同一个 scene 对象——多角色直接 add 会互相抢挂载
+  // （Object3D 只能有一个父节点），改骨骼则全部实例串姿势。
+  // SkeletonUtils.clone 深拷贝骨骼层级并重绑 SkinnedMesh，每个实例拿到独立骨骼姿态；
+  // 缓存源保持 pristine，反复克隆都从绑定姿势出发。选型：drei 标准路径（useGLTF 缓存
+  // + SkeletonUtils.clone），不自加载 GLTFLoader.loadAsync——chunk 零新增、geometry 复用。
   const inner = useMemo(() => {
-    const clone = scene.clone(true)
+    // 多实例关键：useGLTF 缓存返回的是同一个 scene 对象——多角色直接 add 会互相抢挂载
+    // （Object3D 只能有一个父节点），改骨骼则全部实例串姿势。
+    // SkeletonUtils.clone 深拷贝骨骼层级并重绑 SkinnedMesh，每个实例拿到独立骨骼姿态；
+    // 缓存源保持 pristine，反复克隆都从绑定姿势出发。选型：drei 标准路径（useGLTF 缓存
+    // + SkeletonUtils.clone），不自加载 GLTFLoader.loadAsync——chunk 零新增、geometry 复用。
+    const clone = skeletonClone(scene)
     const root = new THREE.Group()
     root.add(clone)
-    // 包围盒归一：统一至约 1.8 单位高（数据契约 scale 只承担用户倍率）
-    const box = new THREE.Box3().setFromObject(clone)
-    const size = new THREE.Vector3()
-    box.getSize(size)
-    const h = Math.max(size.y, 0.001)
-    const k = 1.8 / h
-    root.scale.setScalar(k)
-    // 落地：包围盒底边贴网格地面
-    root.position.y = -box.min.y * k
     // 色板覆色：8 色板选中的颜色覆写全部 mesh（默认色 = 模型原色）
+    let hasSkinnedMesh = false
     clone.traverse((child) => {
       const mesh = child as THREE.Mesh
       if (mesh.isMesh) {
-        const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.05 })
-        mesh.material = mat
+        if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true
+        mesh.material = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.05 })
         mesh.castShadow = false
+        // 克隆后包围球与骨骼姿态不同步，禁用视锥剔除防「角色消失」
+        mesh.frustumCulled = false
       }
     })
+    // 包围盒归一：统一至约 1.8 单位高（数据契约 scale 只承担用户倍率）。
+    // ⚠️ 蒙皮模型必须跳过：内置素体 GLB 的 inverseBindMatrices 为单位阵（非标准导出），
+    // 蒙皮正确性依赖「加载时冻结的骨骼矩阵空间」——对克隆树施加任何祖先缩放都会让
+    // 骨骼世界矩阵偏离绑定空间，角色缩成小点（实测归一化 k=0.052 时仅 ≈0.2 单位高）。
+    // 该素体在原始尺度下渲染高度即 ≈1.78（≈1.8 契约值），无需缩放；
+    // 静态网格模型（无骨骼）不受影响，仍走包围盒归一。
+    if (!hasSkinnedMesh) {
+      const box = new THREE.Box3().setFromObject(clone)
+      const size = new THREE.Vector3()
+      box.getSize(size)
+      const h = Math.max(size.y, 0.001)
+      const k = 1.8 / h
+      root.scale.setScalar(k)
+      // 落地：包围盒底边贴网格地面
+      root.position.y = -box.min.y * k
+    }
     return root
   }, [scene, color])
+
+  // D2 预置姿势：骨骼旋转参数化（切姿势先复位绑定姿势再应用，蒙皮不残留）
+  const restRotRef = useRef<Map<string, [number, number, number]> | null>(null)
+  useEffect(() => {
+    if (!restRotRef.current) {
+      const rest = new Map<string, [number, number, number]>()
+      inner.traverse((child) => {
+        if ((child as THREE.Bone).isBone) {
+          const b = child as THREE.Bone
+          rest.set(b.name, [b.rotation.x, b.rotation.y, b.rotation.z])
+        }
+      })
+      restRotRef.current = rest
+    }
+    const rest = restRotRef.current
+    const joints = (pose && STAGE3D_POSE_PRESETS[pose]) || {}
+    // GLTFLoader 会 sanitize 骨骼名（点号删除）：姿势库 key 与实际骨骼名双侧归一后匹配
+    const jointsBySanitized = new Map(Object.entries(joints).map(([k, v]) => [sanitizeBoneName(k), v]))
+    let matchedCount = 0
+    inner.traverse((child) => {
+      const bone = child as THREE.Bone
+      if (!bone.isBone) return
+      const r = rest.get(bone.name)
+      if (r) bone.rotation.set(r[0], r[1], r[2])
+      const j = jointsBySanitized.get(bone.name)
+      if (j) {
+        matchedCount++
+        bone.rotation.x += j[0]
+        bone.rotation.y += j[1]
+        bone.rotation.z += j[2]
+      }
+    })
+    ;(window as unknown as Record<string, unknown>).__s3poseMatched = matchedCount
+  }, [inner, pose])
+
   return <primitive object={inner} />
 }
 

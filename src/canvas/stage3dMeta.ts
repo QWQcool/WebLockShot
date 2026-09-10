@@ -35,7 +35,7 @@ export const STAGE3D_OPEN_EVENT = 'wls-open-stage3d'
 /** 摆台对象类型：character = 素体（内置 Quaternius 或用户导入），其余为几何体占位 */
 export const STAGE3D_OBJECT_TYPES = ['character', 'box', 'cylinder', 'sphere'] as const
 
-const vec3Schema = z.tuple([z.number().finite(), z.number().finite(), z.number().finite()])
+export const vec3Schema = z.tuple([z.number().finite(), z.number().finite(), z.number().finite()])
 
 const stage3dObjectSchema = z.object({
   id: z.string().min(1).max(64),
@@ -57,6 +57,11 @@ const stage3dObjectSchema = z.object({
       message: '自定义模型引用只允许 idbref://（blob: 跨刷新失效，禁止入档）',
     })
     .optional(),
+  /**
+   * D2：预置姿势 id（引用 stage3dPose.ts 的骨骼旋转参数库，不存整份关节数据）。
+   * 缺省 = rig 绑定姿势（T-Pose）。自定义模型无 DEF- 骨骼时 UI 如实禁用姿势切换。
+   */
+  pose: z.enum(['tpose', 'stand', 'sit', 'walk']).optional(),
 })
 
 const stage3dCameraSchema = z.object({
@@ -67,6 +72,18 @@ const stage3dCameraSchema = z.object({
   target: vec3Schema,
   /** 视场角（度，20~120） */
   fov: z.number().finite().min(20).max(120),
+  /**
+   * D2：运镜关键帧轨迹（结构化数据从第一天入库——D3 C 升级口）。
+   * t 毫秒单调；上限 60 帧（契约层同步 STAGE3D_KEYFRAME_MAX）。
+   */
+  keyframes: z.array(
+    z.object({
+      t: z.number().finite().min(0),
+      position: vec3Schema,
+      target: vec3Schema,
+      fov: z.number().finite().min(20).max(120),
+    })
+  ).max(60).optional(),
 })
 
 const stage3dEnvSchema = z.object({
