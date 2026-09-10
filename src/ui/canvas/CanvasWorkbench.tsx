@@ -345,6 +345,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     })
   }, [])
 
+  // C0：对话栏一键收起（折叠为右下角小胶囊，点击展开还原），收起态完整暴露 tldraw 底部工具条
+  const [chatCollapsed, setChatCollapsed] = useState(false)
+
   // 对话栏：B6 LLM/演示两态编排（一句话 → 整批节点+连线上画布，可一键撤销）
   const [chatDraft, setChatDraft] = useState('')
   const chatInputRef = useRef<HTMLInputElement>(null)
@@ -906,43 +909,78 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               </div>
             )}
 
-            {/* 对话栏：对齐 Miora 图1 底部大输入卡 + 场景模板快捷入口 */}
-            <div className="wls-chat-dock">
-              <div className="wls-chat-bar">
-                <input
-                  ref={chatInputRef}
-                  className="wls-chat-input"
-                  value={chatDraft}
-                  maxLength={500}
-                  placeholder={
-                    orchestrating ? '🤖 Agent 正在布置画布，请稍候…' : '描述你想要什么，Agent 帮你上画布…'
-                  }
-                  aria-label="对话栏：一句话生成 Brief 节点"
-                  onChange={(e) => setChatDraft(e.target.value)}
-                  onKeyDown={onChatKeyDown}
-                />
+            {/* 对话栏：对齐 Miora 图1 底部大输入卡 + 场景模板快捷入口。
+                C0：一键收起为右下角小胶囊（折叠态完整暴露 tldraw 底部工具条），
+                输入内容与模板 chips 状态保存在 state，折叠往返不丢。 */}
+            <div
+              className={`wls-chat-dock${chatCollapsed ? ' wls-chat-dock--collapsed' : ''}`}
+              data-testid="chat-dock"
+            >
+              {chatCollapsed ? (
                 <button
                   type="button"
-                  className="wls-chat-send"
-                  disabled={orchestrating}
-                  onClick={() => void onChatSend()}
+                  className="wls-chat-collapse-pill"
+                  data-testid="chat-expand"
+                  aria-label="展开对话栏"
+                  title="展开对话栏"
+                  onClick={() => {
+                    setChatCollapsed(false)
+                    chatInputRef.current?.focus()
+                  }}
                 >
-                  {orchestrating ? '🤖 编排中…' : '发送 ↗'}
+                  💬 对话
                 </button>
-              </div>
-              <div className="wls-chat-templates">
-                {CANVAS_SCENE_TEMPLATES.map((tpl) => (
-                  <button
-                    key={tpl.id}
-                    type="button"
-                    className="wls-chat-chip"
-                    title={tpl.prompt}
-                    onClick={() => onTemplatePick(tpl.prompt)}
-                  >
-                    {tpl.icon} {tpl.label}
-                  </button>
-                ))}
-              </div>
+              ) : (
+                <>
+                  <div className="wls-chat-bar">
+                    <input
+                      ref={chatInputRef}
+                      className="wls-chat-input"
+                      value={chatDraft}
+                      maxLength={500}
+                      placeholder={
+                        orchestrating
+                          ? '🤖 Agent 正在布置画布，请稍候…'
+                          : '描述你想要什么，Agent 帮你上画布…'
+                      }
+                      aria-label="对话栏：一句话生成 Brief 节点"
+                      onChange={(e) => setChatDraft(e.target.value)}
+                      onKeyDown={onChatKeyDown}
+                    />
+                    <button
+                      type="button"
+                      className="wls-chat-send"
+                      disabled={orchestrating}
+                      onClick={() => void onChatSend()}
+                    >
+                      {orchestrating ? '🤖 编排中…' : '发送 ↗'}
+                    </button>
+                    <button
+                      type="button"
+                      className="wls-chat-collapse"
+                      data-testid="chat-collapse"
+                      aria-label="收起对话栏"
+                      title="收起对话栏（露出底部工具条）"
+                      onClick={() => setChatCollapsed(true)}
+                    >
+                      ▾
+                    </button>
+                  </div>
+                  <div className="wls-chat-templates">
+                    {CANVAS_SCENE_TEMPLATES.map((tpl) => (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        className="wls-chat-chip"
+                        title={tpl.prompt}
+                        onClick={() => onTemplatePick(tpl.prompt)}
+                      >
+                        {tpl.icon} {tpl.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </main>

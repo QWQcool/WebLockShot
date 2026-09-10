@@ -339,6 +339,60 @@
   transform: scale(0.97);
 }
 
+/* C0：对话栏收起按钮（▾，位于输入卡右侧，一键折叠为右下角小胶囊） */
+.wls-chat-collapse {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--cv-mute);
+  font-size: 0.82rem;
+  line-height: 1;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.wls-chat-collapse:hover {
+  color: var(--cv-miku-deep);
+  background: rgba(57, 197, 187, 0.1);
+}
+
+/* C0：折叠态——容器整体不拦截点击（pointer-events: none），
+   仅右下角胶囊可点（pointer-events: auto），避免残留点击热区遮住底部工具条 */
+.wls-chat-dock--collapsed {
+  pointer-events: none;
+  width: auto;
+  left: auto;
+  right: 1rem;
+  bottom: 1rem;
+  transform: none;
+}
+
+.wls-chat-dock--collapsed .wls-chat-collapse-pill {
+  pointer-events: auto;
+  border: 1px solid var(--cv-line);
+  background: var(--cv-panel);
+  color: var(--cv-ink);
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: var(--cv-shadow-lift);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: border-color 0.15s ease, transform 0.1s ease, color 0.15s ease;
+}
+
+.wls-chat-dock--collapsed .wls-chat-collapse-pill:hover {
+  border-color: var(--cv-miku);
+  color: var(--cv-miku-deep);
+  transform: translateY(-1px);
+}
+
 .wls-chat-templates {
   display: flex;
   gap: 0.4rem;
