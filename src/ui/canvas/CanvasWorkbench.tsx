@@ -44,6 +44,8 @@ import {
 import { WlsNodeUtil } from '../../canvas/WlsNodeUtil.tsx'
 import { MemoryGraphView } from './MemoryGraphView.tsx'
 import type { MemoryGraphThumbInput } from '../../canvas/memoryGraph.ts'
+import { SkillMarketView } from './SkillMarketView.tsx'
+import { findInstalledByName, readSkillLibrary, type InstalledSkill } from '../../canvas/skillLibrary.ts'
 
 /**
  * Agent 创意画布 · 一期 A（CANVAS_PLAN.md §4.1-1/2/6/7 + v1.1 变更）。
@@ -354,6 +356,13 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   // E1 记忆图谱（Miora 图4 回炉）：画布工具条入口 + 真实素材缩略叶（打开时从 asset 卡收集）
   const [isMemoryGraphOpen, setIsMemoryGraphOpen] = useState(false)
   const [memoryThumbs, setMemoryThumbs] = useState<MemoryGraphThumbInput[]>([])
+
+  // E2 Skill 市场（Miora 图5 回炉）：工具条入口 + 已安装库状态（官方快捷按钮启停过滤）
+  const [isSkillMarketOpen, setIsSkillMarketOpen] = useState(false)
+  const [installedSkills, setInstalledSkills] = useState<InstalledSkill[]>(() => readSkillLibrary())
+  const refreshInstalledSkills = useCallback(() => {
+    setInstalledSkills(readSkillLibrary())
+  }, [])
   const openMemoryGraph = useCallback(() => {
     const editor = editorRef.current
     const thumbs: MemoryGraphThumbInput[] = []
@@ -870,7 +879,12 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             >
               📥 导入 Skill
             </button>
-            {OFFICIAL_SKILLS.map((skill) => (
+            {/* E2：官方快捷按钮——已安装但停用的 Skill 从快捷入口消失（启停语义，dev 裁量）；
+                未安装的官方 Skill 仍可快捷布置（保持 S2 既有行为，与市场「获取并安装」并存不冲突） */}
+            {OFFICIAL_SKILLS.filter((skill) => {
+              const installed = findInstalledByName(installedSkills, skill.manifest.name)
+              return !installed || installed.enabled
+            }).map((skill) => (
               <button
                 key={skill.id}
                 type="button"
@@ -893,6 +907,18 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               onClick={openMemoryGraph}
             >
               🧠 记忆图谱
+            </button>
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="open-skill-market"
+              title="Skill 市场：已安装/官方内置统一管理（安装/启停/卸载/发布到本地）"
+              onClick={() => {
+                refreshInstalledSkills()
+                setIsSkillMarketOpen(true)
+              }}
+            >
+              🧩 Skill 市场
             </button>
             <span className="wls-canvas-save-state">已保存 {savedAt}</span>
           </div>
@@ -1024,6 +1050,18 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
         <MemoryGraphView
           onClose={() => setIsMemoryGraphOpen(false)}
           thumbs={memoryThumbs}
+        />
+      )}
+
+      {/* E2 Skill 市场全屏覆盖层（图5 浅色主题；布置复用 S2 applySkillImport 链路） */}
+      {isSkillMarketOpen && (
+        <SkillMarketView
+          onClose={() => setIsSkillMarketOpen(false)}
+          onDeploy={(manifest) => {
+            setIsSkillMarketOpen(false)
+            applySkillImport(manifest)
+          }}
+          onChanged={refreshInstalledSkills}
         />
       )}
     </div>

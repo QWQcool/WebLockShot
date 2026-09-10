@@ -1,0 +1,402 @@
+/**
+ * E2 Skill 市场浅色主题（Miora 图5 1:1）——sm- 前缀全隔离，不污染画布/工作台基调。
+ */
+
+.sm-root {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: #f4f6f8;
+  color: #1c2b33;
+  font-family: var(--body, 'Noto Sans SC', sans-serif);
+  overflow-y: auto;
+  padding: 20px clamp(16px, 4vw, 48px) 64px;
+}
+
+/* ---------- 顶部：标题 + 搜索 + 三按钮 ---------- */
+.sm-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 260px;
+}
+.sm-header-left h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.5px;
+}
+.sm-search {
+  flex: 1;
+  max-width: 320px;
+  padding: 8px 14px;
+  border: 1px solid #dde3e8;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  color: #1c2b33;
+}
+.sm-search:focus {
+  outline: none;
+  border-color: #39c5bb;
+  box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.15);
+}
+
+.sm-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sm-btn {
+  padding: 8px 16px;
+  border: 1px solid #dde3e8;
+  border-radius: 10px;
+  background: #fff;
+  color: #1c2b33;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.sm-btn:hover {
+  background: #f6f8fa;
+  border-color: #c8d2da;
+}
+.sm-btn--primary {
+  background: #16323f;
+  border-color: #16323f;
+  color: #fff;
+}
+.sm-btn--primary:hover {
+  background: #0f242e;
+  border-color: #0f242e;
+}
+.sm-btn--close {
+  width: 36px;
+  padding: 8px 0;
+  text-align: center;
+}
+.sm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- 过滤 chips ---------- */
+.sm-filters {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 8px;
+}
+.sm-chip {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid #dde3e8;
+  background: #fff;
+  color: #4a5b66;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sm-chip.active {
+  background: #e8721e;
+  border-color: #e8721e;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ---------- 提示条 ---------- */
+.sm-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.sm-notice.ok {
+  background: #e9f9f4;
+  border: 1px solid #b8ecdd;
+  color: #0d6b52;
+}
+.sm-notice.err {
+  background: #fdeeee;
+  border: 1px solid #f3c1c1;
+  color: #a03030;
+}
+.sm-notice-close {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* ---------- 对话创建 / 发布面板 ---------- */
+.sm-create-panel,
+.sm-publish-panel {
+  margin: 10px 0;
+  padding: 14px 16px;
+  border: 1px solid #dde3e8;
+  border-radius: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sm-create-label {
+  font-size: 13px;
+  color: #4a5b66;
+}
+.sm-create-textarea {
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid #dde3e8;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  color: #1c2b33;
+}
+.sm-create-textarea:focus {
+  outline: none;
+  border-color: #39c5bb;
+  box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.15);
+}
+.sm-create-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sm-create-hint {
+  font-size: 11px;
+  color: #7b8a94;
+}
+.sm-publish-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid #e4e9ed;
+  border-radius: 10px;
+  background: #fbfcfd;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.sm-publish-item:hover {
+  border-color: #39c5bb;
+  background: #f2fbfa;
+}
+.sm-publish-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: #7b8a94;
+}
+
+/* ---------- 分区 ---------- */
+.sm-section {
+  margin-top: 22px;
+}
+.sm-section-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #3a4a54;
+}
+.sm-empty {
+  font-size: 13px;
+  color: #7b8a94;
+  background: #fff;
+  border: 1px dashed #dde3e8;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+/* ---------- 卡片网格（图5：三列白卡） ---------- */
+.sm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.sm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #e4e9ed;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(16, 42, 51, 0.05);
+  transition: box-shadow 0.15s ease;
+}
+.sm-card:hover {
+  box-shadow: 0 4px 14px rgba(16, 42, 51, 0.1);
+}
+.sm-card.disabled {
+  opacity: 0.62;
+}
+
+.sm-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.sm-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #f1f5f7;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.sm-card-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.sm-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-all;
+}
+.sm-card-version {
+  font-size: 11px;
+  color: #7b8a94;
+}
+.sm-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2f4;
+  color: #5b6d78;
+  border: 1px solid #e0e7eb;
+}
+.sm-badge--official {
+  background: #fff4ea;
+  color: #b35f10;
+  border-color: #f5ddc2;
+}
+
+.sm-card-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #66757e;
+  flex: 1;
+}
+
+/* toggle（图5 右上橙色胶囊开关） */
+.sm-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: #d4dbe0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.sm-toggle.on {
+  background: #e8721e;
+}
+.sm-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+.sm-toggle.on .sm-toggle-knob {
+  transform: translateX(18px);
+}
+
+/* ---------- 卡片动作行 ---------- */
+.sm-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sm-card-btn {
+  padding: 6px 12px;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #3a4a54;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sm-card-btn:hover {
+  border-color: #39c5bb;
+  background: #f2fbfa;
+}
+.sm-card-btn--primary {
+  background: #39c5bb;
+  border-color: #39c5bb;
+  color: #fff;
+  font-weight: 600;
+}
+.sm-card-btn--primary:hover {
+  background: #2aa8a0;
+  border-color: #2aa8a0;
+}
+.sm-card-btn--danger:hover {
+  border-color: #e08080;
+  background: #fdf3f3;
+  color: #a03030;
+}
+
+/* 未安装卡「＋」安装按钮 */
+.sm-install-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #dde3e8;
+  background: #fff;
+  color: #3a4a54;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sm-install-btn:hover {
+  border-color: #e8721e;
+  background: #fff4ea;
+  color: #b35f10;
+}
+
+/* ---------- 底部诚实标注 ---------- */
+.sm-footnote {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #8b99a2;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sm-card,
+  .sm-toggle-knob {
+    transition: all 0.15s ease;
+  }
+}
