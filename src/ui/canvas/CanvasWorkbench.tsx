@@ -46,6 +46,14 @@ import { MemoryGraphView } from './MemoryGraphView.tsx'
 import type { MemoryGraphThumbInput } from '../../canvas/memoryGraph.ts'
 import { SkillMarketView } from './SkillMarketView.tsx'
 import { findInstalledByName, readSkillLibrary, type InstalledSkill } from '../../canvas/skillLibrary.ts'
+import { Stage3DStudio } from '../stage3d/Stage3DStudio.tsx'
+import {
+  readStage3DMetaPayload,
+  writeStage3DMetaPayload,
+  createEmptyStage3DPayload,
+  STAGE3D_OPEN_EVENT,
+  type Stage3DMetaPayload,
+} from '../../canvas/stage3dMeta.ts'
 
 /**
  * Agent 创意画布 · 一期 A（CANVAS_PLAN.md §4.1-1/2/6/7 + v1.1 变更）。
@@ -362,6 +370,48 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   const [installedSkills, setInstalledSkills] = useState<InstalledSkill[]>(() => readSkillLibrary())
   const refreshInstalledSkills = useCallback(() => {
     setInstalledSkills(readSkillLibrary())
+  }, [])
+
+  // D1 3D 运镜台：stage3d 节点按钮派发 window 事件 → 打开全屏 Stage3DStudio；
+  // 摆台数据经 writeStage3DMetaPayload 写回节点 meta.stage3d（走既有 shape 变更 → 持久化链路）
+  const [stage3dTarget, setStage3dTarget] = useState<{ shapeId: TLShapeId; payload: Stage3DMetaPayload } | null>(null)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ shapeId: TLShapeId }>).detail
+      if (!detail?.shapeId) return
+      const shape = editorRef.current?.getShape(detail.shapeId)
+      if (!shape || shape.type !== CANVAS_NODE_SHAPE_TYPE) return
+      const meta = (shape.props as { meta?: Record<string, unknown> }).meta ?? {}
+      const check = meta.stage3d !== undefined ? readStage3DMetaPayload(meta.stage3d) : null
+      setStage3dTarget({
+        shapeId: detail.shapeId,
+        payload: check?.ok ? check.payload : createEmptyStage3DPayload(),
+      })
+    }
+    window.addEventListener(STAGE3D_OPEN_EVENT, handler)
+    return () => window.removeEventListener(STAGE3D_OPEN_EVENT, handler)
+  }, [])
+
+  const handleStage3DChange = useCallback((payload: Stage3DMetaPayload) => {
+    setStage3dTarget((prev) => {
+      if (!prev) return prev
+      const editor = editorRef.current
+      if (editor) {
+        const shape = editor.getShape(prev.shapeId)
+        if (shape && shape.type === CANVAS_NODE_SHAPE_TYPE) {
+          const meta = (shape.props as { meta?: Record<string, unknown> }).meta ?? {}
+          const written = writeStage3DMetaPayload(meta, payload)
+          if (written) {
+            editor.updateShape({
+              id: prev.shapeId,
+              type: shape.type,
+              props: { meta: written as JsonObject },
+            })
+          }
+        }
+      }
+      return { ...prev, payload }
+    })
   }, [])
   const openMemoryGraph = useCallback(() => {
     const editor = editorRef.current
@@ -1062,6 +1112,15 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             applySkillImport(manifest)
           }}
           onChanged={refreshInstalledSkills}
+        />
+      )}
+
+      {/* D1 3D 运镜台全屏页（图7；R3F 视口在 Studio 内 React.lazy 懒加载，主包不含 three） */}
+      {stage3dTarget && (
+        <Stage3DStudio
+          payload={stage3dTarget.payload}
+          onChange={handleStage3DChange}
+          onBack={() => setStage3dTarget(null)}
         />
       )}
     </div>

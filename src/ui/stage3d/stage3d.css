@@ -1,0 +1,478 @@
+/**
+ * D1 3D 运镜台 UI（图7 1:1）——s3- 前缀全隔离，不污染画布基调。
+ * 视口白色无限网格由 R3F 渲染；本样式只负责面板/工具条 DOM。
+ */
+
+.s3-root {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  background: #f4f6f8;
+  font-family: var(--body, 'Noto Sans SC', sans-serif);
+  color: #16323f;
+  overflow: hidden;
+}
+
+/* ---------- 左栏 ---------- */
+.s3-left {
+  width: 264px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-right: 1px solid #e2e9ee;
+  overflow-y: auto;
+}
+.s3-left.collapsed {
+  width: 52px;
+}
+.s3-left-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #edf1f4;
+}
+.s3-back {
+  padding: 8px 12px;
+  border: 1px solid #dde3e8;
+  border-radius: 10px;
+  background: #fff;
+  color: #16323f;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.s3-back:hover {
+  border-color: #39c5bb;
+  background: #f2fbfa;
+}
+.s3-collapse {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  color: #5b7a86;
+  flex-shrink: 0;
+}
+.s3-left.collapsed .s3-left-head {
+  flex-direction: column;
+  padding: 10px 8px;
+}
+
+.s3-left-section {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.s3-search {
+  padding: 8px 10px;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.s3-search:focus {
+  outline: none;
+  border-color: #39c5bb;
+  box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.15);
+}
+.s3-left-title {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8b99a2;
+  letter-spacing: 1px;
+}
+.s3-left-static {
+  font-size: 13px;
+  color: #4a5b66;
+}
+.s3-object-tree,
+.s3-camera-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.s3-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font-size: 12px;
+  color: #2c3e49;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.s3-tree-item:hover {
+  background: #f2f6f8;
+}
+.s3-tree-item.active {
+  background: #e9f9f7;
+  border-color: #9be0db;
+  color: #0f6f68;
+  font-weight: 600;
+}
+.s3-tree-item.static {
+  cursor: default;
+}
+.s3-tree-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.s3-tree-empty {
+  font-size: 11px;
+  color: #9aa8b0;
+  padding: 6px 0;
+}
+
+.s3-model-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.s3-model-btn {
+  padding: 8px 10px;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  color: #2c3e49;
+}
+.s3-model-btn:hover {
+  border-color: #39c5bb;
+  background: #f2fbfa;
+}
+.s3-model-notice {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #a3aeb5;
+}
+
+/* ---------- 主区 ---------- */
+.s3-main {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+.s3-viewport {
+  position: absolute;
+  inset: 0;
+}
+.s3-viewport canvas {
+  display: block;
+}
+.s3-viewport-loading,
+.s3-viewport-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f4f6f8;
+}
+.s3-viewport-loading {
+  font-size: 13px;
+  color: #7b8a94;
+}
+.s3-viewport-fallback {
+  background: #f4f6f8;
+  color: #5b7a86;
+  text-align: center;
+  padding: 24px;
+}
+.s3-viewport-fallback span {
+  font-size: 40px;
+}
+.s3-viewport-fallback p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.s3-viewport-fallback small {
+  max-width: 380px;
+  line-height: 1.7;
+  color: #8b99a2;
+}
+
+.s3-top-center {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 10;
+}
+.s3-view-pill {
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: #16323f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(16, 42, 51, 0.25);
+}
+.s3-btn {
+  padding: 7px 14px;
+  border: 1px solid #dde3e8;
+  border-radius: 10px;
+  background: #fff;
+  color: #2c3e49;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(16, 42, 51, 0.06);
+}
+.s3-btn:hover {
+  border-color: #39c5bb;
+  background: #f2fbfa;
+}
+
+.s3-top-right {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 10;
+}
+
+.s3-toolbar {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e2e9ee;
+  box-shadow: 0 4px 16px rgba(16, 42, 51, 0.12);
+  z-index: 10;
+}
+.s3-tool {
+  padding: 8px 13px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  font-size: 12px;
+  color: #4a5b66;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.s3-tool:hover {
+  background: #f2f6f8;
+}
+.s3-tool.active {
+  background: #39c5bb;
+  color: #fff;
+  font-weight: 600;
+}
+
+.s3-honest-tag {
+  position: absolute;
+  bottom: 20px;
+  left: 16px;
+  font-size: 11px;
+  color: #8b99a2;
+  z-index: 10;
+}
+
+/* ---------- 右属性面板 ---------- */
+.s3-right {
+  width: 292px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-left: 1px solid #e2e9ee;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.s3-tabs {
+  display: flex;
+  gap: 6px;
+}
+.s3-tab {
+  flex: 1;
+  padding: 8px 0;
+  border: 1px solid #dde3e8;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  color: #5b7a86;
+  cursor: pointer;
+}
+.s3-tab.active {
+  background: #16323f;
+  border-color: #16323f;
+  color: #fff;
+  font-weight: 600;
+}
+
+.s3-prop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.s3-prop-row > label:first-child {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8b99a2;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.s3-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #16323f;
+}
+.s3-input:focus {
+  outline: none;
+  border-color: #39c5bb;
+  box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.15);
+}
+.s3-vec3 {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.s3-axis {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  font-size: 10px;
+  color: #8b99a2;
+}
+.s3-input-num {
+  padding: 6px 6px;
+  font-size: 12px;
+  -moz-appearance: textfield;
+}
+.s3-input-num::-webkit-outer-spin-button,
+.s3-input-num::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.s3-lock {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.s3-lock.on {
+  background: #e8721e;
+  border-color: #e8721e;
+}
+
+.s3-palette {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.s3-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #dbe3e8;
+  cursor: pointer;
+}
+.s3-swatch.active {
+  box-shadow: 0 0 0 2px #39c5bb;
+  transform: scale(1.12);
+}
+.s3-prop-hint {
+  font-size: 10px;
+  color: #a3aeb5;
+  line-height: 1.6;
+}
+
+.s3-pose-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 14px;
+  border: 1px dashed #dde3e8;
+  border-radius: 12px;
+  text-align: center;
+  color: #8b99a2;
+}
+.s3-pose-locked span {
+  font-size: 34px;
+  opacity: 0.6;
+}
+.s3-pose-locked p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5b7a86;
+}
+.s3-pose-locked small {
+  line-height: 1.7;
+  font-size: 11px;
+}
+
+.s3-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.s3-notice.ok {
+  background: #e9f9f4;
+  border: 1px solid #b8ecdd;
+  color: #0d6b52;
+}
+.s3-notice.err {
+  background: #fdeeee;
+  border: 1px solid #f3c1c1;
+  color: #a03030;
+}
+.s3-notice-close {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .s3-left:not(.collapsed) {
+    width: 210px;
+  }
+  .s3-right {
+    width: 240px;
+  }
+}

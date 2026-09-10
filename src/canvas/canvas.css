@@ -1879,3 +1879,32 @@
     transition: none;
   }
 }
+
+/* ---------- D1：3D 运镜台节点 body（进入按钮 + 摆台摘要） ---------- */
+.wls-stage3d-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+.wls-stage3d-body .wls-node-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--mute, #5b7a86);
+}
+.wls-stage3d-enter {
+  margin-top: auto;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #16323f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.wls-stage3d-enter:hover {
+  background: #0f242e;
+}

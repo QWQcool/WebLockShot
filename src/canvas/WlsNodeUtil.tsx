@@ -15,6 +15,7 @@ import {
   nodeAvailability,
   type CanvasNodeKind,
 } from './contract.ts'
+import { STAGE3D_OPEN_EVENT } from './stage3dMeta.ts'
 import { AssetNodeBody } from './AssetNodeBody.tsx'
 import { GenerateNodeBody } from './GenerateNodeBody.tsx'
 import { ScriptNodeBody } from './ScriptNodeBody.tsx'
@@ -151,6 +152,9 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
             <ScriptNodeBody shape={shape} />
           ) : shape.props.kind === 'storyboard' ? (
             <StoryboardNodeBody shape={shape} />
+          ) : shape.props.kind === 'stage3d' ? (
+            // D1 3D 运镜台节点：摆台摘要 + 进入全屏页按钮（window 事件解耦 tldraw shape 与页面级状态）
+            <Stage3DNodeBody shape={shape} />
           ) : shape.props.kind === 'brief' && skillInputKeys.includes('text') ? (
             // S2：Skill 导入的 Brief 需填输入——内联编辑（原 brief 文本只由对话栏写入，导入场景必须可填）
             <BriefInlineEditor shape={shape} />
@@ -173,6 +177,41 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
       </HTMLContainer>
     )
   }
+}
+
+/**
+ * D1：3D 运镜台节点 body。按钮经 window CustomEvent 通知页面层打开全屏 Stage3DStudio
+ * （事件名常量在 stage3dMeta.ts 契约层）。
+ * 控件级 stopPropagation（B2 约定）：仅按钮本体阻断，不挂容器级。
+ */
+// oxlint-disable-next-line react/only-export-components -- shape 内部 body 组件与 ShapeUtil 同文件（项目既定模式）
+function Stage3DNodeBody({ shape }: { shape: WlsNodeShape }) {
+  const summary = Array.isArray(shape.props.meta.stage3d)
+    ? ''
+    : typeof shape.props.meta.stage3d === 'object' && shape.props.meta.stage3d !== null
+      ? (() => {
+          const objects = (shape.props.meta.stage3d as { objects?: unknown[] }).objects
+          const cams = (shape.props.meta.stage3d as { cameras?: unknown[] }).cameras
+          return `${Array.isArray(objects) ? objects.length : 0} 对象 · ${Array.isArray(cams) ? cams.length : 0} 机位`
+        })()
+      : ''
+  return (
+    <div className="wls-stage3d-body">
+      <p className="wls-node-hint">3D 摆台：素体 + 几何体 + 机位（本地渲染 · 0 灵感币）{summary ? ` · ${summary}` : ''}</p>
+      <button
+        type="button"
+        className="wls-stage3d-enter"
+        data-testid="stage3d-enter"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          window.dispatchEvent(new CustomEvent(STAGE3D_OPEN_EVENT, { detail: { shapeId: shape.id } }))
+        }}
+      >
+        🎬 进入 3D 运镜台
+      </button>
+    </div>
+  )
 }
 
 /**
