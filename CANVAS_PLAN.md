@@ -1,6 +1,8 @@
 # CANVAS_PLAN.md — WebLockShot 「Agent 创意画布」规划（一期 ~ 三期）
 
-> 版本：**v1.7**（2026-09-10）· 基线：`main` 分支现状（sell / drama 双模式 + 工业化底座）
+> 版本：**v1.9**（2026-09-10）· 基线：`main` 分支现状（sell / drama 双模式 + 工业化底座）
+> **v1.9 变更**（用户拍板，新会话执行）：新增 **T 线（T1 E2E 固化 / T2 覆盖率 / T3 性能基准 / T4 跨浏览器+a11y / T5 降级迁移矩阵）**，排在 D9 之后、收官之前；新增 **L1 MIT 开源**（含 tldraw 商业许可如实标注）、**I1 中英双语**（UI 切换 + 英文 README/HOW_TO_USE）、**M1 模型多样性**（海外引擎契约先行）；收官文档改双语。
+> **v1.8 变更**：新增 **D9 小地图 + 多画布项目**；tldraw License 路线拍板（接受水印 / 不接 licenseKey / 不复刻引擎，见 §9 注）。
 > **v1.7 变更**（三期续排片，用户拍板）：D3 的 D 路径改为 **canvas 原生自由镜数分镜**（镜数=机位数，**不放宽 sell 的 6 镜管线**——6 镜硬约束遍布 `ai/schema.ts` / `ai/generate.ts` / `persist.ts` / `types.ts`，属红线）；新增 **D5 画布 UX 对齐（清单二 ①②⑤ + 遗留小修）**、**D6 图8 六类创作场景卡片**、**D7 3D 台增强（场景预设扩展 + 动作预设）**、**D8（可选）MCP 真实接入**；收官动作明确（README + HOW_TO_USE 三版重构 + 遗留台账清零 + tldraw License 决策）。
 > **v1.6 变更**（三期重新锚定，用户拍板）：三期以 `C:\Users\v_chchsli\Desktop\Miroa_Refer` 参考稿 **1:1 复刻为第一目标**；自身特色（运镜词典/深度图等 sell 生态能力）**不进画布**。细化为 C0（工具条修复）+ 素体 Spike + E1/E2（二期形态回炉）+ D1~D4（见 §9），并记录清单二 5 项差异化决策。
 > **v1.5 变更**（二期 B 收官 + 三期筹备）：二期 B S1~S3 归档；新增 **C0 工具条遮挡修复**（二期收官遗留，用户确认做）；三期细化为 D1~D4 草案（已由 v1.6 取代）。
@@ -210,7 +212,8 @@ type CanvasEdge = { id: string; from: string; to: string }
 | 局部重绘 | 目标：✅ 本机验证（ComfyUI 实连）/ 无 ComfyUI 时灰态诚实标注 |
 | 记忆系统 | 伴生服务 sqlite = ✅ 本地验证；纯前端 = 降级并标注 |
 | 3D 运镜台预演 | ✅ 本地实时渲染，不耗积分；出片衔接（构图帧 + 运镜意图）目标：⏳ 待真实引擎（契约层先行） |
-| MCP 连接器 | ⚠️ **仅接口 + 协议层 mock 单测**；真实效果需实际部署配置，纯前端无功能可用 |
+| MCP 连接器 | ⚠️ **仅接口 + 协议层 mock 单测**；真实效果需实际部署配置，纯前端无功能可用；D8 后为可选依赖模式（未安装 SDK = 接口态） |
+| tldraw 生产部署 | ⚠️ 无 license key 时生产环境 5 秒后停渲染、免费/未授权带水印——**上线前必须购买 Commercial license 或更换引擎**（详见 §9 注） |
 
 ---
 
@@ -269,7 +272,15 @@ type CanvasEdge = { id: string; from: string; to: string }
 | **D7 3D 台增强（超越 1:1 的加分项）** | ① **场景预设扩展**：程序化 primitive 场景 5~6 套（商品台/影棚/客厅/卧室/户外台阶/展台，代码生成零外部资产）+ 可选 equirect 全景图预设（AI 生成贴图，用户亦可导入）；② **动作预设增强**：走路循环/挥手/转身等简单骨骼动画（复用 Quaternius 内嵌 45 动画 + AnimationMixer），超越图7 的「摆位+姿势」 | ① 场景预设切换真实生效 + 持久化；② 动作预设播放/停止真实可用 + 与姿势切换不冲突（诚实标注「预演动作非成片」）；③ 不引新重依赖（用 three 自带 AnimationMixer）；④ chunk 增量核对 + 零回归 |
 | **D8（可选）MCP 真实接入 + 反向驱动画布** | 按用户「可选依赖」思路：**默认零依赖不变**，伴生服务动态检测 `@modelcontextprotocol/sdk` 是否已安装（try/catch 动态 import）→ healthz 能力位 `connectors: 'ready' \| 'interface'`；未安装时 UI 显示安装指引（复制 `npm i @modelcontextprotocol/sdk` 命令 + 重启提示），安装后走真实 MCP。**两部分**：① 正向=接 1 个标杆连接器（GitHub 或 Resend，PAT/API key 授权）；② **反向=「MCP 反向驱动画布」**（用户拍板纳入）：伴生服务暴露 MCP server 端点，本地 Agent（Codex/Claude Code 等）可读取画布拓扑并执行操作（建节点/连线/触发节点执行），画布实时反映——参考 infinite-canvas 的 canvas-agent 形态 | ① 未安装 = 现状行为（接口 + 诚实标注）零变化；② 安装后能力位切 'ready' + 正向打通 1 个连接器（授权→取需求/回成品闭环）；③ **反向驱动**：本地 Agent 经 MCP 端点读取画布拓扑 + 执行至少 1 类操作（建节点/连线）且画布实时反映；④ 不装依赖时服务器零报错（动态 import 失败优雅降级）；⑤ 文档交付 + 零回归 |
 | **D9 小地图 + 多画布项目** | ① **小地图**：画布右下角缩略导航（当前视口框 + 点击/拖动跳转，对齐 infinite-canvas 形态；tldraw 无内置则自绘：读页 shapes 边界 + 相机状态，Canvas2D 绘制）；② **多画布项目**：单 CanvasDoc → 多文档（新建/切换/重命名/删除，storage 索引 + 每文档独立 key，既有 `weblockshot.canvas.v1` 自动迁移为默认项目） | ① 小地图实时反映节点分布 + 视口框拖动/点击跳转真实可用；② 多画布增删改切 + 刷新持久化 + 旧单文档零丢失迁移；③ 既有能力（Skill/记忆/编排/3D）在多项目下不串数据；④ 契约单测 + 零回归 + 实机冒烟 |
-| **收官（D5~D9 后）** | README v2.4 能力清单与诚实边界回填（含 server API 直写无 UI 开关约束、单图直出仅演示引擎、tldraw 水印状态）；**HOW_TO_USE「一主两分」重构 + Playwright 实机截图**（画布/带货/短剧三线真实操作截图，替换/新增 `docs/screenshots/`，同步 HTML/PDF 构建产物 `docs/build_how_to_use_pdf.py`）；README hero 改画布优先；遗留台账清零 | ① README 与实现逐项对账无夸大；② 三份文档可独立走通对应模式且截图与实际 UI 一致（非示意图）；③ 遗留台账全部勾销或明确标注「不修 + 原因」 |
+| **T1 E2E 固化** | 把「每切片用完即弃」的 Playwright 实机冒烟固化为可重复套件：`scripts/e2e-canvas.mjs`（独立会话、真实鼠标路径）覆盖画布核心链路（对话栏编排→脚本→分镜→出片→交付）、3D 台（摆位/姿势/机位/关键帧/导出帧）、Skill 市场、记忆图谱、多画布/小地图；`npm run e2e` 一键跑（Playwright 缺失时优雅跳过并如实提示） | ① 一条命令跑完全部画布链路，失败可定位到具体步骤；② 覆盖上述五大块；③ 不污染本地数据（独立 session + 隔离 storage）；④ 脚本入库 + README 说明 |
+| **T2 覆盖率基线** | node 侧覆盖率统计（node --experimental-test-coverage 或 c8）+ 契约/纯函数层门槛（建议 contract.ts / stage3dMeta / memorySource / feedback 聚合 ≥80%） | ① 覆盖率报告可生成；② 关键纯函数层达标或如实记录缺口；③ 不因门槛阻塞既有测试 |
+| **T3 性能基准** | 画布 200/500 节点交互帧率、记忆图谱 500 记录渲染、3D chunk 冷加载耗时、Skill 市场 100 项列表 | ① 输出基准表（数字可复现）；② 明显劣化项如实记录 + 优化建议；③ 本期只测不改 |
+| **T4 跨浏览器 + a11y** | chromium/webkit 抽查核心链路 + axe 基础扫描（画布/3D 台/市场/图谱） | ① 两引擎核心链路可用性结论；② a11y 严重项（serious/critical）清单 + 修复或如实记录 |
+| **T5 降级/迁移矩阵** | 旧单画布→多画布迁移、无 WebGL、无伴生服务、无 LLM Key、`WLS_STORAGE=sqlite/off`、ComfyUI 离线——逐项断言 | ① 六类路径逐项断言通过或如实记录；② 迁移零数据丢失；③ 结论回填 README 诚实边界 |
+| **L1 MIT 开源（用户拍板）** | 仓库补 `LICENSE`（MIT）+ `package.json` `license` 字段 + README 开源声明；**依赖许可如实标注**：tldraw 为商业许可（生产无 key 5 秒后停渲染、免费/未授权带水印），须在 NOTICE/README 明示，避免误导使用者；Quaternius 模型 CC0、其余依赖许可清单 | ① LICENSE(MIT) + package.json 一致；② NOTICE/README 如实列出第三方许可与 tldraw 生产限制；③ 表述准确（我们代码 MIT，依赖各自许可），不声称整体 MIT |
+| **I1 中英双语（用户拍板：只补英文）** | ① UI 语言切换（中/英）选项（设置面板，持久化）；② 画布 + 顶栏/设置关键 UI 文案 i18n；③ `README.en.md` + `docs/HOW_TO_USE.en.md`（画布优先英文手册） | ① 切换即时生效 + 刷新保持；② 英文下画布关键路径可完整走通（无关键中文残留）；③ 英文文档与中文结构一致；④ 默认中文，零回归 |
+| **M1 模型多样性（海外引擎，契约先行）** | 新增海外视频/图像引擎 Provider（Runway / Google Veo / Luma 中选 2，按官方 API 契约实现）+ 设置面板配置项；**无 Key 灰态 + 诚实标注「待真实环境验证」**（延续契约先行、不伪造结果） | ① 新 Provider 走既有 providerContract 测试套（失败显式抛错、未就绪资产不伪造）；② 设置面板可配置 + 探测状态如实；③ 无 Key 灰态不崩；④ 零回归 |
+| **收官（T 线后）** | README v2.4 能力清单与诚实边界回填（含 server API 直写无 UI 开关约束、单图直出仅演示引擎、tldraw 水印与生产限制、T 线测试结论）；**HOW_TO_USE「一主两分」重构 + Playwright 实机截图**（画布/带货/短剧三线真实操作截图，替换/新增 `docs/screenshots/`，同步 HTML/PDF 构建产物 `docs/build_how_to_use_pdf.py`）；**英文版文档同步（I1）**；README hero 改画布优先；遗留台账清零 | ① README 与实现逐项对账无夸大；② 三份文档可独立走通对应模式且截图与实际 UI 一致（非示意图）；③ 中英文档结构一致；④ 遗留台账全部勾销或明确标注「不修 + 原因」 |
 
 > **tldraw License 路线（v1.8 用户拍板）**：① **接受水印，继续用 tldraw**（localhost 属开发环境可正常运行；生产无 key 会 5 秒后停渲染——上线前必须处理）；② **暂不接 `licenseKey` 注入通道**（Trial 接入不做，用户决定「有水印就有水印」）；③ **不做**任何绕过/去除水印或校验的技术手段（违反许可条款，tldraw LICENSE 明载技术措施条款）；④ 商业化前再议：申请官方 Trial（免费 100 天无水印）试水 / 联系销售购买 Commercial license / 换宽松许可引擎（React Flow MIT 最贴合节点-边语义、Excalidraw MIT 次之）——**换引擎需重写 `src/canvas` 与 `src/ui/canvas`，仅在商业前景明确后评估**；⑤ 不自行复刻 tldraw 引擎（最小可用子集估 2~3 个月且难达同等手感，性价比极低）。
 
