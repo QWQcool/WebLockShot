@@ -54,6 +54,10 @@ import {
   STAGE3D_OPEN_EVENT,
   type Stage3DMetaPayload,
 } from '../../canvas/stage3dMeta.ts'
+import {
+  writeStage3DFrameSequence,
+  type Stage3DFrameSequence,
+} from '../../canvas/stage3dFrames.ts'
 
 /**
  * Agent 创意画布 · 一期 A（CANVAS_PLAN.md §4.1-1/2/6/7 + v1.1 变更）。
@@ -413,6 +417,37 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       return { ...prev, payload }
     })
   }, [])
+
+  /**
+   * D3：3D 运镜台导出机位帧序列 → 一次 updateShape 原子写入
+   * meta.stage3d（当前摆台数据）+ meta.stage3dFrames（渲染帧 + 运镜轨迹 + 文字描述）。
+   * 下游 generate / storyboard 沿边读取该导出物（B/D 口）。
+   */
+  const handleStage3DExportFrames = useCallback(
+    (sequence: Stage3DFrameSequence, payload: Stage3DMetaPayload) => {
+      setStage3dTarget((prev) => {
+        if (!prev) return prev
+        const editor = editorRef.current
+        if (editor) {
+          const shape = editor.getShape(prev.shapeId)
+          if (shape && shape.type === CANVAS_NODE_SHAPE_TYPE) {
+            const baseMeta = (shape.props as { meta?: Record<string, unknown> }).meta ?? {}
+            const withStage = writeStage3DMetaPayload(baseMeta, payload) ?? baseMeta
+            const written = writeStage3DFrameSequence(withStage, sequence)
+            if (written) {
+              editor.updateShape({
+                id: prev.shapeId,
+                type: shape.type,
+                props: { meta: written as JsonObject },
+              })
+            }
+          }
+        }
+        return { ...prev, payload }
+      })
+    },
+    []
+  )
   const openMemoryGraph = useCallback(() => {
     const editor = editorRef.current
     const thumbs: MemoryGraphThumbInput[] = []
@@ -1120,6 +1155,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
         <Stage3DStudio
           payload={stage3dTarget.payload}
           onChange={handleStage3DChange}
+          onExportFrames={handleStage3DExportFrames}
           onBack={() => setStage3dTarget(null)}
         />
       )}

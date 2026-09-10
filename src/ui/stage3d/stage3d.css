@@ -164,6 +164,21 @@
   color: #a3aeb5;
 }
 
+/* ---------- D3 出片衔接（机位帧序列导出） ---------- */
+.s3-export {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.s3-export .s3-model-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.s3-export .s3-model-btn:disabled:hover {
+  border-color: #dde3e8;
+  background: #fff;
+}
+
 /* ---------- 主区 ---------- */
 .s3-main {
   flex: 1;

@@ -20,6 +20,13 @@ import {
   writeGenerateMetaPayload,
   type Artifact,
 } from './contract.ts'
+import {
+  buildStage3dDirectPlan,
+  readStage3DFrameSequence,
+  type Stage3DCameraFrame,
+  type Stage3DFrameSequence,
+} from './stage3dFrames.ts'
+import { FrameThumb } from './FrameThumb.tsx'
 import { upsertAssetCard } from './assetCard.ts'
 import type { WlsNodeShape } from './WlsNodeUtil.tsx'
 
@@ -100,6 +107,33 @@ function useUpstreamProduct(editor: ReturnType<typeof useEditor>, shapeId: TLSha
   )
 }
 
+/** D3：沿指入箭头找 stage3d 节点的 meta.stage3dFrames（3D 单镜直出通道，tldraw 响应式） */
+function useUpstreamStage3dFrames(
+  editor: ReturnType<typeof useEditor>,
+  shapeId: TLShapeId
+): Stage3DFrameSequence | null {
+  return useValue(
+    'upstreamStage3dFrames',
+    () => {
+      for (const binding of editor.getBindingsToShape(shapeId, 'arrow')) {
+        const arrow = editor.getShape(binding.fromId)
+        if (!arrow) continue
+        const start = editor
+          .getBindingsFromShape(arrow, 'arrow')
+          .find((b) => (b.props as { terminal?: unknown }).terminal === 'start')
+        if (!start || start.toId === shapeId) continue
+        const src = editor.getShape(start.toId)
+        if (!src || src.type !== 'wls-node') continue
+        if ((src.props as { kind?: unknown }).kind !== 'stage3d') continue
+        const seq = readStage3DFrameSequence((src.props as { meta?: unknown }).meta)
+        if (seq) return seq
+      }
+      return null
+    },
+    [editor, shapeId]
+  )
+}
+
 export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   const editor = useEditor()
   const meta = shape.props.meta
@@ -107,6 +141,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   const upstream = useUpstreamStoryboard(editor, shape.id)
   // S2：单图直出通道——仅有 product 上游（无 storyboard）时以商品标题作提示词单镜演示出片
   const upstreamProduct = useUpstreamProduct(editor, shape.id)
+  // D3：3D 单镜直出通道——仅有 stage3d 上游执导帧（无 storyboard）时以首帧作参考底图 + 运镜文字
+  const upstreamStage3dFrames = useUpstreamStage3dFrames(editor, shape.id)
 
   // 每节点独立引擎实例：复用 ExecutorEngine 全部队列/钱包/FSM 语义，不碰 sell 单例
   const engineRef = useRef<ExecutorEngine | null>(null)
@@ -125,12 +161,38 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   const upstreamRef = useRef(upstream)
   upstreamRef.current = upstream
 
+  // D3：3D 单镜直出的参考底图 objectURL（blob:，供 Mock 录制读取；下次生成/卸载时回收）
+  const refUrlRef = useRef<string[]>([])
+  const revokeRefUrls = () => {
+    for (const u of refUrlRef.current) URL.revokeObjectURL(u)
+    refUrlRef.current = []
+  }
+  useEffect(() => () => revokeRefUrls(), [])
+
+  /** D3：帧图引用水合（idbref → blob objectURL；http(s) 直链原样返回；失败 undefined） */
+  const hydrateRef = async (ref: string): Promise<string | undefined> => {
+    if (ref.startsWith('http://') || ref.startsWith('https://')) return ref
+    if (isIdbRef(ref)) {
+      const u = await getAssetObjectUrl(idbRefToId(ref))
+      return u ?? undefined
+    }
+    return undefined
+  }
+
   const story = upstream?.story ?? null
-  // S2：单图直出模式判定——无 storyboard 上游且 product 上游标题非空；有 storyboard 时优先分镜链路
-  const directTitle = !upstream && upstreamProduct ? upstreamProduct.title.trim() : ''
+  // D3：3D 单镜直出模式判定（优先级 story > stage3d > product）：无 storyboard 上游且 stage3d 执导帧就绪
+  const stage3dFrame: Stage3DCameraFrame | null =
+    !upstream && upstreamStage3dFrames && upstreamStage3dFrames.frames.length > 0
+      ? upstreamStage3dFrames.frames[0]
+      : null
+  const stage3dDirectMode = stage3dFrame !== null
+  // S2：单图直出模式判定——无 storyboard 上游、无 stage3d 执导帧且 product 上游标题非空
+  const directTitle = !upstream && !stage3dDirectMode && upstreamProduct ? upstreamProduct.title.trim() : ''
   const directMode = directTitle.length > 0
   const directTitleRef = useRef('')
   directTitleRef.current = directTitle
+  const stage3dFrameRef = useRef<Stage3DCameraFrame | null>(null)
+  stage3dFrameRef.current = stage3dFrame
   const costPerShot = walletManager.getCost('mock', 1)
   const totalCost = costPerShot * (story?.shots.length ?? 0)
 
@@ -167,8 +229,9 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     if (!self || self.type !== 'wls-node') return
     const story = upstreamRef.current?.story
     const shot = story?.shots.find((s) => `${story.id}-${s.id}` === shotId)
-    // S2 单图直出：无 shot.line 时用商品标题作产物卡标题
+    // D3 3D 单镜直出：用机位名作产物卡标题；S2 单图直出：用商品标题
     const directTitle = directTitleRef.current
+    const s3frame = stage3dFrameRef.current
     upsertAssetCard(
       editor,
       { shapeId: shape.id, x: self.x, y: self.y, w: self.props.w },
@@ -179,9 +242,11 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         createdAt: Date.now(),
         ...(shot?.line
           ? { title: shot.line.slice(0, 40) }
-          : directTitle
-            ? { title: directTitle.slice(0, 40) }
-            : {}),
+          : s3frame
+            ? { title: s3frame.cameraName.slice(0, 40) }
+            : directTitle
+              ? { title: directTitle.slice(0, 40) }
+              : {}),
       }
     )
   }
@@ -234,6 +299,21 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     if (busy) return
     setBusy(true)
     setError(null)
+    // D3：3D 单镜直出分支——机位首帧作参考底图（image2video）+ 运镜文字作提示词（无 story 快照）
+    if (stage3dFrame) {
+      storyDigestRef.current = scriptDigest(stage3dFrame)
+      storyRef.current = null
+      try {
+        revokeRefUrls()
+        const ref = await hydrateRef(stage3dFrame.firstFrameRef)
+        if (ref && ref.startsWith('blob:')) refUrlRef.current.push(ref)
+        await engine.enqueueShots([buildStage3dDirectPlan(stage3dFrame, ref)], 'mock')
+      } catch (err) {
+        setError(`任务入队失败：${err instanceof Error ? err.message : '未知错误'}`)
+        setBusy(false)
+      }
+      return
+    }
     // S2：单图直出分支——商品标题作提示词单镜 Mock 出片（无 story 快照，meta.story 不写）
     if (directMode) {
       storyDigestRef.current = scriptDigest(directTitle)
@@ -274,8 +354,11 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
 
   const staleStory =
     result !== null && upstream !== null && scriptDigest(upstream.story) !== result.storyDigest
+  const staleStage3d =
+    result !== null && stage3dFrame !== null && scriptDigest(stage3dFrame) !== result.storyDigest
   const artifacts = result?.artifacts ?? []
   const succeededCount = artifacts.filter((a) => a.status === 'succeeded').length
+  const expectedShots = story ? story.shots.length : directMode || stage3dDirectMode ? 1 : 0
   const playing = artifacts.find((a) => a.shotId === playingArtifact && a.status === 'succeeded')
 
   return (
@@ -284,13 +367,21 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         <div className="wls-generate-upstream" title={story.title}>
           🔗 上游分镜就绪：{story.shots.length} 镜 · {story.title}
         </div>
+      ) : stage3dFrame ? (
+        <div
+          className="wls-generate-upstream wls-generate-upstream-frame"
+          title={stage3dFrame.motionText}
+        >
+          <FrameThumb frameRef={stage3dFrame.firstFrameRef} alt={`${stage3dFrame.cameraName} 首帧`} />
+          🎥 上游执导帧就绪：{stage3dFrame.cameraName} · {stage3dFrame.motionText}
+        </div>
       ) : directMode ? (
         <div className="wls-generate-upstream" title={directTitle}>
           🔗 上游素材就绪：{directTitle}
         </div>
       ) : (
         <div className="wls-generate-hint">
-          连入 storyboard 节点逐镜出片，或连入 product 节点单图直出（演示引擎）
+          连入 storyboard 节点逐镜出片，或连入 stage3d 执导帧 3D 单镜直出 / product 节点单图直出（演示引擎）
         </div>
       )}
 
@@ -299,14 +390,21 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
           ↕️ 上游分镜已更新，重新生成可同步（不自动覆盖已有产物）
         </div>
       )}
+      {staleStage3d && (
+        <div className="wls-generate-stale" role="status">
+          ↕️ 上游机位帧已更新，重新生成可同步（不自动覆盖已有产物）
+        </div>
+      )}
 
-      {/* 引擎与成本（诚实标注）：Mock 本身是合法引擎；单图直出走演示引擎必须如实标注 */}
+      {/* 引擎与成本（诚实标注）：Mock 本身是合法引擎；单图/3D 单镜直出走演示引擎必须如实标注 */}
       <div className="wls-generate-engine">
-        <span className="wls-generate-engine-tag">{directMode ? '⚡ 单图直出 · 演示引擎' : 'Mock 实验画布'}</span>
+        <span className="wls-generate-engine-tag">
+          {stage3dDirectMode ? '⚡ 3D 单镜直出 · 演示引擎' : directMode ? '⚡ 单图直出 · 演示引擎' : 'Mock 实验画布'}
+        </span>
         <span className="wls-generate-cost">
           {story
             ? `${story.shots.length} 镜 · ${totalCost} 灵感币`
-            : directMode
+            : directMode || stage3dDirectMode
               ? `1 镜 · ${costPerShot} 灵感币`
               : '— 灵感币'}
         </span>
@@ -318,19 +416,23 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
       <button
         type="button"
         className="wls-generate-run"
-        disabled={busy || (!story && !directMode)}
+        disabled={busy || (!story && !directMode && !stage3dDirectMode)}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => void handleGenerate()}
       >
         {busy
           ? '⚙️ 串行出片中…'
-          : directMode
+          : stage3dDirectMode
             ? result
               ? '🔄 重新直出单镜'
-              : '⚡ 单图直演出片'
-            : result
-              ? '🔄 重新生成全部'
-              : '⚙️ 开始逐镜出片'}
+              : '⚡ 3D 单镜直出'
+            : directMode
+              ? result
+                ? '🔄 重新直出单镜'
+                : '⚡ 单图直演出片'
+              : result
+                ? '🔄 重新生成全部'
+                : '⚙️ 开始逐镜出片'}
       </button>
       <div className="wls-generate-cancel-note">
         生成不支持中途取消；刷新页面会中断任务，未完成镜不扣费（冻结款由钱包孤儿回收兜底）
@@ -342,7 +444,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
       {(jobs.length > 0 || artifacts.length > 0) && (
         <div className="wls-generate-artifacts">
           <div className="wls-generate-artifacts-head">
-            产物 {succeededCount}/{directMode ? 1 : (story?.shots.length ?? 0)} 已出片
+            产物 {succeededCount}/{expectedShots} 已出片
           </div>
           {(jobs.length > 0
             ? jobs.map((j) => ({

@@ -28,12 +28,18 @@ export type Stage3DViewportProps = {
   tool: 'move' | 'select'
   onSelect(id: string | null): void
   onTransform(id: string, t: { position: [number, number, number]; rotation: [number, number, number]; scale: [number, number, number] }): void
-  /** 相机控制句柄（重置视角 / 新增机位捕捉当前导演视角参数 / D2 机位飞行） */
+  /** 相机控制句柄（重置视角 / 新增机位捕捉当前导演视角参数 / D2 机位飞行 / D3 帧渲染） */
   controlsRef: React.MutableRefObject<{
     reset: () => void
     getCameraState?: () => { position: [number, number, number]; target: [number, number, number]; fov: number }
     /** D2：平滑飞行至指定机位（ease-in-out，600ms） */
     flyTo?: (camera: { position: [number, number, number]; target: [number, number, number]; fov: number }) => void
+    /** D3：以指定相机姿态同步渲染一帧并返回 PNG dataURL（导出机位帧序列；渲染不可用时返回 null） */
+    captureFrame?: (pose: {
+      position: [number, number, number]
+      target: [number, number, number]
+      fov: number
+    }) => string | null
   } | null>
   /** D2：关键帧播放（kfs 来自选中机位；playing=true 时 useFrame 驱动导演相机） */
   playback: { kfs: Stage3DKeyframe[]; playing: boolean; onPlayhead(t: number): void } | null
@@ -47,7 +53,7 @@ export default function Stage3DViewport(props: Stage3DViewportProps) {
   return (
     <Canvas
       camera={{ position: [5, 3.2, 7], fov: 45, near: 0.1, far: 500 }}
-      gl={{ antialias: true }}
+      gl={{ antialias: true, preserveDrawingBuffer: true }}
       style={{ width: '100%', height: '100%', touchAction: 'none' }}
       onPointerMissed={() => props.onSelect(null)}
     >
@@ -65,6 +71,7 @@ export default function Stage3DViewport(props: Stage3DViewportProps) {
 function SceneContent(props: Stage3DViewportProps) {
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null)
   const scene = useThree((s) => s.scene)
+  const gl = useThree((s) => s.gl)
   const objectRefs = useRef<Map<string, THREE.Object3D>>(new Map())
 
   // 全景背景（equirectangular）
@@ -134,8 +141,36 @@ function SceneContent(props: Stage3DViewportProps) {
         }
         requestAnimationFrame(step)
       },
+      // D3：以指定机位姿态同步渲染一帧 → PNG dataURL（preserveDrawingBuffer 保证帧外可读）。
+      // 渲染后立即恢复原导演视角，避免导出动作扰乱用户当前取景。
+      captureFrame: (pose) => {
+        const c = orbitRef.current
+        if (!c) return null
+        const cam = c.object as THREE.PerspectiveCamera
+        const prevPos = cam.position.clone()
+        const prevTgt = c.target.clone()
+        const prevFov = cam.fov
+        cam.position.set(...pose.position)
+        c.target.set(...pose.target)
+        cam.fov = pose.fov
+        cam.updateProjectionMatrix()
+        c.update()
+        let url: string | null = null
+        try {
+          gl.render(scene, cam)
+          url = gl.domElement.toDataURL('image/png')
+        } catch {
+          url = null
+        }
+        cam.position.copy(prevPos)
+        c.target.copy(prevTgt)
+        cam.fov = prevFov
+        cam.updateProjectionMatrix()
+        c.update()
+        return url
+      },
     }
-  }, [props.controlsRef])
+  }, [props.controlsRef, gl, scene])
 
   return (
     <>

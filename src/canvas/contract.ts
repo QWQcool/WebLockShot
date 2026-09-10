@@ -355,14 +355,22 @@ export function readStoryboardMetaPayload(meta: unknown): StoryboardMetaPayload 
   return parsed.success ? parsed.data : null
 }
 
-/** 写入：分镜结果经 zod 校验后合并进 meta（校验失败返回 null 拒写） */
+/**
+ * 写入：分镜结果经 zod 校验后合并进 meta（校验失败返回 null 拒写）。
+ * 来源互斥：写入 script→6 镜模式时剔除「3D 台自由分镜」痕迹键
+ * （shotPlan / stage3dDigest / stage3dSource，见 stage3dFrames.ts）。
+ */
 export function writeStoryboardMetaPayload(
   baseMeta: Record<string, unknown>,
   payload: StoryboardMetaPayload
 ): Record<string, unknown> | null {
   const parsed = storyboardMetaPayloadSchema.safeParse(payload)
   if (!parsed.success) return null
-  return { ...baseMeta, ...parsed.data }
+  const cleaned = { ...baseMeta }
+  delete cleaned.shotPlan
+  delete cleaned.stage3dDigest
+  delete cleaned.stage3dSource
+  return { ...cleaned, ...parsed.data }
 }
 
 /** 脚本摘要指纹（djb2，纯函数）：上游脚本任何字段变化都会改变指纹，驱动「重新生成分镜」提示 */

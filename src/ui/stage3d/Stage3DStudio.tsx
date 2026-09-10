@@ -16,9 +16,17 @@ import {
 import {
   keyframesDuration,
   normalizeKeyframes,
+  sampleCameraPose,
   type Stage3DKeyframe,
 } from '../../canvas/stage3dKeyframes.ts'
-import { getAssetObjectUrl, putBlobAsset } from '../../persist/assetStore.ts'
+import {
+  STAGE3D_SHOT_PLAN_MAX,
+  buildCameraFrame,
+  buildStage3DFrameSequence,
+  type Stage3DCameraFrame,
+  type Stage3DFrameSequence,
+} from '../../canvas/stage3dFrames.ts'
+import { getAssetObjectUrl, putBlobAsset, putDataUrlAsset } from '../../persist/assetStore.ts'
 import './stage3d.css'
 
 /**
@@ -36,6 +44,11 @@ type Props = {
   payload: Stage3DMetaPayload
   /** 摆台数据变更（Studio 内 300ms debounce，返回画布时 flush） */
   onChange(payload: Stage3DMetaPayload): void
+  /**
+   * D3：导出机位帧序列（渲染帧入 IndexedDB → idbref）→ 写回节点 meta.stage3dFrames。
+   * 随序列一并回传当前摆台数据，调用方一次 updateShape 原子写入（避免 debounce 竞态）。
+   */
+  onExportFrames(sequence: Stage3DFrameSequence, payload: Stage3DMetaPayload): void
   onBack(): void
 }
 
@@ -53,7 +66,7 @@ function detectWebGL(): boolean {
   }
 }
 
-export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) => {
+export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onExportFrames, onBack }) => {
   const [objects, setObjects] = useState<Stage3DObject[]>(payload.objects)
   const [cameras, setCameras] = useState<Stage3DCamera[]>(payload.cameras)
   const [env, setEnv] = useState<Stage3DMetaPayload['env']>(payload.env)
@@ -70,9 +83,11 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
   const [modelUrlByRef, setModelUrlByRef] = useState<Record<string, string>>({})
   const [panoramaUrl, setPanoramaUrl] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  // D3：机位帧渲染导出进行中（渲染 + IndexedDB 存档期间禁用按钮）
+  const [busyExport, setBusyExport] = useState(false)
   const [webglOk] = useState(detectWebGL)
   const objectUrlRef = useRef<string[]>([])
-  const controlsRef = useRef<{ reset: () => void; getCameraState?: () => { position: [number, number, number]; target: [number, number, number]; fov: number }; flyTo?: (camera: { position: [number, number, number]; target: [number, number, number]; fov: number }) => void } | null>(null)
+  const controlsRef = useRef<{ reset: () => void; getCameraState?: () => { position: [number, number, number]; target: [number, number, number]; fov: number }; flyTo?: (camera: { position: [number, number, number]; target: [number, number, number]; fov: number }) => void; captureFrame?: (pose: { position: [number, number, number]; target: [number, number, number]; fov: number }) => string | null } | null>(null)
   const modelInputRef = useRef<HTMLInputElement>(null)
   const panoramaInputRef = useRef<HTMLInputElement>(null)
 
@@ -377,6 +392,94 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
     [commit, env]
   )
 
+  /**
+   * D3：渲染机位首/尾帧（轨迹端点）并存入 IndexedDB（idbref）→ 组装帧记录。
+   * 返回 null 表示失败（已 setNotice 如实说明）。无 WebGL / 视口未就绪时拒绝。
+   */
+  const renderCameraFrames = useCallback(
+    async (cams: Stage3DCamera[]): Promise<Stage3DCameraFrame[] | null> => {
+      const capture = controlsRef.current?.captureFrame
+      if (!capture) {
+        setNotice({ kind: 'err', text: '3D 视口尚未就绪或当前环境无 WebGL，无法渲染机位帧' })
+        return null
+      }
+      const frames: Stage3DCameraFrame[] = []
+      for (const cam of cams) {
+        const kfs = normalizeKeyframes(cam.keyframes ?? [])
+        const fallback = { position: cam.position, target: cam.target, fov: cam.fov }
+        const firstPose = kfs.length > 0 ? sampleCameraPose(kfs, 0) ?? fallback : fallback
+        const lastPose = kfs.length > 0 ? sampleCameraPose(kfs, keyframesDuration(kfs)) ?? firstPose : firstPose
+        const firstData = capture(firstPose)
+        const lastData = capture(lastPose)
+        if (!firstData || !lastData) {
+          setNotice({ kind: 'err', text: `「${cam.name}」帧渲染失败（WebGL 上下文不可用）` })
+          return null
+        }
+        const firstRef = await putDataUrlAsset(`stage3d_frame_${cam.id}_f`, firstData)
+        const lastRef = await putDataUrlAsset(`stage3d_frame_${cam.id}_l`, lastData)
+        if (!firstRef || !lastRef) {
+          setNotice({ kind: 'err', text: '帧图存档失败（IndexedDB 不可用），未写入节点' })
+          return null
+        }
+        frames.push(buildCameraFrame(cam, firstRef, lastRef))
+      }
+      return frames
+    },
+    [controlsRef]
+  )
+
+  /** D3：导出机位帧序列（direct = 单机位执导帧 → generate；plan = 全部机位 → storyboard） */
+  const exportFrames = useCallback(
+    async (cams: Stage3DCamera[], mode: 'direct' | 'plan') => {
+      if (cams.length === 0) {
+        setNotice({ kind: 'err', text: '没有可导出的机位：请先在「＋ 新增机位」添加机位' })
+        return
+      }
+      if (cams.length > STAGE3D_SHOT_PLAN_MAX) {
+        setNotice({
+          kind: 'err',
+          text: `机位数 ${cams.length} 超过自由分镜上限 ${STAGE3D_SHOT_PLAN_MAX}：请精简机位后重试（不截断不伪造）`,
+        })
+        return
+      }
+      setBusyExport(true)
+      try {
+        const frames = await renderCameraFrames(cams)
+        if (!frames) return
+        const check = buildStage3DFrameSequence(frames)
+        if (!check.ok) {
+          setNotice({ kind: 'err', text: check.reason })
+          return
+        }
+        // 随序列回传当前摆台数据：调用方一次 updateShape 原子写入（规避 debounce 竞态）
+        onExportFrames(check.sequence, { objects, cameras, env })
+        setNotice({
+          kind: 'ok',
+          text:
+            mode === 'direct'
+              ? `✓ 已导出执导帧「${cams[0].name}」：首/尾帧入 IndexedDB（idbref）· 连到「视频生成」节点即可 3D 单镜直出`
+              : `✓ 已导出分镜：${frames.length} 机位首/尾帧入 IndexedDB · 连到「分镜预演」节点即可生成自由分镜（镜数=机位数）`,
+        })
+      } finally {
+        setBusyExport(false)
+      }
+    },
+    [renderCameraFrames, onExportFrames, objects, cameras, env]
+  )
+
+  const handleExportDirectFrames = useCallback(() => {
+    const target = selectedCamera ?? cameras[0]
+    if (!target) {
+      setNotice({ kind: 'err', text: '请先添加机位（顶中「＋ 新增机位」）' })
+      return
+    }
+    void exportFrames([target], 'direct')
+  }, [selectedCamera, cameras, exportFrames])
+
+  const handleExportShotPlan = useCallback(() => {
+    void exportFrames(cameras, 'plan')
+  }, [cameras, exportFrames])
+
   const filteredObjects = useMemo(() => {
     const q = sceneSearch.trim().toLowerCase()
     return q ? objects.filter((o) => o.name.toLowerCase().includes(q)) : objects
@@ -506,6 +609,35 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onBack }) =>
                   e.target.value = ''
                 }}
               />
+              {/* D3 出片衔接：机位帧序列导出（B 口 → generate / D 口 → storyboard） */}
+              <div className="s3-left-title">出片衔接</div>
+              <div className="s3-export">
+                <button
+                  type="button"
+                  className="s3-model-btn"
+                  data-testid="s3-export-frames"
+                  title="渲染选中机位（未选中则取第一个）首/尾帧，导出到「视频生成」节点做 3D 单镜直出"
+                  disabled={busyExport || !webglOk || cameras.length === 0}
+                  onClick={handleExportDirectFrames}
+                >
+                  📤 导出执导帧（单机位 → 视频生成）
+                </button>
+                <button
+                  type="button"
+                  className="s3-model-btn"
+                  data-testid="s3-export-shotplan"
+                  title="渲染全部机位首/尾帧，导出到「分镜预演」节点生成自由镜数分镜（镜数=机位数）"
+                  disabled={busyExport || !webglOk || cameras.length === 0}
+                  onClick={handleExportShotPlan}
+                >
+                  🎞️ 导出分镜（全部机位 → 分镜预演）
+                </button>
+                <small className="s3-model-notice" data-testid="s3-export-notice">
+                  {busyExport
+                    ? '渲染机位帧中…'
+                    : `渲染帧落 IndexedDB（idbref）· 运镜轨迹结构化随帧入库 · 自由分镜镜数=机位数（≤${STAGE3D_SHOT_PLAN_MAX}）`}
+                </small>
+              </div>
             </div>
           </>
         )}
