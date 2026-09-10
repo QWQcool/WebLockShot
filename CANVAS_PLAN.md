@@ -1,6 +1,7 @@
 # CANVAS_PLAN.md — WebLockShot 「Agent 创意画布」规划（一期 ~ 三期）
 
-> 版本：**v1.4**（2026-09-09）· 基线：`main` 分支现状（sell / drama 双模式 + 工业化底座）
+> 版本：**v1.5**（2026-09-10）· 基线：`main` 分支现状（sell / drama 双模式 + 工业化底座）
+> **v1.5 变更**（二期 B 收官 + 三期筹备）：二期 B S1~S3 归档；新增 **C0 工具条遮挡修复**（二期收官遗留，用户确认做）；三期细化为 D1~D4 草案（**待用户拍板后执行**，见 §9）。
 > **v1.4 变更**（二期 B 开工）：二期 B 按 B1~B6 / A1~A2 同款双 Agent 流水线执行，细化为三个子切片 S1~S3（见 §9）；S2 明确解锁 **product → generate 单图直出连线通道**（官方 Skill「单图快速出片」要求直连，见 §5.2 增补），其余连线契约不变。
 > **v1.1 变更**（一期 A 实机验收后反馈返工）：① 设计语言从深色夜舱改为 **初音青 × Miroa 浅色工作室风**（对齐参考稿：浅色画布/白卡/圆角/柔和阴影）；② 定位从电商带货扩为**多元化创意工作室**（节点改名「素材/脚本/视频生成」，新增 `image` 图像生成节点 + 5 类场景模板：带货短视频/品牌视觉/短剧分镜/游戏宣传/App 界面）；③ 新增**对话栏**（对齐 Miora 图1 底部大输入卡 + 模板快捷入口，一期 A 一句话落 Brief 节点，接 LLM 编排是一期 B）；④ 剧情短剧顶栏补画布切换入口。
 > 本文是画布模式的**唯一规格**，风格对齐 `PLAN.md` / `UPGRADE_PLAN.md`。未写进「要做」的一律不做。
@@ -226,6 +227,21 @@ type CanvasEdge = { id: string; from: string; to: string }
 | **S3 记忆系统（结构化，不玄学）** | 伴生服务新增 `/api/memory/records`（GET/POST/DELETE，`WLS_STORAGE=sqlite` 时启用，非 sqlite 返回 501，/healthz 能力位 `memory: sqlite\|off`，对齐 tts/render 能力位模式）；记录结构复用 `FeedbackRecordSchema` 形状；**聚合层强制复用 src/domain/feedback.ts 的 `computeWinRates`（Laplace），不另造一套**；script 节点生成时注入 `getWinRateLookup()`（服务端模式：records 从伴生服务拉取后走同一聚合），命中历史数据时节点展示「📊 本条建议来自你的历史数据」徽章；纯前端模式降级本地（回流记录 IndexedDB + 偏好 localStorage）并如实标注能力边界；设置面板新增记忆区块：查看（条数/按结构·钩子·品类胜率）+ 清除（隐私诚实，清除范围明示） | ① 服务端单测：sqlite 模式 records 增/查/清 + 非 sqlite 501 + healthz 能力位；② 聚合复用验证：服务端模式与本地模式产出同一 `computeWinRates` 聚合（单测双路对拍）；③ script 节点注入回流记录后，生成的钩子加权可复现（与 sell 模式 ScriptWriter 采样同源），节点徽章按「有历史数据」如实显隐；④ 无伴生服务/非 sqlite 时 UI 标注「纯前端模式 · 记忆仅存本地」；⑤ 设置面板查看/清除真实可用（清除后胜率回退先验）；⑥ sell / drama 零回归（含回流看板）+ 契约单测 + 实机冒烟 |
 
 每片完成后：开发 Agent 自测（`npm run build` + `npm test` 全绿 + oxlint 0 errors + 真实鼠标路径 Playwright 实测）→ 汇报 → 测试 Agent 独立验收 → PASS 后由主控提交并推送该切片，再进下一片。全部完成后 README 画布能力清单统一更新。
+
+### 二期 B（已完成归档，S1~S3）
+
+> S1 `3d1e9b6` / S2 `cbfe7b5` / S3 `a3806d7` / README v2.3 `dbb9f49`，双 Agent 独立验收全 PASS、零阻塞缺陷。
+> 已验证坑归档：tldraw v5 编程式 editor.run 不自动打 history mark（须显式 markHistoryStoppingPoint）；T.jsonValue 不接受 undefined 键值（meta 无值必须整键省略）；生产模式验证前须注销 PWA SW。
+
+### 二期收官遗留修复 + 三期切片（v1.5：C0 已确认；D1~D4 为草案待拍板）
+
+| 切片 | 内容 | 验收标准 |
+|---|---|---|
+| **C0 工具条遮挡修复（二期遗留，用户已确认）** | 对话栏浮层（底部居中）完全遮住 tldraw 底部工具条 10 个按钮（一期 B 遗留）。方案：对话栏一键收起（折叠为右下角小胶囊，点击展开还原）+ 收起态 tldraw 工具条完整可点；CSS 层核对工具条与浮层的层叠/避让，不触碰 sell/drama | ① 真实鼠标逐一点击工具条全部 10 按钮可用（选择/手绘/橡皮/箭头/文本/便签/图形/帧/资源/更多）；② 对话栏收起→展开往返后输入内容与模板 chips 不丢；③ 收起态浮层不残留点击热区（透明区域不挡画布）；④ npm test 全绿 + oxlint 0 errors + 实机冒烟 |
+| **D1 3D 运镜台基座（草案）** | three.js + @react-three-fiber + drei 引入（**独立 chunk 懒加载**，对齐 tldraw 不进主包）；stage3d 节点蜕壳（参照 edit 蜕壳路径，全屏打开模式）；3~5 套轻量场景预设（商品台/房间等，primitive 组合零外部资产）+ 参数化假人 + 商品占位体，拖拽摆位调构图；全景图（equirectangular）导入作环境；**全程本地实时渲染不调任何生成 API 不扣灵感币**（诚实标注） | ① stage3d 节点打开 3D 台 → 摆位/机位操作真实鼠标可用；② 刷新后摆台状态持久化（meta 契约 zod + 单测）；③ 3D chunk 不进主包（构建产物核对）；④ 无 WebGL 环境灰态诚实降级；⑤ 实机冒烟 |
+| **D2 多机位 + 关键帧运镜（草案）** | 自由添加/切换多机位（每机位独立焦距/高度/角度）；时间轴关键帧录制（位置/朝向/FOV）+ 播放预览运镜轨迹；「摆台预演不耗积分」诚实标注 | ① 录制 ≥2 关键帧 → 播放轨迹平滑插值；② 机位列表增删切持久化；③ 关键帧数据 meta 契约 zod + 单测；④ 实机冒烟 |
+| **D3 两路输出（草案）** | **路径 A 运镜词典编译**：3D 台最终机位/轨迹 → 映射 `motionId`（push_in/pan_left 等同名运动）+ 构图参数（景别/主体位置），喂给 storyboard/generate 节点——**与 GSAP 预演、提示词方案三方同源**（复用 src/stage motions 词典与提示词编译层，零复制）；**路径 B 深度/法线图导出**：机位渲染 ControlNet 深度图，JSON 契约先行冻结，真实 ComfyUI 联调待环境（mock/诚实标注） | ① 3D 台运镜 → storyboard 节点收到对应 motionId/构图参数，GSAP 预演与 3D 预演轨迹一致（三方同源核心验收）；② 深度图导出 PNG 可下载、契约单测过；③ 未实连 ComfyUI 时深度图直连生成灰态标注；④ 零回归 + 实机冒烟 |
+| **D4 MCP 连接器接口（草案，只做接口+诚实标注）** | 伴生服务 `/api/connectors` 路由族（list / auth 回调占位 / run）；server 预留 MCP client 接入点（**本期不引 @modelcontextprotocol/sdk、不接任何真实第三方**——保持零依赖，接口用协议层 mock）；/healthz `connectors: 'interface'` 能力位；画布「连接器」面板两态渲染（在线=接口形态+预留配置项+⚠️ 需实际部署标注；纯前端=无功能可用）；首批三类目标形态只写文档（文档与数据进/项目协作出/触达发送） | ① 路由协议层 mock 单测；② healthz 能力位 + 前端两态如实渲染实机验证；③ 文档章节交付；④ 零回归 |
 
 ### 二期 A（已完成归档，A1~A2）
 
