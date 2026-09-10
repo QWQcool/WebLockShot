@@ -14,6 +14,8 @@ type Props = {
   isOpen: boolean
   onClose: () => void
   onSaved?: () => void
+  /** E1：打开记忆图谱（全屏覆盖层；未提供时按钮不渲染，调用方自行渲染 MemoryGraphView） */
+  onOpenMemoryGraph?: () => void
 }
 
 const PRESET_ENDPOINTS = [
@@ -43,6 +45,7 @@ export const TokenSettingsModal: React.FC<Props> = ({
   isOpen,
   onClose,
   onSaved,
+  onOpenMemoryGraph,
 }) => {
   const [tokenConfig, setTokenConfig] = useState<TokenConfig>({
     baseUrl: 'https://api.siliconflow.cn/v1',
@@ -517,15 +520,26 @@ export const TokenSettingsModal: React.FC<Props> = ({
               </div>
             )}
 
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{ marginTop: '0.6rem' }}
-              disabled={memoryBusy || !memory || memory.records.length === 0}
-              onClick={() => void handleClearMemory()}
-            >
-              {memoryBusy ? '处理中…' : '🗑️ 清除全部记忆'}
-            </button>
+            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={memoryBusy || !memory || memory.records.length === 0}
+                onClick={() => void handleClearMemory()}
+              >
+                {memoryBusy ? '处理中…' : '🗑️ 清除全部记忆'}
+              </button>
+              {onOpenMemoryGraph && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  data-testid="open-memory-graph-settings"
+                  onClick={onOpenMemoryGraph}
+                >
+                  🗺️ 查看记忆图谱
+                </button>
+              )}
+            </div>
             <small className="hint-text" style={{ display: 'block', marginTop: '0.3rem' }}>
               清除范围：{memory?.mode === 'server' ? '伴生服务端全部回流记录（sqlite 持久化数据）' : '本机 IndexedDB 全部回流记录'}。
               清除后胜率回退 0.5 先验，钩子采样恢复均匀分布；不影响画布文档与已生成产物。

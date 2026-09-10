@@ -6,6 +6,7 @@ import {
   type FeedbackRecord,
   type WinRateAggregate,
 } from '../../domain/feedback.ts'
+import { readMemoryEnabled } from '../../domain/memoryPrefs.ts'
 import { STRUCTURE_TEMPLATES } from '../../prompts/library/structures.ts'
 
 /**
@@ -76,11 +77,19 @@ export const FeedbackDashboard: React.FC<Props> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null
 
+  // E1 记忆采集开关（记忆图谱右上角同一持久化键）：渲染期派生读取；
+  // 提交时 handleSubmit 内再次直读，双重确保关闭态不写入（父组件重渲染时刷新）
+  const memoryEnabled = readMemoryEnabled()
+
   const selectedTemplate = STRUCTURE_TEMPLATES.find((t) => t.id === templateId)
   const hookType = selectedTemplate?.hookTypes?.[hookIndex]
 
   const handleSubmit = () => {
     setFormError(null)
+    if (!readMemoryEnabled()) {
+      setFormError('记忆采集已关闭（记忆图谱右上角开关可重新开启），本次录入未写入')
+      return
+    }
     if (!videoTitle.trim()) {
       setFormError('请填写视频标题')
       return
@@ -133,6 +142,11 @@ export const FeedbackDashboard: React.FC<Props> = ({ isOpen, onClose }) => {
         </div>
 
         <div className="modal-body">
+          {!memoryEnabled && (
+            <div className="fb-alert" role="status" data-testid="memory-disabled-notice">
+              ⏸️ 记忆采集已关闭：新回流记录不会写入，已有记录保留。可在记忆图谱右上角开关重新开启。
+            </div>
+          )}
           {/* 录入表单 */}
           <div className="fb-form-grid">
             <label className="fb-field fb-field-wide">

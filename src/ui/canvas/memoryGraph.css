@@ -1,0 +1,322 @@
+/**
+ * E1 记忆图谱暗色主题（Miora 图4 1:1）——仅作用于 .mg-root 覆盖层内部，
+ * 画布工作区浅色基调零污染（选择器全部 mg- 前缀，不碰全局）。
+ */
+
+.mg-root {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background-color: #131313;
+  /* 点阵画布底（图4：深灰底 + 细密圆点） */
+  background-image: radial-gradient(circle, #2e2e2e 1px, transparent 1px);
+  background-size: 26px 26px;
+  font-family: var(--body, 'Noto Sans SC', sans-serif);
+  color: #e8e6e3;
+  overflow: hidden;
+}
+
+/* ---------- 顶栏三件套 ---------- */
+.mg-topbar {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 20;
+}
+
+.mg-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid #3a3a3a;
+  border-radius: 999px;
+  background: #1d1d1d;
+  color: #e8e6e3;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.mg-back:hover {
+  background: #262626;
+  border-color: #4a4a4a;
+}
+
+.mg-title-group {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mg-title-pill {
+  padding: 7px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #e8721e, #f0913a);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  box-shadow: 0 0 18px rgba(232, 114, 30, 0.45);
+}
+
+.mg-title-sub {
+  font-size: 13px;
+  color: #b9b5b0;
+}
+
+.mg-mode-tag {
+  font-size: 11px;
+  color: #8b8680;
+  border: 1px solid #333;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* 右上开关 */
+.mg-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid #3a3a3a;
+  background: #1d1d1d;
+  color: #9a958f;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.mg-toggle .mg-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5a564f;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.mg-toggle.on {
+  color: #f2f0ed;
+  border-color: #4c4c4c;
+}
+.mg-toggle.on .mg-toggle-dot {
+  background: #e8721e;
+  box-shadow: 0 0 8px rgba(232, 114, 30, 0.8);
+}
+
+/* ---------- 图谱视口 ---------- */
+.mg-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.mg-canvas {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.2s ease;
+}
+
+.mg-edges {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.mg-edge {
+  fill: none;
+  stroke: #3c3c3c;
+  stroke-width: 1.5;
+}
+.mg-edge--root {
+  stroke: #55504a;
+  stroke-width: 2;
+}
+
+/* 节点通用定位 */
+.mg-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+/* 中心发光主节点（图4：橙色点阵方块光晕） */
+.mg-center-core {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at center, #f0913a 0%, #e8721e 45%, #b65415 100%);
+  box-shadow:
+    0 0 0 6px rgba(232, 114, 30, 0.12),
+    0 0 34px 8px rgba(232, 114, 30, 0.55),
+    0 0 90px 24px rgba(232, 114, 30, 0.22);
+  animation: mg-breathe 3.2s ease-in-out infinite;
+}
+@keyframes mg-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 6px rgba(232, 114, 30, 0.12),
+      0 0 34px 8px rgba(232, 114, 30, 0.55),
+      0 0 90px 24px rgba(232, 114, 30, 0.22);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(232, 114, 30, 0.18),
+      0 0 44px 12px rgba(232, 114, 30, 0.7),
+      0 0 110px 30px rgba(232, 114, 30, 0.3);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mg-center-core {
+    animation: none;
+  }
+}
+
+/* 二级分类节点（圆形，图标字） */
+.mg-bucket {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #1d1d1d;
+  border: 1px solid #3a3a3a;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+.mg-bucket-label {
+  font-size: 14px;
+  color: #f2f0ed;
+}
+.mg-bucket-count {
+  font-size: 10px;
+  color: #8b8680;
+}
+
+/* 行为记忆文本气泡 */
+.mg-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 240px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #202020;
+  border: 1px solid #383838;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.mg-bubble-label {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #dedbd7;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mg-bubble-detail {
+  font-size: 11px;
+  color: #8b8680;
+}
+
+/* 素材缩略卡 */
+.mg-thumb {
+  width: 96px;
+  height: 128px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #383838;
+  background: #202020;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.mg-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.mg-thumb-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6a6660;
+  font-size: 18px;
+}
+
+/* ---------- 缩放控件（左下） ---------- */
+.mg-zoom {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 20;
+}
+.mg-zoom button {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #3a3a3a;
+  background: #1d1d1d;
+  color: #dedbd7;
+  font-size: 17px;
+  cursor: pointer;
+}
+.mg-zoom button:hover {
+  background: #262626;
+}
+
+/* ---------- 底部诚实标注 ---------- */
+.mg-footnote {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #7a756f;
+  white-space: nowrap;
+  z-index: 20;
+}
+
+/* ---------- 空态 / 加载 ---------- */
+.mg-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 0 24px;
+}
+.mg-empty-icon {
+  font-size: 44px;
+  opacity: 0.7;
+}
+.mg-empty p {
+  margin: 0;
+  font-size: 16px;
+  color: #dedbd7;
+}
+.mg-empty small {
+  max-width: 460px;
+  line-height: 1.7;
+  color: #8b8680;
+}

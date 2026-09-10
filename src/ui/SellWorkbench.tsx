@@ -22,6 +22,7 @@ import {
 import { WorkbenchHeader, type WorkbenchStep, type StudioMode } from './components/WorkbenchHeader.tsx'
 import { PipelineEngineBar } from './components/PipelineEngineBar.tsx'
 import { TokenSettingsModal } from './components/TokenSettingsModal.tsx'
+import { MemoryGraphView } from './canvas/MemoryGraphView.tsx'
 import { WalletModal } from './components/WalletModal.tsx'
 import { ProductStep } from './steps/ProductStep.tsx'
 import { TemplateStep } from './steps/TemplateStep.tsx'
@@ -101,6 +102,8 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama, onSwitchToCanv
   const [isSettingsOpen, setIsSettingsOpen] = useState(urlParams?.get('settings') === 'open')
   const [isWalletOpen, setIsWalletOpen] = useState(urlParams?.get('wallet') === 'open')
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
+  // E1 记忆图谱（设置面板「3. 记忆」区块第二入口）
+  const [isMemoryGraphOpen, setIsMemoryGraphOpen] = useState(false)
   const [hasToken, setHasToken] = useState<boolean>(() => {
     try {
       const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)
@@ -388,9 +391,20 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama, onSwitchToCanv
 
       <FeedbackDashboard isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
 
+      {/* E1 记忆图谱（设置面板「3. 记忆」第二入口；sell 模式无画布素材 → 缩略叶如实缺省） */}
+      {isMemoryGraphOpen && (
+        <MemoryGraphView
+          onClose={() => setIsMemoryGraphOpen(false)}
+        />
+      )}
+
       <TokenSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        onOpenMemoryGraph={() => {
+          setIsSettingsOpen(false)
+          setIsMemoryGraphOpen(true)
+        }}
         onSaved={() => {
           try {
             const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY)

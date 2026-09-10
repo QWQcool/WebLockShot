@@ -24,6 +24,7 @@ import {
   validateEdgeKind,
   validateSkillManifest,
   validateSkillManifestDetailed,
+  readAssetMetaPayload,
   type CanvasDoc,
   type CanvasNodeKind,
   type OrchestrationPlan,
@@ -41,6 +42,8 @@ import {
   editorPageToCanvasDraft,
 } from '../../canvas/serialize.ts'
 import { WlsNodeUtil } from '../../canvas/WlsNodeUtil.tsx'
+import { MemoryGraphView } from './MemoryGraphView.tsx'
+import type { MemoryGraphThumbInput } from '../../canvas/memoryGraph.ts'
 
 /**
  * Agent 创意画布 · 一期 A（CANVAS_PLAN.md §4.1-1/2/6/7 + v1.1 变更）。
@@ -347,6 +350,27 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
 
   // C0：对话栏一键收起（折叠为右下角小胶囊，点击展开还原），收起态完整暴露 tldraw 底部工具条
   const [chatCollapsed, setChatCollapsed] = useState(false)
+
+  // E1 记忆图谱（Miora 图4 回炉）：画布工具条入口 + 真实素材缩略叶（打开时从 asset 卡收集）
+  const [isMemoryGraphOpen, setIsMemoryGraphOpen] = useState(false)
+  const [memoryThumbs, setMemoryThumbs] = useState<MemoryGraphThumbInput[]>([])
+  const openMemoryGraph = useCallback(() => {
+    const editor = editorRef.current
+    const thumbs: MemoryGraphThumbInput[] = []
+    if (editor) {
+      for (const s of editor.getCurrentPageShapes()) {
+        if (s.type !== CANVAS_NODE_SHAPE_TYPE) continue
+        const props = s.props as { kind?: unknown; meta?: Record<string, unknown> }
+        if (props.kind !== 'asset') continue
+        const payload = readAssetMetaPayload(props.meta)
+        if (payload && payload.type === 'image') {
+          thumbs.push({ ref: payload.url, label: payload.title || payload.shotId })
+        }
+      }
+    }
+    setMemoryThumbs(thumbs)
+    setIsMemoryGraphOpen(true)
+  }, [])
 
   // 对话栏：B6 LLM/演示两态编排（一句话 → 整批节点+连线上画布，可一键撤销）
   const [chatDraft, setChatDraft] = useState('')
@@ -861,6 +885,15 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             <button type="button" className="wls-canvas-btn" onClick={onClear}>
               🧹 清空画布
             </button>
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="open-memory-graph"
+              title="记忆图谱：真实回流记录可视化（暗色全屏视图，摆样例数据为零）"
+              onClick={openMemoryGraph}
+            >
+              🧠 记忆图谱
+            </button>
             <span className="wls-canvas-save-state">已保存 {savedAt}</span>
           </div>
           <div className="wls-canvas-root">
@@ -985,6 +1018,14 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
           </div>
         </main>
       </div>
+
+      {/* E1 记忆图谱全屏覆盖层（视图内部暗色主题，退出后画布浅色基调零污染） */}
+      {isMemoryGraphOpen && (
+        <MemoryGraphView
+          onClose={() => setIsMemoryGraphOpen(false)}
+          thumbs={memoryThumbs}
+        />
+      )}
     </div>
   )
 }
