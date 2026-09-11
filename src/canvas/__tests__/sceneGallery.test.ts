@@ -1,5 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync, statSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import {
   SCENE_GALLERY_CARDS,
   SCENE_GALLERY_TOPOLOGY,
@@ -24,6 +27,18 @@ test('SCENE_GALLERY_CARDS：六类场景 + 序号 01~06 + 字段齐备（图8 1:
     assert.ok(c.glyph.length > 0)
     assert.equal(c.gradient.length, 2)
     assert.ok(c.gradient[0].startsWith('#') && c.gradient[1].startsWith('#'))
+    assert.match(c.image, /^[a-z0-9-]+\.webp$/, `${c.title} 配图名须为 kebab-case .webp`)
+  }
+})
+
+test('配图文件真实存在且体积受控（public/scenes/*.webp，单张 <200KB）', () => {
+  const scenesDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'public', 'scenes')
+  for (const c of SCENE_GALLERY_CARDS) {
+    const p = join(scenesDir, c.image)
+    assert.ok(existsSync(p), `缺配图文件：public/scenes/${c.image}`)
+    const kb = statSync(p).size / 1024
+    assert.ok(kb > 1, `${c.image} 体积异常（${kb.toFixed(1)}KB）`)
+    assert.ok(kb < 200, `${c.image} 体积过大（${kb.toFixed(1)}KB），需重新压缩`)
   }
 })
 

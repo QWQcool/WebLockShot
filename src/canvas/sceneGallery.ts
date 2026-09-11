@@ -9,8 +9,8 @@
  * - 对话栏模板 chips = 常用一句话模板（快捷回填）。
  * 三者共用同一条 B6 编排链路与场景路由，不新增场景体系。
  *
- * 诚实边界：卡片**配图为 CSS 风格化艺术面板**（渐变 + 图标），不是参考稿中的实拍图——
- * 本仓库不自产/不分发参考稿图片素材（版权），也不引入外部图库；如实呈现为风格化视觉。
+ * 配图：六张场景插画（`public/scenes/*.webp`，960 宽 webp，合计约 210KB）由项目方自备，
+ * 非参考稿原图（参考稿素材版权不随仓库分发）；`gradient` 作为图片加载前的占位底衬。
  * 编排拓扑对所有场景同链（brief→script→storyboard→generate→deliver，见 buildDemoOrchestrationPlan），
  * 差异在 script 的契约场景（ecommerce/brand/drama），卡片如实标注。
  */
@@ -26,10 +26,12 @@ export type SceneGalleryCard = {
   tagline: string
   /** 路由到的既有编排场景 */
   scene: OrchestrationScene
-  /** 艺术面板图标字形 */
+  /** 配图未加载完成时叠在图片下方的占位图标字形 */
   glyph: string
-  /** 艺术面板渐变（风格化配图，纯 CSS） */
+  /** 配图加载前的渐变底衬（图片就位后仍保留，避免闪烁白块） */
   gradient: [string, string]
+  /** 配图文件名（相对 public/scenes/，由 sceneImageUrl 拼 BASE_URL） */
+  image: string
   /** 点击卡片预填对话栏的一句话（同时必须路由回本卡 scene） */
   prompt: string
 }
@@ -43,6 +45,7 @@ export const SCENE_GALLERY_CARDS: readonly SceneGalleryCard[] = [
     scene: 'brand',
     glyph: '🎨',
     gradient: ['#e8f3ec', '#a8d5b8'],
+    image: 'brand-design.webp',
     prompt: '为一个新消费品牌做全案设计：品牌方向、Logo、主视觉海报与社媒头图，风格统一可延展',
   },
   {
@@ -53,6 +56,7 @@ export const SCENE_GALLERY_CARDS: readonly SceneGalleryCard[] = [
     scene: 'ecommerce',
     glyph: '🛍️',
     gradient: ['#f7efe4', '#e6c9a0'],
+    image: 'ecommerce.webp',
     prompt: '为一款商品批量产出电商物料：商品图、模特图、详情页配图与短视频素材，多用途多尺寸',
   },
   {
@@ -63,6 +67,7 @@ export const SCENE_GALLERY_CARDS: readonly SceneGalleryCard[] = [
     scene: 'drama',
     glyph: '🎬',
     gradient: ['#fdeede', '#f0b183'],
+    image: 'film-creative.webp',
     prompt: '把一个故事创意做成完整成片：故事板 → 分镜 → 出片，一个平台完成全链路',
   },
   {
@@ -73,6 +78,7 @@ export const SCENE_GALLERY_CARDS: readonly SceneGalleryCard[] = [
     scene: 'game',
     glyph: '🎮',
     gradient: ['#e9eefb', '#a9b8e8'],
+    image: 'game.webp',
     prompt: '为一个游戏做内容与玩法 Demo：角色、道具、场景设定与宣传 PV',
   },
   {
@@ -83,6 +89,7 @@ export const SCENE_GALLERY_CARDS: readonly SceneGalleryCard[] = [
     scene: 'app',
     glyph: '📱',
     gradient: ['#fbeaea', '#e39a9a'],
+    image: 'product-ui.webp',
     prompt: '为一款 Web/APP 产品做全套 UI 和交互：界面设计、流程演示与可交付说明',
   },
   {
@@ -93,6 +100,7 @@ export const SCENE_GALLERY_CARDS: readonly SceneGalleryCard[] = [
     scene: 'brand',
     glyph: '📣',
     gradient: ['#fdf3df', '#f2cd6e'],
+    image: 'promo.webp',
     prompt: '围绕一场活动产出多套宣传物料：活动海报、攻略长图与社媒物料',
   },
 ]

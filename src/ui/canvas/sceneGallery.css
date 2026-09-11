@@ -106,26 +106,40 @@
   cursor: pointer;
   padding: 0;
 }
+/* 配图：覆盖在渐变+图标占位之上（z-index 1），加载完成后自然遮住占位 */
+.sg-card-img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+.sg-card-art:hover .sg-card-img {
+  transform: scale(1.04);
+}
 .sg-card-glyph {
   position: absolute;
   inset: 0;
+  z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 52px;
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.12));
-  transition: transform 0.2s ease;
-}
-.sg-card-art:hover .sg-card-glyph {
-  transform: scale(1.08);
 }
 .sg-card-num-badge {
   position: absolute;
+  z-index: 2;
   top: 10px;
   left: 12px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
   font-size: 12px;
   font-weight: 700;
-  color: rgba(28, 43, 51, 0.5);
+  color: rgba(28, 43, 51, 0.72);
   letter-spacing: 1px;
 }
 

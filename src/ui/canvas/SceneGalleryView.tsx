@@ -13,6 +13,14 @@ import './sceneGallery.css'
  * 诚实：配图为 CSS 风格化艺术面板（渐变 + 图标），不是参考稿实拍图（素材版权不随仓库分发）。
  */
 
+/** 配图地址：BASE_URL 感知（GitHub Pages 子路径 /WebLockShot/ 下同样正确） */
+function sceneImageUrl(filename: string): string {
+  if (typeof window === 'undefined') return `/scenes/${filename}`
+  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'
+  const cleanBase = base.endsWith('/') ? base : `${base}/`
+  return `${cleanBase}scenes/${filename}`
+}
+
 type Props = {
   onClose: () => void
   /** 预填对话栏并关闭画廊 */
@@ -59,6 +67,14 @@ export const SceneGalleryView: React.FC<Props> = ({ onClose, onPrefill, onOrches
               title={`预填到对话栏：${card.title}`}
               onClick={() => onPrefill(card.prompt)}
             >
+              {/* 配图（懒加载）；未就绪时下方渐变 + 图标占位，不闪白块 */}
+              <img
+                className="sg-card-img"
+                src={sceneImageUrl(card.image)}
+                alt={`${card.title}场景配图`}
+                loading="lazy"
+                draggable={false}
+              />
               <span className="sg-card-glyph" aria-hidden>
                 {card.glyph}
               </span>
