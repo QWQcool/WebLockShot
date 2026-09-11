@@ -63,6 +63,16 @@ jobs:
           VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
       - name: E2E · 画布核心链路
         run: npm run e2e -- --skip-build
+      # 移动端套件断言的正是「文本度量相关布局」（C 顶栏换行高度 / E 画布高度 / D 行盒数 / B 溢出宽度）。
+      # GitHub ubuntu-24.04 runner 镜像只带 fonts-noto-color-emoji，**无任何 CJK 字体**，
+      # 中文会渲染成 tofu（方框）而改变文本度量 → 可能翻转 C / E 断言。
+      # 故在跑移动端套件前显式安装 CJK 字体。
+      # 诚实边界：本机为 Windows，**无法验证 Linux 渲染效果**，此处为「消除已知风险源」，效果待 CI 实测。
+      - name: Install CJK fonts (for Linux text metrics)
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+      # 移动端 / 触摸窄屏布局断言（P0 验收固化）：复用上一步的 dist 与已安装的 chromium
+      - name: E2E · 移动端 / 触摸（窄屏布局断言）
+        run: npm run e2e:mobile -- --skip-build
       - name: E2E · 子路径部署形态（GitHub Pages base）
         run: npm run e2e:basepath
         env:

@@ -23,6 +23,7 @@
     "preview": "vite preview",
     "start:server": "node server/weblockshot-server.mjs",
     "e2e": "node scripts/e2e-canvas.mjs",
+    "e2e:mobile": "node scripts/e2e-mobile.mjs",
     "perf": "node scripts/perf-canvas.mjs",
     "a11y": "node scripts/a11y-canvas.mjs",
     "degrade": "node scripts/degrade-matrix.mjs",
