@@ -924,6 +924,57 @@
   line-height: 1.4;
 }
 
+/* D5-②：出片前费用确认弹层（节点内嵌，不弹全局模态） */
+.wls-generate-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--cv-miku);
+  border-radius: 10px;
+  background: #f0fbfa;
+}
+.wls-generate-confirm-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--cv-ink);
+}
+.wls-generate-confirm-detail {
+  font-size: 0.64rem;
+  color: var(--cv-mute);
+  line-height: 1.4;
+}
+.wls-generate-confirm-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.1rem;
+}
+.wls-generate-confirm-ok {
+  border: none;
+  background: var(--cv-miku);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+.wls-generate-confirm-ok:hover {
+  background: var(--cv-miku-deep);
+}
+.wls-generate-confirm-cancel {
+  border: 1px solid var(--cv-line);
+  background: #fff;
+  color: var(--cv-ink);
+  border-radius: 8px;
+  font-size: 0.72rem;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+.wls-generate-confirm-cancel:hover {
+  background: #f4f8fa;
+}
+
 .wls-generate-error {
   color: #c2427c;
   font-size: 0.7rem;

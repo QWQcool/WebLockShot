@@ -348,6 +348,14 @@
   flex-direction: column;
   gap: 12px;
 }
+/* D5 遗留小修：机位参数编辑旁的生效提示（编辑写入数据，需飞行才在视口生效） */
+.s3-prop-hint {
+  display: block;
+  margin-top: -4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8b99a2;
+}
 .s3-prop-row > label:first-child {
   display: block;
   font-size: 11px;

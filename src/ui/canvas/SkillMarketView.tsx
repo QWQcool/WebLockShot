@@ -12,6 +12,7 @@ import {
   type SkillManifest,
 } from '../../canvas/contract.ts'
 import { orchestrationPlanToSkillManifest } from '../../canvas/planToSkill.ts'
+import { ORCHESTRATION_SYSTEM_PROMPT } from '../../canvas/orchestrationPrompt.ts'
 import {
   installSkill,
   readSkillLibrary,
@@ -199,19 +200,8 @@ export const SkillMarketView: React.FC<Props> = ({ onClose, onDeploy, onChanged 
       let plan: OrchestrationPlan | null = null
       let mode: 'llm' | 'demo' = 'demo'
       if (hasKey && token) {
-        // 与 B6 编排同一 system 约束（kind 枚举 / brief 首节点 / scriptScene 枚举）
-        const systemPrompt = `你是创意画布的编排助手。根据用户需求输出一个严格 JSON 对象（不加 Markdown 围栏）：
-{
-  "title": "编排主题（20字内）",
-  "nodes": [{ "kind": "节点类型", "params": { } }],
-  "edges": [{ "from": 0, "to": 1 }]
-}
-硬约束：
-1. kind 只能取：brief, product, script, storyboard, generate, deliver；
-2. nodes 数量 2~5 个，第一个节点必须是 brief，其 params.text 为用户需求的完整原文；
-3. edges 用 nodes 数组下标连线，from 不得等于 to；
-4. script 节点 params.scriptScene 只能取：ecommerce（带货）/ brand（品牌） / drama（短剧）之一；
-5. 其余节点 params 留空对象。`
+        // 与 B6 编排同一 system 约束（D5 提取为共享常量，单一来源）
+        const systemPrompt = ORCHESTRATION_SYSTEM_PROMPT
         for (let attempt = 0; attempt < 2; attempt++) {
           const raw = await chatCompletionsText(token, [
             { role: 'system', content: systemPrompt },
@@ -488,14 +478,8 @@ export const SkillMarketView: React.FC<Props> = ({ onClose, onDeploy, onChanged 
                       ⬆ 布置到画布
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="sm-card-btn"
-                    title="发布到本地（下载 Skill 包 JSON）"
-                    onClick={() => handlePublish(e)}
-                  >
-                    📤 发布到本地
-                  </button>
+                  {/* D5 遗留小修：「发布」双入口统一 —— 发布仅保留顶部「🚀 发布 Skill」单一入口
+                      （打开选择面板），卡片内不再重复「发布到本地」按钮，避免同义异名混淆 */}
                   <button
                     type="button"
                     className="sm-card-btn sm-card-btn--danger"
@@ -547,7 +531,8 @@ export const SkillMarketView: React.FC<Props> = ({ onClose, onDeploy, onChanged 
       </section>
 
       <div className="sm-footnote" data-testid="sm-footnote">
-        本地 Skill 库 · 无社区市场与下载量 · 「发布」= 下载 Skill 包到本机 · 启停仅控制画布快捷入口
+        本地 Skill 库 · 无社区市场与下载量 · 「🚀 发布 Skill」= 下载 Skill 包到本机（唯一发布入口）·
+        启停仅控制画布快捷入口
       </div>
     </div>
   )

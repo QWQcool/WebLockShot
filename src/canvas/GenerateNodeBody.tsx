@@ -153,6 +153,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [playingArtifact, setPlayingArtifact] = useState<string | null>(null)
+  // D5-②：出片前「将消耗 N 灵感币」确认弹层（画布顶栏不显示余额；取消不扣费）
+  const [confirmOpen, setConfirmOpen] = useState(false)
   // 生成时上游 story 的摘要快照（产物条目写入 meta 时使用，与 B2/B3 模式一致）
   const storyDigestRef = useRef('')
   // 生成时的 Story 快照（写入 meta.story 供 deliver 打包剪映草稿沿边读取，B5）
@@ -297,6 +299,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
 
   const handleGenerate = async () => {
     if (busy) return
+    setConfirmOpen(false)
     setBusy(true)
     setError(null)
     // D3：3D 单镜直出分支——机位首帧作参考底图（image2video）+ 运镜文字作提示词（无 story 快照）
@@ -410,7 +413,10 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         </span>
       </div>
       <div className="wls-generate-engine-note">
-        可灵 / 即梦{hasProviderKey('kling') || hasProviderKey('jimeng') ? '（已配置 Key，画布模式暂未开放）' : '（未配置 Key）'}暂不可用，请走带货工作台
+        引擎在「⚙️ API 设置 → 2. 视频生成引擎」统一配置（画布内隐式，不暴露引擎下拉）；当前画布出片为演示引擎（Mock）——
+        可灵 / 即梦
+        {hasProviderKey('kling') || hasProviderKey('jimeng') ? '（已配置 Key，画布模式暂未开放）' : '（未配置 Key）'}
+        暂不可用
       </div>
 
       <button
@@ -418,7 +424,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         className="wls-generate-run"
         disabled={busy || (!story && !directMode && !stage3dDirectMode)}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => void handleGenerate()}
+        onClick={() => setConfirmOpen(true)}
       >
         {busy
           ? '⚙️ 串行出片中…'
@@ -434,6 +440,43 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
                 ? '🔄 重新生成全部'
                 : '⚙️ 开始逐镜出片'}
       </button>
+      {/* D5-②：出片前费用确认（画布顶栏不显示余额；确认后才入队扣费，取消不扣费） */}
+      {confirmOpen && (
+        <div
+          className="wls-generate-confirm"
+          role="dialog"
+          aria-label="出片费用确认"
+          data-testid="wls-generate-confirm"
+        >
+          <div className="wls-generate-confirm-title">
+            将消耗 {story ? totalCost : costPerShot} 灵感币
+          </div>
+          <div className="wls-generate-confirm-detail">
+            {story ? `${story.shots.length} 镜` : '1 镜'} · 演示引擎（Mock）· 取消不扣费
+          </div>
+          <div className="wls-generate-confirm-actions">
+            <button
+              type="button"
+              className="wls-generate-confirm-ok"
+              data-testid="wls-generate-confirm-ok"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => void handleGenerate()}
+            >
+              确认出片
+            </button>
+            <button
+              type="button"
+              className="wls-generate-confirm-cancel"
+              data-testid="wls-generate-confirm-cancel"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setConfirmOpen(false)}
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="wls-generate-cancel-note">
         生成不支持中途取消；刷新页面会中断任务，未完成镜不扣费（冻结款由钱包孤儿回收兜底）
       </div>

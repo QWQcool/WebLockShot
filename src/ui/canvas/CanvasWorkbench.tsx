@@ -46,6 +46,9 @@ import { MemoryGraphView } from './MemoryGraphView.tsx'
 import type { MemoryGraphThumbInput } from '../../canvas/memoryGraph.ts'
 import { SkillMarketView } from './SkillMarketView.tsx'
 import { ConnectorPanelView } from './ConnectorPanelView.tsx'
+import { CanvasOnboardingView } from './CanvasOnboardingView.tsx'
+import { ORCHESTRATION_SYSTEM_PROMPT } from '../../canvas/orchestrationPrompt.ts'
+import { markOnboardingSeen, readOnboardingSeen } from '../../canvas/canvasOnboarding.ts'
 import { findInstalledByName, readSkillLibrary, type InstalledSkill } from '../../canvas/skillLibrary.ts'
 import { Stage3DStudio } from '../stage3d/Stage3DStudio.tsx'
 import {
@@ -380,6 +383,14 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   // D4 连接器面板（Miora 图6 回炉）：工具条入口 + 全屏覆盖层（协议层 mock，诚实标注未接入）
   const [isConnectorPanelOpen, setIsConnectorPanelOpen] = useState(false)
 
+  // D5 开场层（Miora 图1 形态）：首次进入叠加（五类场景 tab + 大输入卡 + 连接器条），
+  // 「进入画布」/ Esc 后写入已读标记，之后折叠为底部既有对话栏（不重复弹）
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => !readOnboardingSeen())
+  const closeOnboarding = useCallback(() => {
+    markOnboardingSeen()
+    setIsOnboardingOpen(false)
+  }, [])
+
   // D1 3D 运镜台：stage3d 节点按钮派发 window 事件 → 打开全屏 Stage3DStudio；
   // 摆台数据经 writeStage3DMetaPayload 写回节点 meta.stage3d（走既有 shape 变更 → 持久化链路）
   const [stage3dTarget, setStage3dTarget] = useState<{ shapeId: TLShapeId; payload: Stage3DMetaPayload } | null>(null)
@@ -624,8 +635,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     []
   )
 
-  const onChatSend = useCallback(async () => {
-    const text = chatDraft.trim()
+  /** B6 编排核心（D5：抽取为入参函数，供底部对话栏与开场层共用，避免两套编排逻辑） */
+  const runOrchestration = useCallback(async (rawText: string) => {
+    const text = rawText.trim()
     const editor = editorRef.current
     if (!text || !editor || orchestrating) return
     setOrchestrating(true)
@@ -651,18 +663,8 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       if (hasKey && token) {
         // 真实 LLM 编排：结构化 JSON 拓扑建议，≤2 次重试后降级演示
         mode = 'llm'
-        const systemPrompt = `你是创意画布的编排助手。根据用户需求输出一个严格 JSON 对象（不加 Markdown 围栏）：
-{
-  "title": "编排主题（20字内）",
-  "nodes": [{ "kind": "节点类型", "params": { } }],
-  "edges": [{ "from": 0, "to": 1 }]
-}
-硬约束：
-1. kind 只能取：brief, product, script, storyboard, generate, deliver；
-2. nodes 数量 2~5 个，第一个节点必须是 brief，其 params.text 为用户需求的完整原文；
-3. edges 用 nodes 数组下标连线，from 不得等于 to；
-4. script 节点 params.scriptScene 只能取：ecommerce（带货）/ brand（品牌） / drama（短剧）之一；
-5. 其余节点 params 留空对象。`
+        // D5 遗留小修：system prompt 提取为共享常量（与 Skill 市场「通过对话创建技能」同源）
+        const systemPrompt = ORCHESTRATION_SYSTEM_PROMPT
         for (let attempt = 0; attempt < 2; attempt++) {
           const raw = await chatCompletionsText(token, [
             { role: 'system', content: systemPrompt },
@@ -711,7 +713,22 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     } finally {
       setOrchestrating(false)
     }
-  }, [applyOrchestrationPlan, chatDraft, orchestrating, showOrchestrationNotice])
+  }, [applyOrchestrationPlan, orchestrating, showOrchestrationNotice])
+
+  /** 底部对话栏发送（读取当前输入框内容） */
+  const onChatSend = useCallback(() => {
+    void runOrchestration(chatDraft)
+  }, [chatDraft, runOrchestration])
+
+  /** D5 开场层发送：走同一编排链路，关闭本层并标记已读 */
+  const handleOnboardingSubmit = useCallback(
+    (text: string) => {
+      markOnboardingSeen()
+      setIsOnboardingOpen(false)
+      void runOrchestration(text)
+    },
+    [runOrchestration]
+  )
 
   const onChatKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1160,6 +1177,18 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             applySkillImport(manifest)
           }}
           onChanged={refreshInstalledSkills}
+        />
+      )}
+
+      {/* D5 开场层（图1 形态）：首次进入叠加；关闭后折叠为底部对话栏 */}
+      {isOnboardingOpen && (
+        <CanvasOnboardingView
+          onClose={closeOnboarding}
+          onSubmit={handleOnboardingSubmit}
+          onOpenConnectors={() => {
+            closeOnboarding()
+            setIsConnectorPanelOpen(true)
+          }}
         />
       )}
 

@@ -1,0 +1,201 @@
+/**
+ * D5 开场层浅色主题（Miora 图1 形态）——co- 前缀全隔离，不污染画布/工作台基调。
+ */
+
+.co-root {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background:
+    radial-gradient(1200px 520px at 50% -10%, #e2f6f7 0%, rgba(226, 246, 247, 0) 60%),
+    #f1f7f9;
+  color: #16323f;
+  font-family: var(--body, 'Noto Sans SC', sans-serif);
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(28px, 8vh, 90px) 20px 48px;
+}
+
+.co-card {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---------- 标题 ---------- */
+.co-head {
+  text-align: center;
+  margin-bottom: 4px;
+}
+.co-head h1 {
+  margin: 0 0 8px;
+  font-family: var(--display, 'M PLUS Rounded 1c', sans-serif);
+  font-size: 30px;
+  letter-spacing: 1px;
+  background: linear-gradient(120deg, #16323f, #2aa8a0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.co-head p {
+  margin: 0;
+  font-size: 13.5px;
+  color: #5b7a86;
+}
+
+/* ---------- 场景 tab ---------- */
+.co-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.co-tab {
+  padding: 7px 16px;
+  border: 1px solid #dbe9ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #33505f;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.co-tab:hover {
+  border-color: #b7d9dd;
+  background: #f7fcfd;
+}
+.co-tab.active {
+  border-color: #39c5bb;
+  background: #e6f8f7;
+  color: #1c7d76;
+  font-weight: 600;
+}
+
+/* ---------- 大输入卡 ---------- */
+.co-input-card {
+  background: #fff;
+  border: 1px solid #dbe9ee;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(22, 50, 63, 0.08);
+  padding: 14px 16px 10px;
+}
+.co-input {
+  width: 100%;
+  min-height: 88px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #16323f;
+  background: transparent;
+}
+.co-input::placeholder {
+  color: #9db3bd;
+}
+.co-input-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #eef4f6;
+  padding-top: 10px;
+}
+.co-input-hint {
+  font-size: 11.5px;
+  color: #7e97a3;
+  line-height: 1.5;
+}
+.co-send {
+  flex: 0 0 auto;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 10px;
+  background: #39c5bb;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.co-send:hover {
+  background: #2aa8a0;
+}
+
+/* ---------- 连接器条 ---------- */
+.co-connectors {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border: 1px solid #dbe9ee;
+  border-radius: 14px;
+  background: #fff;
+}
+.co-connectors-label {
+  font-size: 12.5px;
+  color: #5b7a86;
+}
+.co-connector-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.co-connector-icon {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  transition: transform 0.12s ease;
+}
+.co-connector-icon:hover {
+  transform: translateY(-1px);
+}
+.co-connectors-more {
+  border: none;
+  background: transparent;
+  color: #2aa8a0;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.co-connectors-more:hover {
+  text-decoration: underline;
+}
+
+/* ---------- 底部动作 ---------- */
+.co-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.co-enter {
+  padding: 9px 24px;
+  border: 1px solid #16323f;
+  border-radius: 10px;
+  background: #16323f;
+  color: #fff;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.co-enter:hover {
+  background: #0f242e;
+}
+.co-actions-note {
+  font-size: 11.5px;
+  color: #7e97a3;
+}

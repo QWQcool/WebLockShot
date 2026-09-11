@@ -283,14 +283,22 @@
 }
 
 /* ---------- 底部诚实标注 ---------- */
+/* D5 遗留小修：小窗口下长脚注曾以 nowrap 溢出并与气泡重叠——
+   改为限宽换行 + 半透明底衬，保证小窗口可读且不遮挡图谱内容 */
 .mg-footnote {
   position: absolute;
-  bottom: 14px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
+  max-width: min(92vw, 720px);
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(19, 19, 19, 0.88);
+  border: 1px solid #2c2c2c;
   font-size: 11px;
-  color: #7a756f;
-  white-space: nowrap;
+  line-height: 1.6;
+  color: #a8a29b;
+  text-align: center;
   z-index: 20;
 }
 

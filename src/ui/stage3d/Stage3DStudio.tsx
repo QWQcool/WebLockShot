@@ -778,6 +778,10 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onExportFram
                 onChange={(e) => updateCamera(selectedCamera.id, { fov: Math.max(20, Math.min(120, Number(e.target.value) || 45)) })}
               />
             </div>
+            {/* D5 遗留小修：FOV/位置编辑只写入机位数据，需飞行到该机位才在视口生效 */}
+            <small className="s3-prop-hint">
+              编辑后需点击左栏机位「飞行」生效；当前取景可用「📌 设为当前导演视角」反向写入
+            </small>
             <button
               type="button"
               className="s3-model-btn"
