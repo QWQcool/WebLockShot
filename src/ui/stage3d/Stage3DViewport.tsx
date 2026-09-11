@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { Stage3DObject } from '../../canvas/stage3dMeta.ts'
 import { STAGE3D_POSE_PRESETS, sanitizeBoneName } from '../../canvas/stage3dPose.ts'
+import { animClipFor } from '../../canvas/stage3dAnim.ts'
 import { sampleCameraPose, type Stage3DKeyframe } from '../../canvas/stage3dKeyframes.ts'
 
 /**
@@ -299,7 +300,10 @@ function SceneObject({
   return (
     <group
       ref={(r) => {
+        // ⚠️ 必须同时写 groupRef：此前只写 refs 注册表，导致上面的受控同步 effect 永远拿不到
+        // group（groupRef.current 恒为 null）——所有 primitive 堆在原点、F5 后位置/缩放不恢复。
         // oxlint-disable-next-line react/immutability -- ref 注册表：gizmo attach 需要 object3D 引用
+        groupRef.current = r
         if (r) refs.current.set(object.id, r)
         else refs.current.delete(object.id)
       }}
@@ -335,11 +339,29 @@ function CharacterModel({ object, url }: { object: Stage3DObject; url: string | 
       </mesh>
     )
   }
-  return <GLBModel key={url} url={url} color={object.color} pose={object.pose ?? 'tpose'} />
+  return (
+    <GLBModel
+      key={url}
+      url={url}
+      color={object.color}
+      pose={object.pose ?? 'tpose'}
+      anim={object.anim ?? null}
+    />
+  )
 }
 
-function GLBModel({ url, color, pose }: { url: string; color: string; pose: Stage3DObject['pose'] }) {
-  const { scene } = useGLTF(url)
+function GLBModel({
+  url,
+  color,
+  pose,
+  anim,
+}: {
+  url: string
+  color: string
+  pose: Stage3DObject['pose']
+  anim: Stage3DObject['anim'] | null
+}) {
+  const { scene, animations } = useGLTF(url)
   // 多实例关键：useGLTF 缓存返回的是同一个 scene 对象——多角色直接 add 会互相抢挂载
   // （Object3D 只能有一个父节点），改骨骼则全部实例串姿势。
   // SkeletonUtils.clone 深拷贝骨骼层级并重绑 SkinnedMesh，每个实例拿到独立骨骼姿态；
@@ -385,20 +407,64 @@ function GLBModel({ url, color, pose }: { url: string; color: string; pose: Stag
     return root
   }, [scene, color])
 
-  // D2 预置姿势：骨骼旋转参数化（切姿势先复位绑定姿势再应用，蒙皮不残留）
-  const restRotRef = useRef<Map<string, [number, number, number]> | null>(null)
+  // 绑定姿势快照：克隆树在首次渲染时即绑定姿势（早于任何姿势/动作写入），此处采集最可靠
+  const restRot = useMemo(() => {
+    const m = new Map<string, [number, number, number]>()
+    inner.traverse((child) => {
+      const b = child as THREE.Bone
+      if (b.isBone) m.set(b.name, [b.rotation.x, b.rotation.y, b.rotation.z])
+    })
+    return m
+  }, [inner])
+
+  // D7 动作播放：AnimationMixer（three 自带，零新增依赖）驱动内置素体内嵌片段
+  const clipName = animClipFor(anim)
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null)
   useEffect(() => {
-    if (!restRotRef.current) {
-      const rest = new Map<string, [number, number, number]>()
-      inner.traverse((child) => {
-        if ((child as THREE.Bone).isBone) {
-          const b = child as THREE.Bone
-          rest.set(b.name, [b.rotation.x, b.rotation.y, b.rotation.z])
-        }
-      })
-      restRotRef.current = rest
+    const debug = window as unknown as Record<string, unknown>
+    if (!clipName) {
+      const m = mixerRef.current
+      if (m) {
+        m.stopAllAction()
+        m.uncacheRoot(inner)
+        mixerRef.current = null
+      }
+      debug.__s3animClip = null
+      return
     }
-    const rest = restRotRef.current
+    const clip = animations.find((c) => c.name === clipName)
+    if (!clip) {
+      // 自定义模型无同名片段：如实不播放（UI 侧已按实际片段禁用）
+      debug.__s3animClip = null
+      return
+    }
+    const mixer = new THREE.AnimationMixer(inner)
+    const action = mixer.clipAction(clip)
+    action.setLoop(THREE.LoopRepeat, Infinity)
+    action.play()
+    mixerRef.current = mixer
+    debug.__s3animClip = clipName
+    return () => {
+      mixer.stopAllAction()
+      mixer.uncacheRoot(inner)
+      if (mixerRef.current === mixer) mixerRef.current = null
+    }
+  }, [inner, animations, clipName])
+
+  // 每帧推进动画（未播放时 mixerRef 为空，零开销）
+  useFrame((_, delta) => {
+    mixerRef.current?.update(delta)
+  })
+
+  // D2 预置姿势：骨骼旋转参数化（切姿势先复位绑定姿势再应用，蒙皮不残留）。
+  // D7：**播放动作期间暂停姿势叠加**——动画关键帧为绝对姿态，与姿势叠加会互相打架；
+  // 停止动作后本效应重跑，自动恢复绑定姿势 + 所选姿势（实测互斥切换无残留）。
+  useEffect(() => {
+    if (anim) {
+      // -1 = 本帧因动作播放而跳过姿势叠加（显式哨兵，便于实机断言；非「命中 0 个关节」）
+      ;(window as unknown as Record<string, unknown>).__s3poseMatched = -1
+      return
+    }
     const joints = (pose && STAGE3D_POSE_PRESETS[pose]) || {}
     // GLTFLoader 会 sanitize 骨骼名（点号删除）：姿势库 key 与实际骨骼名双侧归一后匹配
     const jointsBySanitized = new Map(Object.entries(joints).map(([k, v]) => [sanitizeBoneName(k), v]))
@@ -406,7 +472,7 @@ function GLBModel({ url, color, pose }: { url: string; color: string; pose: Stag
     inner.traverse((child) => {
       const bone = child as THREE.Bone
       if (!bone.isBone) return
-      const r = rest.get(bone.name)
+      const r = restRot.get(bone.name)
       if (r) bone.rotation.set(r[0], r[1], r[2])
       const j = jointsBySanitized.get(bone.name)
       if (j) {
@@ -417,7 +483,7 @@ function GLBModel({ url, color, pose }: { url: string; color: string; pose: Stag
       }
     })
     ;(window as unknown as Record<string, unknown>).__s3poseMatched = matchedCount
-  }, [inner, pose])
+  }, [inner, pose, anim, restRot])
 
   return <primitive object={inner} />
 }

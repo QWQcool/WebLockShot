@@ -10,6 +10,7 @@
  * 本模块为纯函数（node --test 可跑），不 import three/R3F。
  */
 import { z } from 'zod'
+import { STAGE3D_ANIM_IDS } from './stage3dAnim.ts'
 
 /** 8 色板（图7 右栏圆形色块，与画布设计 token 同源的克制色系） */
 export const STAGE3D_PALETTE = [
@@ -62,6 +63,11 @@ const stage3dObjectSchema = z.object({
    * 缺省 = rig 绑定姿势（T-Pose）。自定义模型无 DEF- 骨骼时 UI 如实禁用姿势切换。
    */
   pose: z.enum(['tpose', 'stand', 'sit', 'walk']).optional(),
+  /**
+   * D7：预演动作 id（引用 stage3dAnim.ts 的动画预设库 → 内置素体内嵌片段）。
+   * 缺省 = 不播放动作（静态摆位/姿势）。播放期间姿势叠加暂停（避免骨骼冲突）。
+   */
+  anim: z.enum(STAGE3D_ANIM_IDS).optional(),
 })
 
 const stage3dCameraSchema = z.object({
@@ -98,6 +104,11 @@ const stage3dEnvSchema = z.object({
       }
     )
     .optional(),
+  /**
+   * D7：当前应用的场景预设 id（仅用于 UI 高亮「当前场景」；几何体本身已物化进 objects）。
+   * 可选字段，老文档缺省仍合法（向后兼容）。
+   */
+  scenePreset: z.string().max(40).optional(),
 })
 
 export const stage3dMetaPayloadSchema = z.object({

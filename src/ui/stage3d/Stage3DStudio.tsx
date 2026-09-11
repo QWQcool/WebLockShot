@@ -13,6 +13,12 @@ import {
   STAGE3D_POSE_LABELS,
   type Stage3DPoseId,
 } from '../../canvas/stage3dPose.ts'
+import { STAGE3D_ANIM_PRESETS } from '../../canvas/stage3dAnim.ts'
+import {
+  STAGE3D_SCENE_PRESETS,
+  applyScenePreset,
+  type Stage3DScenePresetId,
+} from '../../canvas/stage3dScenes.ts'
 import {
   keyframesDuration,
   normalizeKeyframes,
@@ -313,9 +319,54 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onExportFram
 
   const updateObject = useCallback(
     (id: string, patch: Partial<Stage3DObject>) => {
-      commit({ objects: objects.map((o) => (o.id === id ? { ...o, ...patch } : o)) })
+      commit({
+        objects: objects.map((o) => {
+          if (o.id !== id) return o
+          // D7：patch 中显式 undefined = 删除该键（tldraw T.jsonValue 不接受 undefined 值，
+          // 写 meta 时会抛 ValidationError 崩 shape 渲染——必须整键删除而非置 undefined）
+          const next: Record<string, unknown> = { ...o }
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === undefined) delete next[k]
+            else next[k] = v
+          }
+          return next as Stage3DObject
+        }),
+      })
     },
     [objects, commit]
+  )
+
+  /** D7：应用场景预设（替换几何体，保留素体角色；写 env.scenePreset 供 UI 高亮） */
+  const handleApplyScene = useCallback(
+    (presetId: Stage3DScenePresetId) => {
+      const r = applyScenePreset(objects, presetId)
+      if (!r.ok) {
+        setNotice({ kind: 'err', text: `⛔ ${r.reason}` })
+        return
+      }
+      commit({ objects: r.objects, env: { ...env, scenePreset: presetId } })
+      setSelectedId(null)
+      const label = STAGE3D_SCENE_PRESETS.find((p) => p.id === presetId)?.label ?? presetId
+      setNotice({
+        kind: 'ok',
+        text: `✓ 已应用场景「${label}」：${r.added} 个 primitive 布景（角色已保留 · 预演布景非成片）`,
+      })
+    },
+    [objects, env, commit]
+  )
+
+  /** D7：动作预设播放/停止（undefined = 删除键，停止播放并恢复姿势叠加） */
+  const handleToggleAnim = useCallback(
+    (objectId: string, animId: Stage3DObject['anim']) => {
+      updateObject(objectId, { anim: animId })
+      const label = STAGE3D_ANIM_PRESETS.find((a) => a.id === animId)?.label
+      setNotice(
+        animId
+          ? { kind: 'ok', text: `▶ 正在播放「${label}」（预演动作 · 非成片；播放期间姿势叠加暂停）` }
+          : { kind: 'ok', text: '⏹ 已停止动作，恢复所选姿势' }
+      )
+    },
+    [updateObject]
   )
 
   // 缩放锁联动：锁定时改任一轴，其余两轴等比（比例 = new/old，old≈0 时按 1 处理）
@@ -609,6 +660,26 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onExportFram
                   e.target.value = ''
                 }}
               />
+              {/* D7 场景预设：六套程序化 primitive 布景（代码生成零外部资产） */}
+              <div className="s3-left-title">场景预设</div>
+              <div className="s3-scenes" data-testid="s3-scenes">
+                {STAGE3D_SCENE_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`s3-scene-btn${env.scenePreset === p.id ? ' active' : ''}`}
+                    data-testid={`s3-scene-${p.id}`}
+                    title={`${p.hint}（替换几何体，保留素体角色）`}
+                    onClick={() => handleApplyScene(p.id)}
+                  >
+                    🏗️ {p.label}
+                  </button>
+                ))}
+                <small className="s3-model-notice" data-testid="s3-scene-notice">
+                  程序化 primitive 布景（零外部资产）· 应用替换几何体、保留角色 · 预演布景非成片
+                </small>
+              </div>
+
               {/* D3 出片衔接：机位帧序列导出（B 口 → generate / D 口 → storyboard） */}
               <div className="s3-left-title">出片衔接</div>
               <div className="s3-export">
@@ -868,6 +939,33 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onExportFram
               ) : (
                 <small className="s3-prop-hint">内置素体 rig：DEF- 前缀 53 骨（Blender metarig）</small>
               )}
+
+              {/* D7 动作预设：内置素体内嵌动画片段（three AnimationMixer，零新增依赖） */}
+              <div className="s3-anim" data-testid="s3-anim">
+                <div className="s3-left-title">动作预设（预演 · 非成片）</div>
+                <div className="s3-anim-grid">
+                  {STAGE3D_ANIM_PRESETS.map((a) => {
+                    const active = selected.anim === a.id
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        className={`s3-anim-btn${active ? ' active' : ''}`}
+                        data-testid={`s3-anim-${a.id}`}
+                        title={`${a.hint} · 片段 ${a.clip}`}
+                        onClick={() => handleToggleAnim(selected.id, active ? undefined : a.id)}
+                      >
+                        {active ? '⏹' : '▶'} {a.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <small className="s3-prop-hint">
+                  播放内置素体内嵌动画片段（three 自带 AnimationMixer，零新增依赖）· 播放期间姿势叠加暂停
+                  （动画为绝对姿态，叠加会打架）· 参考稿提到的「挥手 / 转身」在 CC0 库中无对应片段，
+                  此处如实以库内真实动作替代，不伪造
+                </small>
+              </div>
             </div>
           ) : (
             <div className="s3-pose-locked" data-testid="s3-pose-locked">

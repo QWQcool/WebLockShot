@@ -356,6 +356,70 @@
   line-height: 1.5;
   color: #8b99a2;
 }
+
+/* ---------- D7 场景预设（左栏） ---------- */
+.s3-scenes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.s3-scene-btn {
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid #2f3a42;
+  border-radius: 8px;
+  background: #1b2329;
+  color: #cfe3ea;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.s3-scene-btn:hover {
+  background: #223037;
+  border-color: #3d4c56;
+}
+.s3-scene-btn.active {
+  border-color: #39c5bb;
+  background: #17332f;
+  color: #eafffb;
+}
+
+/* ---------- D7 动作预设（姿势 tab 内） ---------- */
+.s3-anim {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #2b353c;
+}
+.s3-anim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.s3-anim-btn {
+  padding: 7px 8px;
+  border: 1px solid #2f3a42;
+  border-radius: 8px;
+  background: #1b2329;
+  color: #cfe3ea;
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.s3-anim-btn:hover {
+  background: #223037;
+  border-color: #3d4c56;
+}
+.s3-anim-btn.active {
+  border-color: #ff7eb6;
+  background: #351f2b;
+  color: #ffe9f3;
+}
 .s3-prop-row > label:first-child {
   display: block;
   font-size: 11px;
