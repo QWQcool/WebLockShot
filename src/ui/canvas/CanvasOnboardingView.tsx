@@ -22,9 +22,16 @@ type Props = {
   onSubmit: (text: string) => void
   /** 打开连接器面板（D4） */
   onOpenConnectors: () => void
+  /** 打开完整创作场景画廊（D6，可选）；未提供时不渲染入口 */
+  onOpenScenes?: () => void
 }
 
-export const CanvasOnboardingView: React.FC<Props> = ({ onClose, onSubmit, onOpenConnectors }) => {
+export const CanvasOnboardingView: React.FC<Props> = ({
+  onClose,
+  onSubmit,
+  onOpenConnectors,
+  onOpenScenes,
+}) => {
   const [draft, setDraft] = useState('')
   const [activeTab, setActiveTab] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -134,6 +141,11 @@ export const CanvasOnboardingView: React.FC<Props> = ({ onClose, onSubmit, onOpe
           <button type="button" className="co-enter" data-testid="co-enter" onClick={onClose}>
             进入画布 →
           </button>
+          {onOpenScenes && (
+            <button type="button" className="co-scenes-link" data-testid="co-open-scenes" onClick={onOpenScenes}>
+              更多创作场景 →
+            </button>
+          )}
           <span className="co-actions-note">首次进入显示本页；之后折叠为底部对话栏</span>
         </div>
       </div>

@@ -199,3 +199,13 @@
   font-size: 11.5px;
   color: #7e97a3;
 }
+.co-scenes-link {
+  border: none;
+  background: transparent;
+  color: #2aa8a0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.co-scenes-link:hover {
+  text-decoration: underline;
+}

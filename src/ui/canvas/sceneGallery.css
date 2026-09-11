@@ -1,0 +1,218 @@
+/**
+ * D6 创作场景画廊浅色主题（Miora 图8 1:1）——sg- 前缀全隔离。
+ */
+
+.sg-root {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: #f5f6f7;
+  color: #1c2b33;
+  font-family: var(--body, 'Noto Sans SC', sans-serif);
+  overflow-y: auto;
+  padding: 22px clamp(16px, 4vw, 48px) 64px;
+}
+
+.sg-header {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sg-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex: 1;
+  min-width: 260px;
+}
+.sg-header-left h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.5px;
+}
+.sg-header-sub {
+  font-size: 12.5px;
+  color: #6b7a84;
+}
+.sg-close {
+  padding: 8px 16px;
+  border: 1px solid #dde3e8;
+  border-radius: 10px;
+  background: #fff;
+  color: #1c2b33;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sg-close:hover {
+  background: #f6f8fa;
+  border-color: #c8d2da;
+}
+
+.sg-honest {
+  max-width: 1080px;
+  margin: 14px auto 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #eef3f7;
+  border: 1px solid #d3dee6;
+  color: #33505f;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* ---------- 卡片网格（图8：3 列 2 行） ---------- */
+.sg-grid {
+  max-width: 1080px;
+  margin: 20px auto 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 1000px) {
+  .sg-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 660px) {
+  .sg-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sg-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e6e8ea;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.sg-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(22, 50, 63, 0.1);
+}
+
+/* 艺术面板（风格化配图：渐变 + 图标，非参考稿实拍图——诚实标注） */
+.sg-card-art {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.sg-card-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 52px;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.12));
+  transition: transform 0.2s ease;
+}
+.sg-card-art:hover .sg-card-glyph {
+  transform: scale(1.08);
+}
+.sg-card-num-badge {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(28, 43, 51, 0.5);
+  letter-spacing: 1px;
+}
+
+.sg-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+  flex: 1;
+}
+.sg-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #16323f;
+}
+.sg-card-num {
+  font-size: 14px;
+  font-weight: 800;
+  color: #e8721e;
+  letter-spacing: 0.5px;
+}
+.sg-card-sub {
+  margin: 0;
+  font-size: 12.5px;
+  color: #64727c;
+  line-height: 1.5;
+}
+.sg-card-tagline {
+  margin: 0;
+  font-size: 12.5px;
+  color: #1c7d76;
+  line-height: 1.5;
+}
+
+/* 建议拓扑 chips */
+.sg-topology {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.sg-topo-chip {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f0f2f4;
+  color: #55636c;
+  white-space: nowrap;
+}
+.sg-topo-arrow {
+  font-size: 10px;
+  color: #a9b4bc;
+}
+
+.sg-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  flex-wrap: wrap;
+}
+.sg-btn {
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  cursor: pointer;
+  border: 1px solid #dde3e8;
+  background: #fff;
+  color: #1c2b33;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.sg-btn:hover {
+  background: #f6f8fa;
+  border-color: #c8d2da;
+}
+.sg-btn--primary {
+  background: #39c5bb;
+  border-color: #39c5bb;
+  color: #fff;
+  font-weight: 600;
+}
+.sg-btn--primary:hover {
+  background: #2aa8a0;
+  border-color: #2aa8a0;
+}

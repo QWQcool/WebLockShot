@@ -47,6 +47,7 @@ import type { MemoryGraphThumbInput } from '../../canvas/memoryGraph.ts'
 import { SkillMarketView } from './SkillMarketView.tsx'
 import { ConnectorPanelView } from './ConnectorPanelView.tsx'
 import { CanvasOnboardingView } from './CanvasOnboardingView.tsx'
+import { SceneGalleryView } from './SceneGalleryView.tsx'
 import { ORCHESTRATION_SYSTEM_PROMPT } from '../../canvas/orchestrationPrompt.ts'
 import { markOnboardingSeen, readOnboardingSeen } from '../../canvas/canvasOnboarding.ts'
 import { findInstalledByName, readSkillLibrary, type InstalledSkill } from '../../canvas/skillLibrary.ts'
@@ -391,6 +392,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     setIsOnboardingOpen(false)
   }, [])
 
+  // D6 创作场景画廊（Miora 图8 回炉）：工具条/开场层入口；卡片点击 → 预填对话栏 或 一键编排（复用 B6）
+  const [isSceneGalleryOpen, setIsSceneGalleryOpen] = useState(false)
+
   // D1 3D 运镜台：stage3d 节点按钮派发 window 事件 → 打开全屏 Stage3DStudio；
   // 摆台数据经 writeStage3DMetaPayload 写回节点 meta.stage3d（走既有 shape 变更 → 持久化链路）
   const [stage3dTarget, setStage3dTarget] = useState<{ shapeId: TLShapeId; payload: Stage3DMetaPayload } | null>(null)
@@ -730,6 +734,22 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     [runOrchestration]
   )
 
+  /** D6 画廊卡片：预填对话栏（用户可改后再发送） */
+  const handleScenePrefill = useCallback((text: string) => {
+    setIsSceneGalleryOpen(false)
+    setChatDraft(text)
+    chatInputRef.current?.focus()
+  }, [])
+
+  /** D6 画廊卡片：一键编排（复用 B6 既有链路，两态诚实标注不变） */
+  const handleSceneOrchestrate = useCallback(
+    (text: string) => {
+      setIsSceneGalleryOpen(false)
+      void runOrchestration(text)
+    },
+    [runOrchestration]
+  )
+
   const onChatKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
@@ -1035,6 +1055,15 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             >
               🔌 连接器
             </button>
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="open-scene-gallery"
+              title="创作场景：六类创作场景卡片（点击预填对话栏 / 一键编排，复用 B6 编排路由）"
+              onClick={() => setIsSceneGalleryOpen(true)}
+            >
+              🎬 创作场景
+            </button>
             <span className="wls-canvas-save-state">已保存 {savedAt}</span>
           </div>
           <div className="wls-canvas-root">
@@ -1189,11 +1218,24 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             closeOnboarding()
             setIsConnectorPanelOpen(true)
           }}
+          onOpenScenes={() => {
+            closeOnboarding()
+            setIsSceneGalleryOpen(true)
+          }}
         />
       )}
 
       {/* D4 连接器面板全屏覆盖层（图6 浅色主题；协议层 mock，卡片如实标注未接入） */}
       {isConnectorPanelOpen && <ConnectorPanelView onClose={() => setIsConnectorPanelOpen(false)} />}
+
+      {/* D6 创作场景画廊全屏覆盖层（图8 浅色主题；卡片预填/一键编排复用 B6 链路） */}
+      {isSceneGalleryOpen && (
+        <SceneGalleryView
+          onClose={() => setIsSceneGalleryOpen(false)}
+          onPrefill={handleScenePrefill}
+          onOrchestrate={handleSceneOrchestrate}
+        />
+      )}
 
       {/* D1 3D 运镜台全屏页（图7；R3F 视口在 Studio 内 React.lazy 懒加载，主包不含 three） */}
       {stage3dTarget && (
