@@ -23,7 +23,17 @@
     但**本项目的画布数据不受影响**（IndexedDB / localStorage 照常保留）；
   - 本项目**接受该限制**，不包含也不提供任何绕过许可校验或去水印的手段；
     页面内已加**如实提示条**（说明原因 + 官方解决路径，见 `src/ui/canvas/TldrawLicenseNotice.tsx`）；
-  - 若要正式上线，需自行取得 license 并配置 `VITE_TLDRAW_LICENSE_KEY`
+    该提示条挂在 `<Tldraw>` **之外**——闸门触发时编辑器子树（含画布内的说明条）会被整体卸载，只有它活得下来；
+  - **当前仓库状态（2026-09-11）**：GitHub Secrets 已配置 `TLDRAW_LICENSE_KEY`，由 Pages 工作流在构建期注入
+    （`VITE_TLDRAW_LICENSE_KEY`）→ **线上产物已烘焙 key，当前不会再停渲染**。
+    ⚠️ 该 key 为**免费 trial，2026-12-20 到期**；官方文档明确「**评估（试用）许可没有宽限期，到期立即失效**」
+    —— 到期当天线上画布会对**所有访客**一起消失。`npm run e2e:prod` 已加到期日解析 + 剩余 ≤30 天告警。
+  - **key 打包进前端产物是官方设计允许的，不是泄露**：官方文档原文
+    "License keys are validated on the client. **They can be public: you can safely include them in your frontend code.**"
+    （本地验签、不请求许可服务器）。但 key **绑定域名**（本项目 key 的允许域为通配 `*`）。
+  - **隐私披露**：按官方文档，**trial 许可在生产环境会向 tldraw 服务器发送**许可 ID、许可类型、SDK 版本、
+    构建环境与部署 URL（用于分析；官方声明不含用户数据 / 画布内容 / 个人信息）。商用许可不发任何数据。
+  - 若要长期上线，需自行取得 license（或续期）并配置 `VITE_TLDRAW_LICENSE_KEY`
     （构建期环境变量，Pages 工作流已预留 `TLDRAW_LICENSE_KEY` secret 透传），或替换为 MIT 许可的画布引擎。
     **tldraw 对非商业项目提供免费档位**：hobby license（个人项目 / 原型 / 学生作品等，
     须显示 `made with tldraw` 水印，<https://tldraw.dev/get-a-license/hobby>）与 100 天 trial license

@@ -1618,7 +1618,14 @@ function miniEqual(
   return true
 }
 
-/** 画布内诚实标注条（tldraw 左上菜单下方，单一信息位） */
+/**
+ * 画布内标注条（tldraw 左上菜单下方，单一信息位）。
+ *
+ * 这里**只放静态产品说明**：本组件是 `<Tldraw>` 的子节点，而 tldraw 的许可闸门触发时
+ * 会把整个编辑器子树替换成空 div —— 也就是说「未授权时的许可说明」放在这里根本活不到
+ * 那时（2026-09-11 实测：闸门后 `.wls-canvas-hint` 直接消失）。
+ * 许可条件的如实告知由闸门**之外**的 `TldrawLicenseNotice` 负责（它能存活）。
+ */
 function CanvasEmptyHint() {
   const t = useT()
   return (

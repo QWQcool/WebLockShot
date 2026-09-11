@@ -137,6 +137,10 @@ async function main() {
       await page.click('[data-testid=co-enter]')
       await page.waitForSelector('[data-testid=canvas-onboarding]', { state: 'detached', timeout: 5000 })
       assert(await page.isVisible('[data-testid=chat-dock]'), '对话栏未出现')
+      // 本形态是 http://127.0.0.1 → tldraw 判定为开发环境（豁免），顶部说明条**不应**出现
+      // 「5 秒停渲染」这类限制文案（2026-09-11 配置 license key 后的过期文案回归）。
+      const hint = (await page.locator('.wls-canvas-hint').first().textContent()) || ''
+      assert(!/5 秒停渲染/.test(hint), `开发/已授权形态不应出现 tldraw 限制文案：${hint.slice(0, 60)}`)
     })
 
     await step('① 对话栏演示编排 → 节点落位（无 LLM Key 走演示并如实标注）', async () => {

@@ -80,6 +80,20 @@ describe('字典完整性（防漏译静默回退）', () => {
       `疑似漏译：${identical.join(', ')}`
     )
   })
+
+  it('静态产品文案不得写死「运行期许可条件」（过期文案守卫）', () => {
+    // 2026-09-11：配置 tldraw license key 后，顶部说明条仍固定展示「水印与生产环境约 5 秒
+    // 停渲染为 tldraw 免费版限制」——授权状态已变、文案却是写死的，属过期文案。
+    // 而且该说明条位于 <Tldraw> 子树内，闸门触发后自身会被卸载，写在那里也告知不到；
+    // 许可条件的如实告知只能由 `TldrawLicenseNotice`（闸门之外，能存活）负责。
+    for (const lang of LANGUAGES) {
+      const hint = t(lang, 'canvas.emptyHint')
+      assert.ok(
+        !/tldraw|5\s*秒|水印|watermark|free tier|licen[cs]e/i.test(hint),
+        `${lang} 的 canvas.emptyHint 写死了运行期许可条件：${hint}`
+      )
+    }
+  })
 })
 
 /* ---------------- 取词函数 ---------------- */

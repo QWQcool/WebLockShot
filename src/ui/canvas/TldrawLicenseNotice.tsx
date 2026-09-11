@@ -1,10 +1,6 @@
-import React, { useEffect, useState } from 'react'
-import {
-  TLDRAW_LICENSE_MARKER_TESTID,
-  currentTldrawLicenseMode,
-  type TldrawLicenseMode,
-} from '../../canvas/tldrawLicense.ts'
+import React, { useState } from 'react'
 import { useT } from '../../i18n/useLanguage.ts'
+import { useTldrawGate } from './useTldrawGate.ts'
 
 /**
  * tldraw 生产许可闸门 · 诚实提示条（V1）。
@@ -20,22 +16,9 @@ import { useT } from '../../i18n/useLanguage.ts'
  */
 export const TldrawLicenseNotice: React.FC = () => {
   const t = useT()
-  const [mode] = useState<TldrawLicenseMode>(() => currentTldrawLicenseMode())
-  const [gateFired, setGateFired] = useState(false)
+  const { gated } = useTldrawGate()
   const [dismissed, setDismissed] = useState(false)
 
-  // 兜底观察：tldraw 内部许可状态不可读，用它自己渲染的标记节点判定
-  useEffect(() => {
-    const check = (): void => {
-      setGateFired(Boolean(document.querySelector(`[data-testid="${TLDRAW_LICENSE_MARKER_TESTID}"]`)))
-    }
-    check()
-    const observer = new MutationObserver(check)
-    observer.observe(document.body, { childList: true, subtree: true })
-    return () => observer.disconnect()
-  }, [])
-
-  const gated = mode === 'unlicensed-production' || gateFired
   if (!gated || dismissed) return null
 
   return (

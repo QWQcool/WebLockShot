@@ -77,8 +77,12 @@ const ZH = {
   'chat.collapseTitle': '收起对话栏（露出底部工具条）',
   'chat.expand': '💬 对话',
 
+  /* 只写静态产品说明。**不要**把 tldraw 的许可限制写进来：
+     它是运行期条件（配置 license key 后即不成立），2026-09-11 就因写死而变成「过期文案」；
+     而且本组件位于 <Tldraw> 子树内，闸门触发后它自身就会被卸载，写在这里也告知不到。
+     许可条件的如实告知统一由 `TldrawLicenseNotice`（闸门之外）负责。 */
   'canvas.emptyHint':
-    '对话栏一句话 → 自动布置节点与连线 · 节点内可直接生成脚本 / 分镜 / 出片 · 3D 运镜台本地渲染不耗积分 · 水印与生产环境约 5 秒停渲染为 tldraw 免费版限制',
+    '对话栏一句话 → 自动布置节点与连线 · 节点内可直接生成脚本 / 分镜 / 出片 · 3D 运镜台本地渲染不耗积分',
 
   'orch.busy': '🤖 Agent 正在布置画布，请稍候…',
   'orch.llm': '✓ LLM 编排',
@@ -239,7 +243,7 @@ const EN: Record<MessageKey, string> = {
   'chat.expand': '💬 Chat',
 
   'canvas.emptyHint':
-    'One sentence in the chat bar lays out nodes and edges · nodes generate scripts / storyboards / shots in place · the 3D camera stage renders locally at no cost · the watermark and the ~5s stop in production come from the tldraw free tier',
+    'One sentence in the chat bar lays out nodes and edges · nodes generate scripts / storyboards / shots in place · the 3D camera stage renders locally at no cost',
 
   'orch.busy': '🤖 The Agent is laying out the canvas, please wait…',
   'orch.llm': '✓ LLM orchestration',
