@@ -357,6 +357,11 @@ npm run e2e -- --headed     # 有头模式（排障）
 真实浏览器实测画布 200/500 节点帧率、记忆图谱 500 记录、3D 懒加载 chunk、Skill 市场 100 项，
 基准表与优化建议见 [`docs/perf.md`](docs/perf.md)（**本期只测不改**）。
 
+### 跨浏览器 + a11y（`npm run a11y`）
+
+chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）扫描四个界面状态，
+报告见 [`docs/a11y.md`](docs/a11y.md)（当前双引擎核心链路 **5/5**、axe 严重项 **0**）。
+
 ---
 
 ## 📄 License

@@ -103,8 +103,9 @@
   cursor: pointer;
 }
 .sm-chip.active {
-  background: #e8721e;
-  border-color: #e8721e;
+  /* T4 a11y：原 #e8721e 上白字仅 ~3.1:1，加深底色到 ~5.1:1 */
+  background: #b3520a;
+  border-color: #b3520a;
   color: #fff;
   font-weight: 600;
 }
@@ -213,7 +214,8 @@
 }
 .sm-empty {
   font-size: 13px;
-  color: #7b8a94;
+  /* T4 a11y：原 #7b8a94 在白底上仅 ~3.6:1，加深到 ~4.8:1 */
+  color: #5f6f79;
   background: #fff;
   border: 1px dashed #dde3e8;
   border-radius: 12px;
@@ -276,7 +278,8 @@
 }
 .sm-card-version {
   font-size: 11px;
-  color: #7b8a94;
+  /* T4 a11y：同上，加深到 ~4.8:1 */
+  color: #5f6f79;
 }
 .sm-badge {
   font-size: 10px;
@@ -288,7 +291,8 @@
 }
 .sm-badge--official {
   background: #fff4ea;
-  color: #b35f10;
+  /* T4 a11y：原 #b35f10 在米底上 ~4.3:1，加深到 ~5.5:1 */
+  color: #9a4f08;
   border-color: #f5ddc2;
 }
 
@@ -390,7 +394,8 @@
   left: 50%;
   transform: translateX(-50%);
   font-size: 11px;
-  color: #8b99a2;
+  /* T4 a11y：原 #8b99a2 在浅底上仅 ~2.7:1，加深到 ~4.8:1 */
+  color: #5f6f79;
   white-space: nowrap;
 }
 

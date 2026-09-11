@@ -29,7 +29,8 @@
   --cv-pink: #ff7eb6;
   --cv-halo: #7ec8e3;
   --cv-ink: #16323f;
-  --cv-mute: #5b7a86;
+  /* T4 a11y：原 #5b7a86 在浅底上仅 ~4.5:1（边界值），统一加深到 ~6.0:1 */
+  --cv-mute: #4a6873;
   --cv-shadow: 0 8px 28px rgba(22, 50, 63, 0.08), 0 2px 8px rgba(22, 50, 63, 0.05);
   --cv-shadow-lift: 0 12px 34px rgba(22, 50, 63, 0.13), 0 3px 10px rgba(22, 50, 63, 0.07);
 
@@ -61,7 +62,8 @@
 .wls-canvas-topbar .logo-badge {
   display: inline-block;
   background: var(--cv-miku);
-  color: #fff;
+  /* T4 a11y：白字在初音青上对比度仅 ~2.1:1，改用深墨色（~6.3:1）达标 WCAG AA */
+  color: var(--cv-ink);
   font-family: var(--display);
   font-weight: 700;
   padding: 0.2rem 0.55rem;
@@ -110,7 +112,8 @@
 }
 
 .wls-canvas-topbar .mode-btn.active {
-  color: #fff;
+  /* T4 a11y：同上，白字在初音青上对比度不足，改深墨色 */
+  color: var(--cv-ink);
   background: var(--cv-miku);
   border-color: var(--cv-miku);
   box-shadow: 0 4px 14px rgba(57, 197, 187, 0.35);
@@ -323,7 +326,8 @@
   flex: none;
   border: none;
   background: var(--cv-miku);
-  color: #fff;
+  /* T4 a11y：白字在初音青上仅 ~2.1:1，改深墨色（~6.3:1） */
+  color: var(--cv-ink);
   border-radius: 12px;
   padding: 0.5rem 0.95rem;
   font-size: 0.86rem;

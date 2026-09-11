@@ -86,7 +86,8 @@
   margin-top: 6px;
   font-size: 11px;
   font-weight: 700;
-  color: #8b99a2;
+  /* T4 a11y：原 #8b99a2 在浅底 #f4f6f8 上仅 ~2.7:1，加深到 ~4.8:1 */
+  color: #5f6f79;
   letter-spacing: 1px;
 }
 .s3-left-static {
@@ -135,7 +136,8 @@
 }
 .s3-tree-empty {
   font-size: 11px;
-  color: #9aa8b0;
+  /* T4 a11y：原 #9aa8b0 在浅底上仅 ~2.4:1，加深到 ~4.8:1 */
+  color: #5f6f79;
   padding: 6px 0;
 }
 
@@ -161,7 +163,8 @@
 .s3-model-notice {
   font-size: 10px;
   line-height: 1.6;
-  color: #a3aeb5;
+  /* T4 a11y：原 #a3aeb5 仅 ~2.1:1，加深到 ~4.8:1 */
+  color: #5f6f79;
 }
 
 /* ---------- D3 出片衔接（机位帧序列导出） ---------- */
@@ -297,7 +300,8 @@
 }
 .s3-tool.active {
   background: #39c5bb;
-  color: #fff;
+  /* T4 a11y：白字在初音青上仅 ~2.1:1，改深墨色（~6.3:1） */
+  color: #16323f;
   font-weight: 600;
 }
 

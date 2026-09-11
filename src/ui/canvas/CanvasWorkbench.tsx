@@ -1168,13 +1168,13 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
         </div>
 
         <div className="mode-toggle" role="tablist" aria-label="工作模式">
-          <button type="button" className="mode-btn" onClick={onSwitchToSell}>
+          <button type="button" role="tab" aria-selected={false} className="mode-btn" onClick={onSwitchToSell}>
             🎯 带货工作台
           </button>
-          <button type="button" className="mode-btn" onClick={onSwitchToDrama}>
+          <button type="button" role="tab" aria-selected={false} className="mode-btn" onClick={onSwitchToDrama}>
             🎭 剧情短剧
           </button>
-          <button type="button" className="mode-btn active" aria-current="page">
+          <button type="button" role="tab" aria-selected={true} className="mode-btn active" aria-current="page">
             🎨 Agent 画布
           </button>
         </div>

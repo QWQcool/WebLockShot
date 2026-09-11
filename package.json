@@ -18,6 +18,7 @@
     "start:server": "node server/weblockshot-server.mjs",
     "e2e": "node scripts/e2e-canvas.mjs",
     "perf": "node scripts/perf-canvas.mjs",
+    "a11y": "node scripts/a11y-canvas.mjs",
     "test:chaos": "node scripts/chaos-smoke.mjs",
     "verify:providers": "node --experimental-strip-types scripts/verify-providers.mjs"
   },
@@ -42,6 +43,7 @@
     "@types/react-dom": "^19.2.4",
     "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "^6.1.0",
+    "axe-core": "^4.13.0",
     "better-sqlite3": "^13.0.3",
     "jsdom": "^29.1.1",
     "oxlint": "^1.79.0",
