@@ -450,13 +450,19 @@ npm run e2e:basepath -- --skip-build
 所以**全部本地套件（http://127.0.0.1）都看不到它，线上 https 必现**：无 license key 时
 `<Tldraw>` 会在约 5 秒后被替换成空 div —— 用户看到的是「画布内容忽然全部消失」（2026-09-11 实机反馈）。
 
-本套件用 **HTTPS + 非回环主机名**（自签证书 + `--host-resolver-rules`）复现线上形态，双向断言：
+本套件用 **HTTPS + 非回环主机名**（自签证书 + `--host-resolver-rules`）复现线上形态，
+并**按构建产物是否烘焙了 license key 自动切换预期分支**（探测字符串，不读取 key 内容）：
 
-- **生产形态**：闸门确实触发 → 本项目**如实提示条**出现（含原因与官方解决路径）→ 外层 UI 不崩 → 画布数据不丢；
-- **对照形态**（http://127.0.0.1）：闸门不触发、提示条不出现（证明提示不是误报）。
+| 构建产物 | 生产形态（https 非回环）预期 | 对照形态（http://127.0.0.1）预期 |
+|---|---|---|
+| **无 key** | 闸门触发 → **如实提示条**出现（含原因与官方解决路径）→ 外层 UI 不崩 → 画布数据不丢 | 闸门不触发、无提示（证明提示不是误报） |
+| **有 key** | 闸门**不**触发 → 画布正常渲染节点 → 无提示 | 同上 |
+
+因此配置 `TLDRAW_LICENSE_KEY` 后，本套件顺带成为**「key 是否有效 / 是否过期」的监控**
+（CI 的 `e2e` job 也带上该 secret 构建，key 一旦失效会直接卡住部署）。
 
 ```bash
-npm run e2e:prod              # 需要 openssl（Git for Windows 自带）生成自签证书；缺失时如实跳过
+npm run e2e:prod              # 需要 openssl（Git for Windows / ubuntu-latest 自带）；缺失时如实跳过
 npm run e2e:prod -- --skip-build
 ```
 

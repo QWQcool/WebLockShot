@@ -21,7 +21,7 @@
 import { execFileSync } from 'node:child_process'
 import { createServer } from 'node:https'
 import { createServer as createHttpServer } from 'node:http'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { ROOT, ensureDist, loadPlaywright, randomPort, skipEnv } from './lib/browser-env.mjs'
 
@@ -120,6 +120,26 @@ function startStaticServer({ tls, port, distDir }) {
   return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(server)))
 }
 
+/**
+ * 构建产物里是否已烘焙 tldraw license key（形如 `tldraw-2026-12-20/…`）。
+ * 用它决定本套件的**预期分支**：
+ *   - 未烘焙 → 生产环境应触发闸门（验证「如实提示」这条防线）；
+ *   - 已烘焙 → 生产环境**不应**触发闸门（顺带验证 key 有效，可作为「key 过期/无效」的监控）。
+ * 注意：只做字符串探测，不读取也不打印 key 内容本身。
+ */
+function detectBakedLicenseKey(distDir) {
+  let files = []
+  try {
+    files = readdirSync(join(distDir, 'assets')).filter((f) => f.endsWith('.js'))
+  } catch {
+    return false
+  }
+  for (const f of files) {
+    if (/tldraw-20\d\d-\d\d-\d\d\//.test(readFileSync(join(distDir, 'assets', f), 'utf8'))) return true
+  }
+  return false
+}
+
 // ---------------- 断言工具 ----------------
 
 let failures = 0
@@ -153,6 +173,12 @@ async function main() {
 
   ensureDist({ skipBuild: SKIP_BUILD })
   const distDir = join(ROOT, 'dist')
+  const licensed = detectBakedLicenseKey(distDir)
+  console.log(
+    licensed
+      ? '· 构建产物已烘焙 tldraw license key → 预期：生产环境**不**触发闸门（并验证 key 有效）'
+      : '· 未烘焙 tldraw license key → 预期：生产环境触发闸门 + 展示诚实提示'
+  )
   const tls = makeCert(openssl)
 
   const prodPort = randomPort(27_000)
@@ -209,32 +235,36 @@ async function main() {
     const gateFired = await prodPage.evaluate(
       () => Boolean(document.querySelector('[data-testid="tl-license-expired"]'))
     )
-    check(gateFired, 'tldraw 生产许可闸门确实触发（证明本套件真的复现了线上形态）')
-
-    const noticeVisible = await prodPage
-      .locator('[data-testid=tldraw-license-notice]')
-      .isVisible()
-      .catch(() => false)
-    check(noticeVisible, '本项目「诚实提示」已展示（不再是莫名空画布）')
-
-    const noticeText = noticeVisible
-      ? await prodPage.textContent('[data-testid=tldraw-license-notice]')
-      : ''
-    check(/VITE_TLDRAW_LICENSE_KEY/.test(noticeText || ''), '提示含官方解决路径（不提供绕过手段）')
-    check(
-      /不提供任何绕过许可校验/.test(noticeText || ''),
-      '提示明确声明不绕过许可校验'
-    )
-
+    const noticeCount = await prodPage.locator('[data-testid=tldraw-license-notice]').count()
+    const prodNodeDom = await prodPage.evaluate(() => document.querySelectorAll('.wls-node').length)
     const paletteAlive = await prodPage.locator('.wls-palette-item').count()
-    check(paletteAlive > 0, '外层自有 UI 未崩（节点面板仍在）', `${paletteAlive} 项`)
-
     const afterGate = await canvasStorage(prodPage)
-    check(
-      JSON.stringify(afterGate) === JSON.stringify(beforeGate),
-      '画布数据未丢失（闸门只影响渲染，不动存储）'
-    )
-    check(prodErrors.length === 0, '生产形态全程零 pageerror', prodErrors.slice(0, 3).join(' | ') || 'ok')
+
+    if (licensed) {
+      // ---- 已配置 license key：预期「不触发闸门」，顺带验证 key 有效 ----
+      check(!gateFired, '已配置 license key：生产环境闸门未触发（key 有效）')
+      check(noticeCount === 0, '已配置 license key：不显示许可提示（提示不是误报）')
+      check(prodNodeDom > 0, '已配置 license key：生产环境画布正常渲染节点', `${prodNodeDom} 个`)
+      check(paletteAlive > 0, '外层自有 UI 正常（节点面板仍在）', `${paletteAlive} 项`)
+      check(
+        JSON.stringify(afterGate) === JSON.stringify(beforeGate),
+        '画布数据未丢失（键值变化只影响渲染授权）'
+      )
+      check(prodErrors.length === 0, '生产形态全程零 pageerror', prodErrors.slice(0, 3).join(' | ') || 'ok')
+    } else {
+      // ---- 未配置 license key：预期「触发闸门 + 如实提示」 ----
+      check(gateFired, 'tldraw 生产许可闸门确实触发（证明本套件真的复现了线上形态）')
+      check(noticeCount > 0, '本项目「诚实提示」已展示（不再是莫名空画布）')
+      const noticeText = noticeCount > 0 ? await prodPage.textContent('[data-testid=tldraw-license-notice]') : ''
+      check(/VITE_TLDRAW_LICENSE_KEY/.test(noticeText || ''), '提示含官方解决路径（不提供绕过手段）')
+      check(/不提供任何绕过许可校验/.test(noticeText || ''), '提示明确声明不绕过许可校验')
+      check(paletteAlive > 0, '外层自有 UI 未崩（节点面板仍在）', `${paletteAlive} 项`)
+      check(
+        JSON.stringify(afterGate) === JSON.stringify(beforeGate),
+        '画布数据未丢失（闸门只影响渲染，不动存储）'
+      )
+      check(prodErrors.length === 0, '生产形态全程零 pageerror', prodErrors.slice(0, 3).join(' | ') || 'ok')
+    }
     await prodCtx.close()
 
     // ---------- B) 对照：开发形态（http）不应出现提示 ----------
