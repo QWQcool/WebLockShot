@@ -512,7 +512,133 @@ async function main() {
       )
     })
 
-    await step('⑪ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
+    // ---- ⑪ P1 运行历史（S3 数据层 + S4 UI） ----
+    await step('⑪ 运行历史：刷新后仍在 + 面板可开合 + ≥3 条 + 字段完整 + 持久引用', async () => {
+      // 显式再刷新一次：记录存 IndexedDB，必须跨刷新存活（TODO P1 验收标准）
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('[data-testid=chat-dock]', { timeout: 20_000 })
+
+      // 刷新后引擎内存态为空 → 重新点「出片」会真正新建任务。
+      // 注意：⑨ 只等「首个产物出现」就继续了，故这里必须等**6 镜全部到终态**再断言记录数。
+      await page.evaluate(() => {
+        const node = [...document.querySelectorAll('.wls-node[data-kind="generate"]')].pop()
+        const btn = [...(node?.querySelectorAll('button') ?? [])].find((b) => /出片|重新生成/.test(b.textContent || ''))
+        btn?.click()
+      })
+      await page.waitForSelector('[data-testid=wls-generate-confirm-ok]', { timeout: 10_000 })
+      await page.click('[data-testid=wls-generate-confirm-ok]')
+      await page.waitForFunction(
+        () => {
+          const els = [...document.querySelectorAll('.wls-generate-artifact')]
+          return els.length >= 6 && els.every((e) => !/排队中|生成中/.test(e.textContent || ''))
+        },
+        null,
+        { timeout: 90_000 }
+      )
+
+      await page.click('[data-testid=open-run-history]')
+      await page.waitForSelector('[data-testid=run-history]', { timeout: 10_000 })
+      await page.waitForSelector('[data-testid=rh-row]', { timeout: 10_000 })
+
+      const rows = page.locator('[data-testid=rh-row]')
+      const count = await rows.count()
+      assert(count >= 3, `运行历史记录不足（${count}，期望 ≥3：逐镜出片 6 镜应有 6 条）`)
+
+      // 取一条**成功**记录做字段断言（不假设首条一定成功：⑨ 只等首个产物，中途导航可能留下
+      // 未释放的跨页锁元数据，使个别镜次在下一轮以「跨页任务锁」失败——那是既有幂等实现的
+      // 已知粗糙点，与本步要验证的「记录字段完整性」无关，故按状态定位而非按位置定位）。
+      const okRows = page.locator('[data-testid=rh-row]', { hasText: '成功' })
+      assert((await okRows.count()) > 0, '运行历史中没有成功记录')
+      const okRow = okRows.first()
+      const okText = (await okRow.innerText()) || ''
+      assert(/耗时/.test(okText), `记录未显示耗时：${okText.slice(0, 80)}`)
+      assert(/灵感币/.test(okText), `记录未显示费用：${okText.slice(0, 80)}`)
+      assert(/演示 · 非真实生成/.test(okText), `演示引擎记录未标注「演示 · 非真实生成」：${okText.slice(0, 80)}`)
+
+      // 展开详情：演示产物的 record.outputRef 是 blob:，必须回查到节点 meta 的 idbref:// 持久引用
+      await okRow.locator('button').first().click()
+      const detail = (await page.textContent('[data-testid=rh-detail]')) || ''
+      assert(/idbref:\/\//.test(detail), `详情未显示持久 idbref 引用（blob: 回查节点 meta 失败）：${detail.slice(0, 200)}`)
+      assert(!/产物引用已失效/.test(detail), `持久引用回查失败，退化成「已失效」：${detail.slice(0, 200)}`)
+
+      await page.click('[data-testid=rh-close]')
+      await page.waitForSelector('[data-testid=run-history]', { state: 'detached', timeout: 5000 })
+    })
+
+    await step('⑫ 运行历史：注入上游失败 → 记录数递增 + 失败原因可见 + 0 币不显示已退款 + 清空', async () => {
+      // 刷新 → 引擎内存态清空（否则同 taskKey 会被幂等防重跳过，不会产生新记录）
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('[data-testid=chat-dock]', { timeout: 20_000 })
+
+      // 基线记录数（从 UI 读，顺带验证「面板可开合」）
+      await page.click('[data-testid=open-run-history]')
+      await page.waitForSelector('[data-testid=rh-row]', { timeout: 10_000 })
+      const before = await page.locator('[data-testid=rh-row]').count()
+      await page.click('[data-testid=rh-close]')
+      await page.waitForSelector('[data-testid=run-history]', { state: 'detached', timeout: 5000 })
+
+      // 一次性故障注入（仅测试钩子，见 mock.ts）：下一次 submit 返回「上游 4xx」，其余 5 镜照常成功
+      await page.evaluate(() => {
+        window.__WLS_MOCK_FAIL_ONCE__ = true
+      })
+      await page.evaluate(() => {
+        const node = [...document.querySelectorAll('.wls-node[data-kind="generate"]')].pop()
+        const btn = [...(node?.querySelectorAll('button') ?? [])].find((b) => /出片|重新生成/.test(b.textContent || ''))
+        btn?.click()
+      })
+      await page.waitForSelector('[data-testid=wls-generate-confirm-ok]', { timeout: 10_000 })
+      await page.click('[data-testid=wls-generate-confirm-ok]')
+      await page.waitForFunction(
+        () => {
+          const els = [...document.querySelectorAll('.wls-generate-artifact')]
+          return els.length >= 6 && els.every((e) => !/排队中|生成中/.test(e.textContent || ''))
+        },
+        null,
+        { timeout: 90_000 }
+      )
+
+      // 记录数递增 + 失败原因可见
+      await page.click('[data-testid=open-run-history]')
+      await page.waitForSelector('[data-testid=rh-row]', { timeout: 10_000 })
+      const after = await page.locator('[data-testid=rh-row]').count()
+      assert(after > before, `记录数未递增（${before} → ${after}）`)
+
+      // 在失败记录里定位「注入的那条」（不假设它一定是最新一条），并采集全部失败原因便于诊断
+      const failRows = page.locator('[data-testid=rh-row]', { hasText: '失败' })
+      const failCount = await failRows.count()
+      assert(failCount > 0, '注入失败后运行历史中没有失败记录')
+      const collected = []
+      let injectedText = ''
+      let injectedDetail = ''
+      for (let i = 0; i < Math.min(failCount, 6); i++) {
+        const row = failRows.nth(i)
+        const text = (await row.innerText()) || ''
+        await row.locator('button').first().click()
+        const d = (await page.textContent('[data-testid=rh-detail]')) || ''
+        collected.push(`${text.slice(0, 24)} → ${d.replace(/\s+/g, ' ').slice(0, 140)}`)
+        if (/模拟上游 4xx/.test(d)) {
+          injectedText = text
+          injectedDetail = d
+          break
+        }
+      }
+      assert(
+        injectedText.length > 0,
+        `未在任何失败记录中看到注入的失败原因（采集 ${collected.length} 条：${collected.join(' || ')}）`
+      )
+      assert(/0 灵感币/.test(injectedText), `演示引擎 0 币失败的费用应显示「0 灵感币」：${injectedText.slice(0, 80)}`)
+      assert(!/已退款/.test(injectedText), `0 币无可退，不应显示「已退款」：${injectedText.slice(0, 80)}`)
+      assert(/无款项可退/.test(injectedDetail), `0 币失败应显示「无款项可退」：${injectedDetail.slice(0, 200)}`)
+
+      // 清空
+      await page.click('[data-testid=rh-clear]')
+      await page.waitForSelector('[data-testid=rh-empty]', { timeout: 10_000 })
+      assert((await page.locator('[data-testid=rh-row]').count()) === 0, '清空后仍存在记录')
+      await page.click('[data-testid=rh-close]')
+      await page.waitForSelector('[data-testid=run-history]', { state: 'detached', timeout: 5000 })
+    })
+
+    await step('⑬ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
       assert(pageErrors.length === 0, `捕获到 ${pageErrors.length} 条 pageerror：${pageErrors.slice(0, 3).join(' | ')}`)
     })
   } finally {

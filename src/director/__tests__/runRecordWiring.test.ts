@@ -61,6 +61,23 @@ const failProvider: VideoProvider = {
   },
 }
 
+/** 演示引擎（mock，0 币/镜）失败：验证「0 币失败不显示为已退款」（S4 观察项修正） */
+const failMockProvider: VideoProvider = {
+  id: 'mock',
+  async submit() {
+    return { taskId: 'task-mock-fail' }
+  },
+  async poll() {
+    return { status: 'failed' as const, error: '模拟上游 4xx（演示引擎）' }
+  },
+  async getAsset(): Promise<MediaAsset> {
+    throw new Error('失败路径不应读取产物')
+  },
+  estimateCost() {
+    return '0 灵感币/镜'
+  },
+}
+
 async function waitFor(predicate: () => boolean | Promise<boolean>, label: string, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -148,6 +165,21 @@ describe('ExecutorEngine → RunRecord 单一收口', () => {
     assert.equal(r.cost, 0, '未成功冻结 → 不虚报消耗')
     assert.equal(r.refunded, false, '未发生冻结 → 也无退款')
     assert.match(r.error ?? '', /余额不足/)
+  })
+
+  it('0 币失败（演示引擎）不标记为「已退款」（S3 观察项修正）', async () => {
+    setup()
+    const engine = new ExecutorEngine(failMockProvider)
+    await engine.enqueueShots([testPlan], 'mock')
+    await waitForJob(engine, 's1', 'failed')
+    await waitForRecordCount(1)
+
+    const r = (await listRunRecords())[0]
+    assert.equal(r.status, 'failed')
+    assert.equal(r.cost, 0, 'mock 0 灵感币/镜')
+    assert.equal(r.refunded, false, '0 币无可退 → 不应标记已退款（否则 UI 会误显示「已退款」）')
+    assert.equal(r.demo, true)
+    assert.match(r.error ?? '', /模拟上游 4xx/)
   })
 
   it('记录数随动作递增（S4 面板「记录数递增」的数据前提）', async () => {

@@ -26,6 +26,7 @@ import {
   validateSkillManifest,
   validateSkillManifestDetailed,
   readAssetMetaPayload,
+  readGenerateMetaPayload,
   type CanvasDoc,
   type CanvasNodeKind,
   type OrchestrationPlan,
@@ -56,6 +57,7 @@ import { SkillMarketView } from './SkillMarketView.tsx'
 import { ConnectorPanelView } from './ConnectorPanelView.tsx'
 import { CanvasOnboardingView } from './CanvasOnboardingView.tsx'
 import { SceneGalleryView } from './SceneGalleryView.tsx'
+import { RunHistoryView } from './RunHistoryView.tsx'
 import {
   mcpEdgeArrowId,
   mcpNodeShapeId,
@@ -495,6 +497,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell }) => {
 
   // D6 创作场景画廊（Miora 图8 回炉）：工具条/开场层入口；卡片点击 → 预填对话栏 或 一键编排（复用 B6）
   const [isSceneGalleryOpen, setIsSceneGalleryOpen] = useState(false)
+
+  // P1 S4 运行历史抽屉（工具条入口；数据来自 S3 执行器单一收口）
+  const [isRunHistoryOpen, setIsRunHistoryOpen] = useState(false)
 
   // D8 MCP 反向驱动：能力位就绪（伴生服务 + 可选 SDK）时启用拓扑镜像推送与 Agent 操作批轮询
   const [mcpReady, setMcpReady] = useState(false)
@@ -966,6 +971,23 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell }) => {
     [runOrchestration]
   )
 
+  /**
+   * S4：运行历史的**持久**输出引用回查（nodeId + shotId → 节点 meta.artifacts 的 idbref://）。
+   * 演示出片的 `record.outputRef` 是 blob:（刷新即失效），持久引用由 GenerateNodeBody 出片后
+   * 转存到本节点 meta.artifacts —— 这里按需惰性读 editorRef，不订阅整个画布。
+   */
+  const resolveRunDurableRef = useCallback((nodeId: string, shotId?: string) => {
+    const editor = editorRef.current
+    if (!editor) return undefined
+    const shape = editor.getShape(nodeId as TLShapeId)
+    if (!shape || shape.type !== CANVAS_NODE_SHAPE_TYPE) return undefined
+    const meta = (shape.props as { meta?: Record<string, unknown> }).meta ?? {}
+    const payload = readGenerateMetaPayload(meta)
+    if (!payload) return undefined
+    const hit = shotId ? payload.artifacts?.find((a) => a.shotId === shotId) : payload.artifacts?.[0]
+    return hit?.url
+  }, [])
+
   const onChatKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
@@ -1363,6 +1385,15 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell }) => {
             >
               {t('toolbar.scenes')}
             </button>
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="open-run-history"
+              title={t('toolbar.runHistoryTitle')}
+              onClick={() => setIsRunHistoryOpen(true)}
+            >
+              {t('toolbar.runHistory')}
+            </button>
             {mcpReady && (
               <span
                 className="wls-canvas-mcp-chip"
@@ -1589,6 +1620,14 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell }) => {
           onClose={() => setIsSceneGalleryOpen(false)}
           onPrefill={handleScenePrefill}
           onOrchestrate={handleSceneOrchestrate}
+        />
+      )}
+
+      {/* P1 S4 运行历史抽屉（右侧滑出；数据来自执行器单一收口，持久引用回查节点 meta） */}
+      {isRunHistoryOpen && (
+        <RunHistoryView
+          onClose={() => setIsRunHistoryOpen(false)}
+          resolveDurableRef={resolveRunDurableRef}
         />
       )}
 

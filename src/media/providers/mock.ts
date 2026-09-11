@@ -277,6 +277,21 @@ export class MockVideoProvider implements VideoProvider {
   async submit(req: VideoGenRequest): Promise<{ taskId: string }> {
     const taskId = `mock_task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 
+    // E2E 故障注入钩子（**仅测试用**，默认不设置 → 生产行为零影响，与 __WLS_BACKEND_URL__ 同惯例）：
+    // 置真后**本次** submit 直接进入 failed 并自动复位（一次性），用于实机验证
+    // 「失败 → 运行历史显示失败原因」链路；一次性而非持续失败，避免熔断器被连续失败打开污染后续用例。
+    // 用法：page.evaluate(() => { window.__WLS_MOCK_FAIL_ONCE__ = true })
+    if ((globalThis as { __WLS_MOCK_FAIL_ONCE__?: unknown }).__WLS_MOCK_FAIL_ONCE__ === true) {
+      ;(globalThis as { __WLS_MOCK_FAIL_ONCE__?: unknown }).__WLS_MOCK_FAIL_ONCE__ = false
+      mockTasks.set(taskId, {
+        req,
+        status: 'failed',
+        progress: 0,
+        error: '模拟上游 4xx（E2E 故障注入）',
+      })
+      return { taskId }
+    }
+
     mockTasks.set(taskId, {
       req,
       status: 'queued',

@@ -149,6 +149,13 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   if (!engineRef.current) engineRef.current = new ExecutorEngine()
   const engine = engineRef.current
 
+  // S4：把执行历史关联到本节点（nodeId/kind 注入）。
+  // 必须在 enqueueShots **之前**设置；engine 由 useRef 持有、跨渲染稳定，故挂载时设一次即可。
+  // 注意：不要在 handler 里 `new ExecutorEngine()`——那样上下文设不到真正执行任务的实例上。
+  useEffect(() => {
+    engine.setRunContext({ nodeId: shape.id, kind: 'generate' })
+  }, [engine, shape.id])
+
   const [jobs, setJobs] = useState<ShotJob[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

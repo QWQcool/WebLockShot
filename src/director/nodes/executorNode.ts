@@ -440,11 +440,14 @@ export class ExecutorEngine {
 
   /**
    * 退款并记录「本次是否发生退款」。
-   * 只有钱包真的完成退款（返回 true）才置真——无凭据被拒的退款不算，避免虚报。
+   * - 只有钱包真的完成退款（返回 true）才置真——无凭据被拒的退款不算，避免虚报；
+   * - **S4 观察项修正**：`walletManager.refund` 对 `amount<=0` 直接返回 true（无款项可退），
+   *   若据此置真，会把「0 币失败」（如 mock 演示出片失败）显示成「已退款」。语义上
+   *   「是否发生退款」应指「有款项被退回」，故要求 `amount > 0` 且真的退成功。
    */
   private refundRun(job: ShotJob, amount: number, reason: string, run: RunAcc) {
     const ok = walletManager.refund(job.shotId, amount, job.provider, reason)
-    if (ok) run.refunded = true
+    if (amount > 0 && ok) run.refunded = true
   }
 
   /**

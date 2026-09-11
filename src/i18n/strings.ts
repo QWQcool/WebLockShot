@@ -51,6 +51,9 @@ const ZH = {
   'toolbar.connectorsTitle': '连接器：推荐连接器目录 + 自定义添加（本期仅接口 + 协议层 mock，未接入）',
   'toolbar.scenes': '🎬 创作场景',
   'toolbar.scenesTitle': '创作场景：六类创作场景卡片（点击预填对话栏 / 一键编排，复用 B6 编排路由）',
+  'toolbar.runHistory': '🕘 运行历史',
+  'toolbar.runHistoryTitle':
+    '运行历史：节点每次执行的状态 / 耗时 / 消耗灵感币 / 是否退款（由执行器单一收口落库，滚动保留最近 200 条）',
   'toolbar.mcpReady': '🤖 MCP 已就绪',
   'toolbar.mcpReadyTitle': 'MCP 反向驱动已就绪：本地 Agent 可读取画布拓扑并建节点/连线',
   'toolbar.savedAt': '已保存 {time}',
@@ -215,6 +218,9 @@ const EN: Record<MessageKey, string> = {
   'toolbar.connectorsTitle': 'Connectors: recommended catalog + custom entries (interface + protocol mock only in this phase, not wired up)',
   'toolbar.scenes': '🎬 Scene Gallery',
   'toolbar.scenesTitle': 'Scene Gallery: six creative-scene cards (prefill the chat bar, or orchestrate in one click via the B6 route)',
+  'toolbar.runHistory': '🕘 Run history',
+  'toolbar.runHistoryTitle':
+    'Run history: status / duration / inspiration coins spent / refunded for every node run (written by the executor in one place, latest 200 kept)',
   'toolbar.mcpReady': '🤖 MCP ready',
   'toolbar.mcpReadyTitle': 'MCP reverse driving is ready: a local Agent can read the canvas topology and create nodes/edges',
   'toolbar.savedAt': 'Saved {time}',
