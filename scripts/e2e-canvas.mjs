@@ -365,7 +365,95 @@ async function main() {
       assert(/待真实环境验证/.test(lumaHint || ''), `Luma Key 区未标注验证状态：${lumaHint?.slice(0, 140)}`)
     })
 
-    await step('⑨ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
+    // ---- ⑨ 节点管线「实跑」（R6 审计固化） ----
+    // 此前所有步骤只**摆节点**、从不**执行节点动作**，于是「标注就绪但实际跑不通」这类缺陷
+    // 完全没有覆盖。本步把整条链路真跑一遍：生成脚本 → 生成分镜 → 逐镜出片 → 打包剪映草稿 zip。
+    await step('⑨ 节点管线实跑：生成脚本 → 生成分镜 → 逐镜出片 → 打包剪映草稿 zip', async () => {
+      await page.goto(base, { waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('[data-testid=chat-dock]', { timeout: 20_000 })
+      // 先清空画布：本步需要「唯一一套」节点与确定的上下游连线——前序步骤（3D 节点、多画布项目等）
+      // 会在画布上留下节点，导致按 DOM 取节点时新旧混在一起、连线关系不确定（首版即踩此坑）。
+      await page.locator('.wls-canvas-btn', { hasText: '清空画布' }).first().click()
+      await page.waitForTimeout(700)
+      await page.fill('.wls-chat-input', '给一款保温杯拍一条 30 秒竖屏带货短视频')
+      await page.click('.wls-chat-send')
+      await page.waitForFunction(
+        () => /演示编排|LLM 编排/.test(document.querySelector('[data-testid=orchestration-notice]')?.textContent || ''),
+        null,
+        { timeout: 20_000 }
+      )
+      await page.waitForTimeout(900)
+
+      const nodeText = (kind) =>
+        page.evaluate((k) => {
+          const el = [...document.querySelectorAll(`.wls-node[data-kind="${k}"]`)].pop()
+          return el ? (el.innerText || '').replace(/\s+/g, ' ') : ''
+        }, kind)
+      const clickNodeBtn = async (kind, label) => {
+        const r = await page.evaluate(
+          ({ k, lp }) => {
+            const el = [...document.querySelectorAll(`.wls-node[data-kind="${k}"]`)].pop()
+            if (!el) return 'no-node'
+            const b = [...el.querySelectorAll('button')].find((x) => (x.textContent || '').includes(lp))
+            if (!b) return 'no-button'
+            if (b.disabled) return 'disabled'
+            b.click()
+            return 'clicked'
+          },
+          { k: kind, lp: label }
+        )
+        assert(r === 'clicked', `${kind} 节点的「${label}」按钮不可用（${r}）`)
+      }
+
+      // ① 生成脚本（无 LLM Key → 演示编排，必须如实标注）
+      // 等待条件直接盯「脚本节点自身」的文案：全局 body 文本里 Critic 会出现在别处（如节点提示），
+      // 会造成「等到了但其实还没生成完」的假通过（首版即踩此坑）。
+      await clickNodeBtn('script', '生成脚本')
+      await page.waitForFunction(
+        () => {
+          const el = [...document.querySelectorAll('.wls-node[data-kind="script"]')].pop()
+          return /演示 · 评分非真实/.test(el?.innerText || '')
+        },
+        null,
+        { timeout: 25_000 }
+      )
+
+      // ② 生成分镜 → 6 镜 GSAP 预演
+      // 注意：`wls-shotplan-shot` 属于 **D3 自由镜数分镜**（来自 3D 台），script→6 镜走的是
+      // ShotStage 预演（节点内显示「镜 k/N」），两者不是同一渲染路径——首版断言用错 testid。
+      await clickNodeBtn('storyboard', '生成分镜')
+      await page.waitForFunction(
+        () => {
+          const el = [...document.querySelectorAll('.wls-node[data-kind="storyboard"]')].pop()
+          return /镜 \d+\/\d+/.test(el?.innerText || '')
+        },
+        null,
+        { timeout: 25_000 }
+      )
+      const sbText = await nodeText('storyboard')
+      assert(/镜 1\/6/.test(sbText), `分镜未生成 6 镜：${sbText.slice(0, 160)}`)
+      assert(/本地预演 · 非成片/.test(sbText), '分镜节点未如实标注「本地预演 · 非成片」')
+
+      // ③ 逐镜出片（演示引擎；确认弹窗必须显式确认）
+      await clickNodeBtn('generate', '开始逐镜出片')
+      await page.waitForSelector('[data-testid=wls-generate-confirm-ok]', { timeout: 10_000 })
+      await page.click('[data-testid=wls-generate-confirm-ok]')
+      await page.waitForFunction(
+        () => document.querySelectorAll('.wls-node[data-kind="asset"]').length > 0,
+        null,
+        { timeout: 45_000 }
+      )
+      assert(/播放/.test(await nodeText('asset')), '产物卡未进入可播放态')
+
+      // ④ 打包剪映草稿 zip（真实下载）
+      const downloadPromise = page.waitForEvent('download', { timeout: 25_000 })
+      await clickNodeBtn('deliver', '打包剪映草稿')
+      const download = await downloadPromise
+      assert(/剪映草稿\.zip$/.test(download.suggestedFilename()), `下载文件名异常：${download.suggestedFilename()}`)
+      assert(/已下载剪映草稿 zip/.test(await nodeText('deliver')), 'deliver 节点未给出打包成功反馈')
+    })
+
+    await step('⑩ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
       assert(pageErrors.length === 0, `捕获到 ${pageErrors.length} 条 pageerror：${pageErrors.slice(0, 3).join(' | ')}`)
     })
   } finally {

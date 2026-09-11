@@ -132,6 +132,8 @@ function readJsonBody(req, maxBytes, res) {
     let size = 0
     let overflow = false
     let settled = false
+    let drained = 0
+    const drainHardCap = maxBytes * 8
     const finish = (err, data) => {
       if (settled) return
       settled = true
@@ -141,15 +143,19 @@ function readJsonBody(req, maxBytes, res) {
     const tooLargeErr = () => Object.assign(new Error('body too large'), { code: 'WLS_BODY_TOO_LARGE' })
 
     req.on('data', (chunk) => {
-      if (settled) return
+      if (settled) {
+        // 413 已回写：继续排空（绝不能拆连接，详见 render.mjs readJsonBody 注释）
+        drained += chunk.length
+        if (drained > drainHardCap) req.destroy()
+        return
+      }
       size += chunk.length
       if (size > maxBytes) {
         overflow = true
         if (res && !res.headersSent) {
-          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' })
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' })
           res.end(JSON.stringify({ error: '请求体超过上限' }))
         }
-        // resume 排空剩余 body，避免 socket 未读数据触发 RST 令客户端丢弃 413（见 render.mjs 注释）
         req.resume()
         finish(tooLargeErr())
         return

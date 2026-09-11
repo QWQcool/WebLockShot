@@ -234,17 +234,27 @@ async function handleDraftZip(req, res, args, logger) {
   let size = 0
   const MAX = 200 * 1024 * 1024 // 200MB 上限
   let tooLarge = false
+  let drained = 0
+  const drainHardCap = MAX * 2
 
   req.on('data', (chunk) => {
     size += chunk.length
     if (size > MAX) {
-      if (tooLarge) return
+      if (tooLarge) {
+        // 413 已回写：继续排空剩余 body（不能 destroy——拆连接会让仍在上传的客户端收到 RST
+        // 而丢掉刚回的 413，详见 readBody 注释）；超硬上限才强断防恶意长流
+        drained += chunk.length
+        if (drained > drainHardCap) req.destroy()
+        return
+      }
       tooLarge = true
-      // R2 修复：destroy 前先回 413 并结束响应。此前只 destroy 不回应，
-      // 'end' 永不触发 → 分支内 writeHead(413) 成为死代码，客户端连接被裸重置。
-      res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' })
+      // R2 修复：先回 413 并结束响应（此前只 destroy 不回应，'end' 永不触发 →
+      // 分支内 writeHead(413) 成为死代码，客户端连接被裸重置）。
+      // 2026-09-11 二次修复：去掉 Connection: close 与 req.destroy()——两者都会立即拆 socket，
+      // 而客户端此刻还在上传剩余 zip，拆连接会 RST 掉刚回的 413（随机 ECONNRESET 的根因）。
+      res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ error: 'zip 超过 200MB 上限' }))
-      req.destroy()
+      req.resume()
       return
     }
     chunks.push(chunk)
@@ -291,8 +301,15 @@ const SESSION_BODY_MAX = 8 * 1024 * 1024 // 8MB
 
 /**
  * 读取请求体（R2 修复：超限 / 中途断开均不再挂起）。
- * - 超限：先回写 413（Connection: close）再 destroy，随后 reject —— 调用方 catch 中须判
- *   res.headersSent 避免二次回写。此前只 destroy 不回应，await 永挂 → 互斥锁等资源永久饿死。
+ * - 超限：**先回写 413，再排空剩余 body**（不 destroy、不设 Connection: close），随后 reject ——
+ *   调用方 catch 中须判 res.headersSent 避免二次回写。此前只 destroy 不回应，await 永挂
+ *   → 互斥锁等资源永久饿死。
+ * - 为什么不能带 `Connection: close`（2026-09-11 二次修复）：该头会让 Node 在响应刷出后
+ *   立即拆除 socket；而客户端（undici，`duplex:'half'`）此刻**还在上传**剩余 body，
+ *   socket 被拆 + 内核接收缓冲仍有未读数据 → 发 RST → 客户端丢掉刚收到的 413。
+ *   这正是「全量并发下约 1/3 概率抖动成 ECONNRESET」的根因。改为：保持连接 + 持续排空，
+ *   让客户端写完后再自然结束，413 稳定送达。
+ *   防恶意长流：排空量超过 maxBytes 的 8 倍仍不收手时强制断开。
  * - req 'close'/'aborted'（未正常 end 即断开）→ reject，防止 Promise 永挂。
  * @returns {Promise<Buffer>}
  */
@@ -302,6 +319,8 @@ function readBody(req, maxBytes, res) {
     let size = 0
     let overflow = false
     let settled = false
+    let drained = 0
+    const drainHardCap = maxBytes * 8
     const finish = (err, data) => {
       if (settled) return
       settled = true
@@ -311,15 +330,19 @@ function readBody(req, maxBytes, res) {
     const tooLargeErr = () => Object.assign(new Error('body too large'), { code: 'WLS_BODY_TOO_LARGE' })
 
     req.on('data', (chunk) => {
-      if (settled) return
+      if (settled) {
+        // 413 已回写：继续排空剩余 body（见上方注释——此时绝不能拆连接）
+        drained += chunk.length
+        if (drained > drainHardCap) req.destroy()
+        return
+      }
       size += chunk.length
       if (size > maxBytes) {
         overflow = true
         if (res && !res.headersSent) {
-          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' })
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' })
           res.end(JSON.stringify({ error: '请求体超过上限' }))
         }
-        // resume 排空剩余 body，避免 socket 未读数据触发 RST 令客户端丢弃 413（见 render.mjs 注释）
         req.resume()
         finish(tooLargeErr())
         return

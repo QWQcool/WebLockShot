@@ -403,7 +403,7 @@ WebLockShot/
 # 画布契约 / Skill manifest / 3D 摆台 meta·动作·场景 / 记忆源 / 多画布存储 / 小地图 / MCP 操作批
 # i18n 字典（中英键对齐 / 无漏译 / 插值与持久化）
 # UI 冒烟（vitest + testing-library）：钱包交互 / 熔断徽章三态 / 共享管线
-# tests 409 (node) + 18 (vitest), fail 0
+# tests 410 (node) + 18 (vitest), fail 0
 ```
 
 ### 画布 E2E 套件（`npm run e2e`）
@@ -518,7 +518,7 @@ chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）�
 
 | 切片 | 结论 |
 |---|---|
-| T1 E2E 固化 | `npm run e2e` 13 步全过（真实鼠标路径 + 隔离 storage）；Playwright 缺失时优雅跳过 exit 0 |
+| T1 E2E 固化 | `npm run e2e` 14 步全过（真实鼠标路径 + 隔离 storage；含 T9 补的「节点管线实跑」）；Playwright 缺失时优雅跳过 exit 0 |
 | T2 覆盖率基线 | 关键纯函数层 **10/10 ≥ 80%**（补齐 `feedback.ts` 的 IndexedDB 分支，100% 行覆盖）；不伪造覆盖率 |
 | T3 性能基准 | 200 节点 54.5fps / 500 节点 25.7fps；记忆图谱 500 记录 79ms；3D chunk 957kB / 视口就绪 352ms；Skill 市场 100 项 86ms。**发现文档契约上限 200 节点、超限静默不落盘**（已记入优化建议，本期只测不改） |
 | T4 跨浏览器 + a11y | chromium / webkit 核心链路各 **5/5**；axe 严重项从 6 处**清零**（修 tablist 语义 + 8 处对比度），四态扫描 0 违规 |
@@ -526,6 +526,7 @@ chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）�
 | T6 线上白屏事故修复 | 3D 运镜台「加人物」在 GitHub Pages 子路径下**整页白屏**（模型 URL 写死根绝对路径 → 404 → `useGLTF` 抛错且无 ErrorBoundary 兜底）。修复：`publicUrl` 统一收口 + 根级/局部双重 ErrorBoundary + 新增 `npm run e2e:basepath` 子路径回归（**已做负向验收**：还原错误写法后该套件 5 项失败并复现 404，确认能抓到） |
 | T7 画布消失事故修复 | 线上「画布内容忽然全部消失」= **tldraw 生产许可闸门**（无 license key + https 非回环 → 约 5s 后 `<Tldraw>` 被替换为空 div）。修复：如实提示条 + `npm run e2e:prod` 生产模式回归（HTTPS 复现闸门，双向断言）+ 官方 license 路径文档化。**不绕过、不去水印** |
 | T8 过期文案校正 | 全量审计用户可见文案（非只改截图里的两处）：`stage3d` 由 locked 误判改为 ready（此前「已能进入 3D 运镜台」却标「3 期开放 / 仅摆放占位」）；`image` 由「二期开放」改为「尚未实现」；顶栏副标题去掉「一期 A」；画布提示条重写（原「一期 A 只落 Brief 节点…」严重过期）；`product`/`edit`/`deliver` 节点提示去掉「一期 B 接通 / A2 接通」；左侧面板阶段标签改为可用性口径；产物卡空态不再显示「契约校验未通过」；节点 body 提示统一走 i18n（消除与 `meta.hint` 的重复源）。**新增守卫单测：扫描中英字典全量文案 + `meta.hint`，禁止残留期数口径（带自检，防空转）** |
+| T9 实机缺陷二轮修复 | ①**413 竞态**（`Connection: close` 致 RST 丢响应）在 4 处统一修复 + 新增确定性回归用例（负向验收通过）；②**UI 重叠**：对话栏模板 chips 压在 tldraw 底部工具条上、半透明背景把工具条按钮「透」出来 → 对话栏抬到工具条之上 + chips 改不透明；③**短剧入口移除**（用户拍板，代码与 `?view=drama` 深链保留）；④**左下角操作提示面板**（快捷键全部经真实浏览器实测，含否掉的两条：`Ctrl+0`/`Shift+1` 实测无效故不写入）；⑤**节点可用性审计**：9 个「就绪」节点逐一实跑（脚本→分镜→出片→打包 zip 全通、素材导入出产物卡、局部重绘连线后可用），未发现「标了就绪但用不了」；⑥**E2E 补「节点管线实跑」步骤**（此前自动化只摆节点、从不执行节点动作） |
 
 ---
 
@@ -554,13 +555,15 @@ chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）�
    secret 透传（配置后即恢复）；本项目**不提供绕过校验 / 去水印手段**（用户已拍板）。详见 [NOTICE](./NOTICE)。
 10. **`image`（图像生成）节点仍未实现**：文案已由「二期开放」校正为「尚未实现」，节点为占位（不装可用）；
    若要补齐需新增 `ImageNodeBody` 并接入 ComfyUI 文生图 / 图生图链路。
-11. **server 套件有一个既有的偶发失败**（非本次引入）：`R2 PUT /api/sessions/:id：超限 body → 413`
-    在**全量并发**下约 1/3 概率因「9MB 请求体 + 服务端提前 413」的竞态抖动（单独跑该文件稳定通过）。
-    CI 现为阻断门禁，因此它**可能随机卡住部署**——遇到时重跑该 run 即可；根治需在服务端 413 路径
-    正确 drain 请求体（属 server 行为改动，未在本轮动手）。
-12. **tldraw license key 到期即会卡住部署**（这是刻意设计）：`TLDRAW_LICENSE_KEY` 失效/过期时，
-    CI 的 `e2e:prod` 会在「已授权分支」上失败——用于提前暴露授权问题。当前为免费 trial（2026-12-20 到期），
-    届时换成 hobby license 的 key 或续期即可。
+11. ~~server 套件偶发失败~~ **已修复（2026-09-11）**：根因是 413 响应带 `Connection: close`，
+    Node 在响应刷出后立即拆 socket，而客户端（undici 半双工）此刻仍在上传 9MB → RST 让客户端
+    丢掉刚收到的 413。已在 4 处（`weblockshot-server.mjs` 的 readBody / draft-zip、`render.mjs`、
+    `tts.mjs`）统一改为「回 413 + 持续排空、不拆连接」，并新增**确定性回归用例**
+    `R2b 413 送达（慢速 body）`——负向验收：把 `Connection: close` 加回去，该用例立刻以
+    `Error: read ECONNRESET` 失败，与线上偶发失败的错误码完全一致。
+12. **tldraw license key 失效只告警、不阻断部署**：`e2e:prod` 在「已授权分支」发现闸门仍触发时
+    只打印 `⚠`（并继续校验「诚实提示」兜底），不使部署失败。当前为免费 trial（2026-12-20 到期），
+    到期后换成 hobby license 的 key 或续期即可。
 7. **Skill 市场全量渲染**：100 项渲染 1340 个 DOM 节点，未做虚拟列表（规模继续增长时建议窗口化）。
 8. **tldraw 免费版水印 + 生产 5 秒停渲染**：需购买 license 或替换画布引擎（用户已拍板接受，不做绕过）。
 9. **`npm run test:node` 曾偶发 ECONNRESET 抖动**：已用 `duplex:'half'` 从测试侧消除（连续 4 次全量跑 0 失败）。

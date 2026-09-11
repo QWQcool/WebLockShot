@@ -84,6 +84,7 @@ import { useLanguage, useT } from '../../i18n/useLanguage.ts'
 import { setLanguage } from '../../i18n/language.ts'
 import { nodeAvailabilityKey, nodeHint, nodeLabel, templateLabel } from '../../i18n/strings.ts'
 import { TldrawLicenseNotice } from './TldrawLicenseNotice.tsx'
+import { CanvasShortcutsHint } from './CanvasShortcutsHint.tsx'
 
 /**
  * Agent 创意画布 · 一期 A（CANVAS_PLAN.md §4.1-1/2/6/7 + v1.1 变更）。
@@ -96,7 +97,10 @@ import { TldrawLicenseNotice } from './TldrawLicenseNotice.tsx'
 
 type Props = {
   onSwitchToSell: () => void
-  onSwitchToDrama: () => void
+  /**
+   * R4（用户拍板）：剧情短剧不再作为可选项暴露，故不再传入切换回调。
+   * 短剧模式本身与 `?view=drama` 深链仍然可用（见 App.tsx），恢复入口只需加回按钮与该 prop。
+   */
 }
 
 /**
@@ -158,7 +162,7 @@ function enforceEdgeCompat(editor: Editor): string | null {
   return reason
 }
 
-export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDrama }) => {
+export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell }) => {
   // I1：界面语言（默认中文；切换后顶栏/工具条/节点面板/对话栏即时重渲染）
   const lang = useLanguage()
   const t = useT()
@@ -1193,9 +1197,8 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
           <button type="button" role="tab" aria-selected={false} className="mode-btn" onClick={onSwitchToSell}>
             {t('mode.sell')}
           </button>
-          <button type="button" role="tab" aria-selected={false} className="mode-btn" onClick={onSwitchToDrama}>
-            {t('mode.drama')}
-          </button>
+          {/* R4（用户拍板）：剧情短剧不再作为可选项暴露——其成熟度明显低于带货工作台与 Agent 画布。
+              代码与 ?view=drama 深链保留（未删除），恢复入口只需把下面这个按钮加回来。 */}
           <button type="button" role="tab" aria-selected={true} className="mode-btn active" aria-current="page">
             {t('mode.canvas')}
           </button>
@@ -1391,6 +1394,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
 
             {/* V1：tldraw 生产许可闸门如实提示（无 license key 的生产环境 5s 后编辑器停渲染） */}
             <TldrawLicenseNotice />
+
+            {/* R5：左下角操作提示（快捷键均经实机实测） */}
+            <CanvasShortcutsHint />
 
             {/* D9 项目操作提示条 */}
             {projectNotice && (

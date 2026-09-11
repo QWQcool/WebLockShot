@@ -62,13 +62,8 @@ export const WorkbenchHeader: React.FC<Props> = ({
             >
               🎯 带货工作台（仿爆款）
             </button>
-            <button
-              type="button"
-              className={`mode-btn ${mode === 'drama' ? 'active' : ''}`}
-              onClick={() => onModeChange('drama')}
-            >
-              🎭 剧情短剧（粗剪台）
-            </button>
+            {/* R4（用户拍板）：剧情短剧不再作为可选项暴露（成熟度明显低于另两者）。
+                代码与 ?view=drama 深链保留；恢复入口只需把原按钮加回来。 */}
             <button
               type="button"
               className={`mode-btn ${mode === 'canvas' ? 'active' : ''}`}

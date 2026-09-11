@@ -44,10 +44,9 @@ export default function App() {
             </div>
           }
         >
-          <CanvasWorkbench
-            onSwitchToSell={() => setMode('sell')}
-            onSwitchToDrama={() => setMode('drama')}
-          />
+          {/* R4：短剧入口已从可选项移除（用户拍板），故不再传 onSwitchToDrama；
+              `?view=drama` 深链仍走上面的 mode 分支，短剧代码与能力未删除。 */}
+          <CanvasWorkbench onSwitchToSell={() => setMode('sell')} />
         </Suspense>
         <PwaUpdatePrompt />
       </>

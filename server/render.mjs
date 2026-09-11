@@ -444,8 +444,13 @@ function sendJson(res, status, payload) {
 
 /**
  * 读取 JSON 请求体（R2 修复：超限 / 中途断开均不再挂起）。
- * - 超限：先回写 413（Connection: close）再 destroy 并 reject —— 此前只 destroy 不回应，
- *   await 永挂 → /api/render 互斥锁 release 永不执行 → 后续所有请求永久 429。
+ * - 超限：**先回写 413，再排空剩余 body**（不 destroy、不设 Connection: close），随后 reject ——
+ *   此前只 destroy 不回应，await 永挂 → /api/render 互斥锁 release 永不执行 → 后续所有请求永久 429。
+ * - **为什么必须去掉 `Connection: close`**（2026-09-11 二次修复，与 weblockshot-server 同源）：
+ *   该头让 Node 在响应刷出后立即拆 socket；而客户端（undici，`duplex:'half'`）此刻还在上传剩余
+ *   body，拆连接 + 内核接收缓冲有未读数据 → RST → 客户端丢掉刚收到的 413（表现为随机 ECONNRESET）。
+ *   只 `resume()` 不足以避免——拆连接的时机由 `Connection: close` 决定。
+ *   防恶意长流：排空量超过 maxBytes 的 8 倍仍不收手时强制断开。
  * - req 'close'/'aborted'（未正常 end 即断开）→ reject，防止 Promise 永挂。
  * 调用方 catch 中须先判 res.headersSent（413 已直接回写）避免二次响应。
  */
@@ -455,6 +460,8 @@ function readJsonBody(req, maxBytes, res) {
     let size = 0
     let overflow = false
     let settled = false
+    let drained = 0
+    const drainHardCap = maxBytes * 8
     const finish = (err, data) => {
       if (settled) return
       settled = true
@@ -464,16 +471,19 @@ function readJsonBody(req, maxBytes, res) {
     const tooLargeErr = () => Object.assign(new Error('body too large'), { code: 'WLS_BODY_TOO_LARGE' })
 
     req.on('data', (chunk) => {
-      if (settled) return
+      if (settled) {
+        // 413 已回写：继续排空（此时绝不能拆连接，见上方注释）
+        drained += chunk.length
+        if (drained > drainHardCap) req.destroy()
+        return
+      }
       size += chunk.length
       if (size > maxBytes) {
         overflow = true
         if (res && !res.headersSent) {
-          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' })
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' })
           res.end(JSON.stringify({ error: '请求体超过上限' }))
         }
-        // resume 排空剩余 body（body-parser 同款）：socket 有未读数据时关闭会发 RST，
-        // 客户端会丢弃 413 响应只见 ECONNRESET；排空后连接干净关闭，413 可正常送达
         req.resume()
         finish(tooLargeErr())
         return

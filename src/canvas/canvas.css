@@ -283,7 +283,10 @@
 .wls-chat-dock {
   position: absolute;
   left: 50%;
-  bottom: 1rem;
+  /* R3 修复（实机反馈「UI 重叠」）：原先 bottom:1rem 时对话栏的模板 chips 行正好压在
+     tldraw 底部工具条上；chips 是半透明白，工具条的按钮会「透」出来，看起来像渲染错乱。
+     抬到工具条之上（工具条约占底部 56px），两者不再交叠，工具条在对话栏展开时也可直接点。 */
+  bottom: 4.5rem;
   transform: translateX(-50%);
   z-index: 320;
   width: min(41rem, calc(100% - 6rem));
@@ -406,7 +409,8 @@
 
 .wls-chat-chip {
   border: 1px solid var(--cv-line);
-  background: rgba(255, 255, 255, 0.88);
+  /* R3：不透明——半透明时背后画布内容会透出，观感像渲染错乱 */
+  background: #fff;
   color: var(--cv-ink);
   border-radius: 999px;
   padding: 0.3rem 0.75rem;
@@ -2098,6 +2102,79 @@
   font-family: var(--mono);
   font-size: 0.6rem;
   color: var(--cv-mute, #5b7a86);
+}
+
+/* ---------------- R5：左下角画布操作提示（快捷键 + 基本操作） ---------------- */
+
+.wls-shortcuts {
+  position: absolute;
+  left: 0.8rem;
+  /* 与对话栏同基线：位于 tldraw 缩放控件（约底部 56px）上方，不与其交叠 */
+  bottom: 4.5rem;
+  z-index: 330;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  max-width: min(23rem, calc(100% - 1.6rem));
+}
+
+.wls-shortcuts-toggle {
+  border: 1px solid var(--cv-line);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--cv-mute);
+  border-radius: 999px;
+  padding: 0.32rem 0.8rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(22, 50, 63, 0.08);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.wls-shortcuts-toggle:hover,
+.wls-shortcuts-toggle[aria-expanded='true'] {
+  color: var(--cv-ink);
+  border-color: var(--cv-miku);
+}
+
+.wls-shortcuts-panel {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--cv-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 8px 24px rgba(22, 50, 63, 0.12);
+}
+
+.wls-shortcuts-title {
+  margin-bottom: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--cv-ink);
+}
+
+.wls-shortcuts-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.wls-shortcuts-list li {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  /* T4 a11y 口径：浅底正文对比度 ≥4.5:1 */
+  color: var(--cv-ink);
+}
+
+.wls-shortcuts-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: #4a6873;
 }
 
 /* ---------------- tldraw 生产许可闸门 · 诚实提示条（V1） ---------------- */

@@ -152,6 +152,18 @@ const ZH = {
   'error.retry': '↻ 重试',
   'error.reload': '↻ 重新加载页面',
 
+  'shortcuts.toggle': '⌨ 操作提示',
+  'shortcuts.title': '画布操作提示（快捷键均已实机实测）',
+  'shortcuts.pan': '平移画布：滚轮 · 空格 + 拖拽 · 中键拖拽',
+  'shortcuts.zoom': '缩放：Ctrl / ⌘ + 滚轮（注意：直接滚轮是平移，不是缩放）',
+  'shortcuts.tools': '工具：V 选择 · H 抓手 · A 箭头 · N 便笺 · T 文本 · R 矩形 · D 画笔',
+  'shortcuts.history': '撤销 / 重做：Ctrl / ⌘ + Z · Ctrl / ⌘ + ⇧ + Z',
+  'shortcuts.delete': '删除 / 复制：Delete 或 ⌫ · Ctrl / ⌘ + D',
+  'shortcuts.addNode': '添加节点：点击左侧「Agent 节点」里的任意节点',
+  'shortcuts.connect': '连线：按 A 切到箭头，从一个节点拖到另一个节点',
+  'shortcuts.stage3d': '3D 运镜台：点节点里的「进入 3D 运镜台」',
+  'shortcuts.collapseHint': '底部工具条被对话栏遮住时，点对话栏右侧 ▾ 收起即可完整使用。',
+
   'tldraw.gate.title': '⚠️ tldraw 编辑器已停止渲染（第三方许可限制，非本项目缺陷）',
   'tldraw.gate.body':
     '当前是生产环境（https 且非本地地址）且未配置 tldraw license key。按 tldraw 许可条款，编辑器会在约 5 秒后停止渲染：画布与 tldraw 自带工具条会消失，但你的画布数据仍保存在本地（IndexedDB / localStorage 未受影响），刷新或配置授权后可继续编辑。',
@@ -302,6 +314,18 @@ const EN: Record<MessageKey, string> = {
   'error.detail': 'Technical detail: {msg}',
   'error.retry': '↻ Retry',
   'error.reload': '↻ Reload page',
+
+  'shortcuts.toggle': '⌨ Shortcuts',
+  'shortcuts.title': 'Canvas controls (every shortcut verified in a real browser)',
+  'shortcuts.pan': 'Pan: wheel · Space + drag · middle-button drag',
+  'shortcuts.zoom': 'Zoom: Ctrl / ⌘ + wheel (plain wheel pans, it does not zoom)',
+  'shortcuts.tools': 'Tools: V select · H hand · A arrow · N note · T text · R rectangle · D draw',
+  'shortcuts.history': 'Undo / redo: Ctrl / ⌘ + Z · Ctrl / ⌘ + ⇧ + Z',
+  'shortcuts.delete': 'Delete / duplicate: Delete or ⌫ · Ctrl / ⌘ + D',
+  'shortcuts.addNode': 'Add a node: click any node in the “Agent nodes” panel on the left',
+  'shortcuts.connect': 'Connect: press A for the arrow tool, then drag from one node to another',
+  'shortcuts.stage3d': '3D camera stage: click the button inside the 3D node (the studio UI itself is Chinese-only for now)',
+  'shortcuts.collapseHint': 'If the bottom toolbar is covered by the chat bar, click ▾ on its right to collapse it.',
 
   'tldraw.gate.title': '⚠️ tldraw editor stopped rendering (third-party license limit, not a bug in this project)',
   'tldraw.gate.body':

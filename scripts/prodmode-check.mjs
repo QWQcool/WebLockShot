@@ -143,12 +143,23 @@ function detectBakedLicenseKey(distDir) {
 // ---------------- 断言工具 ----------------
 
 let failures = 0
+let warnings = 0
 function check(ok, label, extra = '') {
   if (ok) console.log(`  ✔ ${label}${extra ? `（${extra}）` : ''}`)
   else {
     failures++
     console.error(`  ❌ ${label}${extra ? ` —— ${extra}` : ''}`)
   }
+}
+
+/**
+ * 只告警不失败（不阻断部署）。
+ * 用途：license key 过期/失效属「授权运维事件」，不该卡住部署——按用户要求降级为告警，
+ * 但仍要如实打印，且继续校验「诚实提示」兜底是否生效。
+ */
+function warn(label, extra = '') {
+  warnings++
+  console.warn(`  ⚠ ${label}${extra ? `（${extra}）` : ''}`)
 }
 
 /** 读取当前页面的画布持久化快照（用于验证「画布数据不丢」） */
@@ -241,10 +252,17 @@ async function main() {
     const afterGate = await canvasStorage(prodPage)
 
     if (licensed) {
-      // ---- 已配置 license key：预期「不触发闸门」，顺带验证 key 有效 ----
-      check(!gateFired, '已配置 license key：生产环境闸门未触发（key 有效）')
-      check(noticeCount === 0, '已配置 license key：不显示许可提示（提示不是误报）')
-      check(prodNodeDom > 0, '已配置 license key：生产环境画布正常渲染节点', `${prodNodeDom} 个`)
+      // ---- 已配置 license key：预期「不触发闸门」 ----
+      // key 有效性只告警（不阻断部署）：过期/失效属授权运维事件，仍要如实打印。
+      if (gateFired) {
+        warn('已配置 license key 但生产环境闸门仍触发 —— key 可能已过期或无效（按约定不阻断部署）')
+        // key 失效时，兜底链路必须仍然可用：如实提示条要出现
+        check(noticeCount > 0, 'key 失效时应退回「如实提示」兜底（提示条已展示）')
+      } else {
+        check(true, '已配置 license key：生产环境闸门未触发（key 有效）')
+        check(noticeCount === 0, '已配置 license key：不显示许可提示（提示不是误报）')
+        check(prodNodeDom > 0, '已配置 license key：生产环境画布正常渲染节点', `${prodNodeDom} 个`)
+      }
       check(paletteAlive > 0, '外层自有 UI 正常（节点面板仍在）', `${paletteAlive} 项`)
       check(
         JSON.stringify(afterGate) === JSON.stringify(beforeGate),
@@ -302,6 +320,7 @@ async function main() {
     devServer.close()
   }
 
+  if (warnings > 0) console.warn(`\n（告警 ${warnings} 项，不阻断部署）`)
   console.log(
     failures === 0
       ? '\n=== 生产模式回归：全部通过 ==='

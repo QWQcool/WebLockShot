@@ -612,6 +612,76 @@ test('R2 PUT /api/sessions/:id：超限 body → 413（readBody 同族修复）'
   }
 })
 
+/**
+ * R2b：413 送达的**确定性**回归（2026-09-11 二次修复）。
+ *
+ * 上面的 R2 用例用 undici + `duplex:'half'` 一次性抛出 9MB，能否复现「RST 丢掉 413」
+ * 取决于内核缓冲与调度时序（实测全量并发下约 1/3 概率，单跑常常复现不到）。
+ * 这里改用**慢速分片上传**把竞态窗口固定下来：服务端在收到 >8MB 时就回 413，
+ * 而客户端此刻仍在续写剩余分片 —— 这正是「客户端还在上传时服务端拆连接 → RST」的条件。
+ * 修复前该用例会因 socket 被拆而拿不到 413；修复后必须稳定拿到。
+ */
+test('R2b 413 送达：服务端已回应而客户端仍在上传时，响应不得被 RST 丢掉（慢速 body 回归）', async () => {
+  const dir = tmpDist()
+  try {
+    const { server, port } = await startServer({ port: 0, dist: dir, env: {} })
+    const base = `http://127.0.0.1:${port}`
+    try {
+      const TOTAL = 9 * 1024 * 1024 // > 8MB 会话上限
+      const FAST_UNTIL = 8.5 * 1024 * 1024 // 先快速越过上限（服务端在此刻回 413）
+      const status = await new Promise((resolve, reject) => {
+        const req = http.request(
+          {
+            host: '127.0.0.1',
+            port,
+            path: '/api/sessions/slow',
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': String(TOTAL) },
+          },
+          (res) => {
+            res.resume()
+            resolve(res.statusCode)
+            // 收完响应主动关掉这条客户端连接：keep-alive 会让 server.close() 等空闲连接，
+            // 把用例拖到 4s+（本例只是验证 413 送达，不需要保持长连接）
+            const drop = () => req.destroy()
+            res.on('end', drop)
+            res.on('close', drop)
+          }
+        )
+        req.on('error', reject)
+        let sent = 0
+        const pump = () => {
+          if (sent >= TOTAL) {
+            req.end()
+            return
+          }
+          const remaining = TOTAL - sent
+          const fast = sent < FAST_UNTIL
+          // 越过上限后改用小分片 + 间隔：让「服务端已回 413、客户端仍在写」的窗口稳定存在
+          const size = fast ? Math.min(256 * 1024, remaining) : Math.min(32 * 1024, remaining)
+          sent += size
+          req.write(Buffer.alloc(size, 0x78), () => (fast ? setImmediate(pump) : setTimeout(pump, 5)))
+        }
+        pump()
+      })
+      assert.equal(status, 413, '客户端仍在上传时也必须收到 413（不得因拆连接变成 ECONNRESET）')
+
+      // 服务端存活 + 连接可继续复用
+      const put = await fetch(`${base}/api/sessions/ok`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { version: 2 } }),
+      })
+      assert.equal(put.status, 200)
+      assert.equal((await fetch(`${base}/healthz`)).status, 200)
+    } finally {
+      await close(server)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 // ---------------- R3：反代上游中途断流 → 进程不死 ----------------
 
 test('R3 反代上游中途断流：客户端得到终止连接而非进程崩溃，server 存活', async () => {
