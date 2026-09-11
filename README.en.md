@@ -1,27 +1,46 @@
-# WebLockShot (v2.3)
+# WebLockShot (v2.4)
 
 > English edition. The Chinese [`README.md`](./README.md) is canonical and may carry extra detail.
 
-An **industrial-grade, multi-Agent video production and CapCut/Jianying project delivery workbench** for
-e-commerce creators and vertical-video teams — now extended with an **Agent Canvas** that turns it into a
-general-purpose creative studio.
+**A complete creative production workbench that runs in a browser.** The primary product line is the
+**🎨 Agent Canvas** (a free-form creative space, and the default entry point since v2.4); the secondary line is
+the **🛒 e-commerce commerce pipeline** (mature six-step workflow); the **🎭 drama rough-cut studio** is a
+legacy mode (kept for compatibility and zero regression — new work should start on the canvas).
 
-- **🎨 Agent Canvas (new · free-form creative space)**: a third workspace mode on a tldraw infinite canvas.
-  One sentence in the chat bar (or one of five scene templates: commerce video / brand visuals / drama
-  storyboard / game promo / App UI) → LLM or demo orchestration lays out an Agent node graph (single-click
-  batch undo) → script writing (ScriptWriter + Critic) → 9:16 GSAP storyboard preview → mock multi-engine
-  shot-by-shot rendering (two-phase wallet transactions on the canvas) → artifact cards → one-click CapCut
-  draft zip. Box-select nodes to **distill them into a Skill workflow package** (manifest JSON: node topology
-  + parameter slots + input/output declarations, with artifacts and heavy assets stripped); importing rebuilds
-  the node group so you only fill in new input (two official Skills ship built in: “six-step commerce flow”
-  and “single-image quick shot”). The memory system weights script sampling by per-structure / per-hook /
-  per-category win rates (Laplace smoothing). Edges are validated against a type-compatibility contract, and
-  the whole canvas persists to localStorage with cross-tab sync.
-- **🛒 Full six-step commerce workflow**: multimodal product import (link / image / video frame extraction) →
-  5 proven structures + golden-3-second hook library (JSON data assets + category routing + win-rate weighted
-  sampling) → dual-Agent script writing with adversarial review → 9:16 GSAP storyboard preview → visual prompt
-  compilation → concurrent task-queue rendering → CapCut/Jianying draft export with microsecond-level
-  audio/video/subtitle alignment (plus a full asset zip).
+- **🎨 Agent Canvas (primary · default entry)**: a free-form creative space on a tldraw infinite canvas.
+  One sentence in the chat bar (or the five onboarding scene tabs / the six-card Scene Gallery) → LLM or demo
+  orchestration lays out an Agent node graph (single-click batch undo) → script writing (ScriptWriter + Critic)
+  → 9:16 GSAP storyboard preview → multi-engine shot-by-shot rendering (two-phase wallet transactions on the
+  canvas) → artifact cards → one-click CapCut draft zip. Box-select nodes to **distill them into a Skill
+  workflow package** (manifest JSON: node topology + parameter slots + input/output declarations, with
+  artifacts and heavy assets stripped); importing rebuilds the node group so you only fill in new input (two
+  official Skills ship built in: “six-step commerce flow” and “single-image quick shot”). The memory system
+  weights script sampling by per-structure / per-hook / per-category win rates (Laplace smoothing). Edges are
+  validated against a type-compatibility contract, and the whole canvas persists to localStorage with
+  cross-tab sync. **Added in phase 3**:
+  - **🖌️ Local repaint**: artifact card → brush/lasso the region → ComfyUI inpaint (FLUX.1 Fill / SD inpainting
+    presets) or an offline demo repaint (honestly labelled “not a real generation”); results stack as
+    **versions** on the card (up to 20, roll back and keep layering)
+  - **🎥 3D camera stage**: built-in Quaternius CC0 character (45 real animation clips) + six procedural scene
+    presets + multiple cameras + keyframe tracks + first/last-frame export, feeding either “video generation”
+    (single shot) or “storyboard” (free shot count). **Local preview · 0 credits**
+  - **🔌 Connector panel**: seven recommended connector cards + custom connectors; honestly labelled
+    (pure front-end mode / interface-only)
+  - **🧩 Skill Market**: built-in and installed Skills managed in one place (install / enable / uninstall /
+    publish locally)
+  - **🧠 Memory graph**: visualization of real feedback records (never seeded with sample data); dual mode
+    (companion-server sqlite / local IndexedDB) labelled honestly
+  - **🗺️ Minimap + multi-canvas projects**: minimap navigation in the bottom-right corner; per-project storage
+    with **zero-loss migration** of the legacy single-canvas document
+  - **🤖 MCP both ways (optional dependency)**: a local Agent can read the canvas topology and create
+    nodes/edges in reverse (without the SDK: `mcp:off` + 501 guidance)
+- **🛒 Full six-step commerce workflow (secondary · mature)**: multimodal product import (link / image / video
+  frame extraction) → 5 proven structures + golden-3-second hook library (JSON data assets + category routing +
+  win-rate weighted sampling) → dual-Agent script writing with adversarial review → 9:16 GSAP storyboard
+  preview → visual prompt compilation → concurrent task-queue rendering → CapCut/Jianying draft export with
+  microsecond-level audio/video/subtitle alignment (plus a full asset zip).
+  **Six engines**: Mock / Kling / Jimeng / 🔥 private ComfyUI / **Runway (overseas · contract-first)** /
+  **Luma (overseas · contract-first)**.
 - **⚡ Single-Agent fast path**: high-conversion prompt presets, AI camera-movement rewriting, multimodal
   reference images/videos, 1–60 s duration tuning.
 - **🤖 Multi-Agent director room**: with a real LLM it runs a four-agent structured deliberation
@@ -43,9 +62,15 @@ general-purpose creative studio.
   Python, no API key. Toggle with `WLS_TTS` (on by default).
 - **🎬 Server-side rendering (companion server)**: `POST /api/render` merges storyboard video + TTS audio +
   optional subtitles into a final mp4 with ffmpeg. `WLS_FFMPEG=auto` probes the binary; the Docker image ships it.
-- **🎭 Drama rough-cut studio (kept for compatibility)**: six-shot drama previews and prompt-pack export, zero regression.
+- **🌐 Bilingual UI**: switch between Chinese and English from the top bar (“🌐 中文 / EN”) or the settings
+  panel; persisted, Chinese by default with zero regression.
+- **🎭 Drama rough-cut studio (legacy)**: six-shot drama previews and prompt-pack export, kept for
+  compatibility and zero regression — new work should start on the Agent Canvas.
 
-> 📖 **Full handbook**: [docs/HOW_TO_USE.en.md](./docs/HOW_TO_USE.en.md) (Chinese: [docs/HOW_TO_USE.md](./docs/HOW_TO_USE.md)).
+> 📖 **Handbook (one main + two branches)**: main [docs/HOW_TO_USE.en.md](./docs/HOW_TO_USE.en.md) ·
+> canvas branch [docs/HOW_TO_USE.canvas.en.md](./docs/HOW_TO_USE.canvas.en.md) ·
+> commerce branch [docs/HOW_TO_USE.commerce.en.md](./docs/HOW_TO_USE.commerce.en.md)
+> (Chinese: [HOW_TO_USE.md](./docs/HOW_TO_USE.md) and its two branches).
 
 > 📄 **License**: our own code is [MIT](./LICENSE); **third-party dependencies keep their own licenses**
 > (tldraw is a commercial license, GSAP uses its own free license). See [`NOTICE`](./NOTICE) for the full list.
@@ -163,6 +188,7 @@ Engine and deployment capabilities are labelled by **how far they were actually 
 | Kling JWT signing (HS512/HS256, official header/payload) | ✅ Contract-verified | Independent reference implementation (node:crypto) with locked vectors + cross-checks, see `src/media/__tests__/authVectors.test.ts` |
 | Jimeng V4 HMAC-SHA256 signing (Volcengine spec) | ✅ Contract-verified | Same, full Authorization string locked by vectors |
 | Request shape / response parsing / error mapping | ✅ Contract-verified | `test/fixtures/kling|jimeng/` + `src/media/__tests__/providerContract.test.ts` |
+| **Runway / Luma overseas engines (M1)** | ✅ Contract-verified / ⏳ awaiting a real environment | Body / endpoint / headers / poll-state mapping / error text all implemented from the official docs and locked by fixtures (`test/fixtures/runway|luma/`); **not yet rendered through a real account**, and no request is sent without a key |
 | Kling / Jimeng live rendering | ⏳ Awaiting a real environment | `npm run verify:providers -- --kling-key=AK:SK --jimeng-key=AK:SK` |
 | Docker image build | ✅ CI-verified | `.github/workflows/docker-build.yml` (build only, no push); `docker compose up --build` works locally |
 | Edge-TTS narration (`/api/tts`) | ✅ Verified locally | Produces a real mp3 (zh-CN-XiaoxiaoNeural, 38 KB); protocol-level mock tests need no network |
@@ -427,12 +453,15 @@ WebLockShot/
 │   ├── export/                       # CapCut draft alignment + zero-dependency zip
 │   ├── hooks/                        # useVideoPipeline, useRevocableObjectUrl
 │   ├── i18n/                         # zh/en dictionaries + language store (default Chinese)
-│   ├── media/                        # ComfyUI, Kling, Jimeng, Mock, Audio TTS, AssetSize
+│   ├── i18n/                         # zh/en dictionaries + language store (Chinese by default)
+│   ├── media/                        # ComfyUI, Kling, Jimeng, Runway, Luma, Mock, Audio TTS, AssetSize
 │   ├── persist/                      # IndexedDB asset storage
-│   └── ui/                           # React UI (WorkbenchHeader, SellWorkbench, Studios, Modals, canvas/)
+│   └── ui/                           # React UI (WorkbenchHeader, SellWorkbench, Studios, Modals, canvas/, stage3d/)
+├── scripts/                          # e2e / coverage / perf / a11y / degrade / screenshots / chaos
 ├── vite.config.ts                    # Vite build + API proxies + vitest config
 ├── start-weblockshot.bat             # Windows one-click start
 ├── CANVAS_PLAN.md                    # Agent Canvas plan (phase 1–3 slices and acceptance criteria)
+├── LICENSE / NOTICE                  # MIT + honest third-party license inventory
 └── package.json
 ```
 
@@ -458,8 +487,9 @@ npm test
 # canvas contracts, Skill manifests, 3D stage meta/anim/scenes, memory source, multi-canvas store, minimap, MCP ops
 # i18n dictionaries (key parity, no missing translations) + language persistence
 # TTS adaptive speaking rate
-# ComfyUI / Kling / Jimeng providers (explicit errors on network failure, no fabricated assets)
+# ComfyUI / Kling / Jimeng / Runway / Luma providers (explicit errors on network failure, no fabricated assets, no request without a key)
 # UI smoke (vitest + testing-library): wallet interaction / circuit-breaker badge / shared pipeline
+# 400 (node) + 18 (vitest) tests, 0 failures
 ```
 
 ### Canvas E2E suite (`npm run e2e`)
@@ -468,7 +498,8 @@ npm test
 
 - **Coverage**: onboarding → chat-bar demo orchestration → nodes placed → reload recovery; 3D camera stage
   (enter / scene preset / back); Skill Market (install / toggle / uninstall); memory graph (honest empty state
-  or real data); multi-canvas projects + minimap + connectors + Scene Gallery; language switching
+  or real data); multi-canvas projects + minimap + connectors + Scene Gallery; language switching;
+  overseas engines (selectable, no-key grey state, honest labelling in the settings panel)
 - **Isolation**: a dedicated browser context (localStorage / IndexedDB never touch your machine) and a
   companion server on a random port with `WLS_STORAGE=memory`
 - **Honest skip**: if Playwright or its browsers are missing it prints enablement instructions and exits 0
@@ -502,6 +533,49 @@ engines).
 Six capability-loss paths are exercised on a real browser (legacy single canvas migration, no WebGL, no
 companion server, no LLM key, `WLS_STORAGE=memory|sqlite`, ComfyUI offline); the matrix lives in
 [`docs/degrade-matrix.md`](docs/degrade-matrix.md) (currently **6/6 passing**).
+
+### Real screenshots (`npm run shots`)
+
+`scripts/capture-screenshots.mjs` drives the **production build plus companion server** through real
+interactions and captures screenshots into `docs/screenshots/` (11 canvas + 1 commerce + 1 drama + the 14
+existing ones). The README, handbook and PDF all use these real screenshots — no design mock-ups.
+The caption of the “memory graph with data” screenshot states honestly that its demo data was written into
+local IndexedDB by the capture script.
+
+### Test-engineering summary (the T line)
+
+| Slice | Result |
+|---|---|
+| T1 E2E suite | `npm run e2e` 13 steps pass (real mouse paths, isolated storage); skips gracefully with exit 0 when Playwright is missing |
+| T2 Coverage baseline | Key pure-function layers **10/10 ≥ 80%** (the `feedback.ts` IndexedDB branch was added, reaching 100% line coverage); coverage is never faked |
+| T3 Performance baseline | 200 nodes 54.5 fps / 500 nodes 25.7 fps; memory graph with 500 records 79 ms; 3D chunk 957 kB / viewport ready in 352 ms; Skill Market with 100 entries 86 ms. **Found: the document contract caps at 200 nodes and silently stops persisting beyond it** (recorded as an optimization note; measure-only in this pass) |
+| T4 Cross-browser + a11y | chromium / webkit core flow **5/5 each**; axe serious findings went from 6 to **0** (tablist semantics + 8 contrast fixes), all four states clean |
+| T5 Degradation matrix | All six capability-loss paths degrade gracefully, label honestly and never crash or blank; legacy single-canvas migration is lossless |
+
+---
+
+## 🧾 Known remaining items (recorded honestly)
+
+There are **no blocking issues** in this release. The following small items are known and accepted or
+scheduled; all can be handled incrementally:
+
+1. **Canvas document contract caps at 200 nodes / 400 edges** (`canvasDocSchema`): beyond that
+   `validateCanvasDoc` returns null and `persistNow` returns early — **the canvas looks fine but stops
+   persisting, with no warning** (measured in T3). An honest over-limit notice is the suggested follow-up.
+2. **i18n covers “key copy” only**: node internals, Skill Market / memory graph / connectors / 3D stage deep
+   copy are still Chinese; scope and rationale in [docs/i18n.md](./docs/i18n.md).
+3. **Overseas engines (Runway / Luma) await a real environment**: contracts and fixtures are locked, but no
+   real render has been run through a live account.
+4. **Kling / Jimeng live rendering** awaits a real environment (`npm run verify:providers`).
+5. **3D stage animation presets lack “wave / turn”**: the bundled CC0 clip library has no matching clips —
+   substituted honestly rather than faked.
+6. **Edge extraction is O(n²)** (`shapes.find` inside `editorPageToCanvasDraft`): persistence cost grows with
+   scale; a single Map index is the suggested fix.
+7. **Skill Market renders everything**: 100 entries produce 1340 DOM nodes with no virtualization.
+8. **tldraw free-tier watermark + 5-second production render stop**: requires buying a license or swapping the
+   canvas engine (the user accepted this; no bypass is provided).
+9. **`npm run test:node` occasionally flaked with ECONNRESET**: fixed on the test side with `duplex:'half'`
+   (four consecutive full runs, zero failures).
 
 ---
 

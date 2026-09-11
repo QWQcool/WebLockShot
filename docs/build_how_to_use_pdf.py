@@ -42,7 +42,13 @@ def _default_edge() -> str:
 
 EDGE = _default_edge()
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC_MD = os.path.join(HERE, "HOW_TO_USE.md")
+# 一主两分：主手册 + 画布分册 + 带货分册，按顺序合并排版成一本 PDF
+SRC_MDS = [
+    os.path.join(HERE, "HOW_TO_USE.md"),
+    os.path.join(HERE, "HOW_TO_USE.canvas.md"),
+    os.path.join(HERE, "HOW_TO_USE.commerce.md"),
+]
+SRC_MD = SRC_MDS[0]
 OUT_HTML = os.path.join(HERE, "HOW_TO_USE.html")
 DEFAULT_PDF = os.environ.get(
     "WLS_PDF_OUT",
@@ -209,13 +215,26 @@ def md_to_html(text: str) -> str:
 
 
 def main() -> None:
+    # Windows 控制台默认 GBK：文档里含 ‹ › 等字符会让 print 抛 UnicodeEncodeError，
+    # 统一改为 UTF-8 + 替换不可编码字符（只影响日志，不影响 PDF 内容）
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 - 老版本 Python 无 reconfigure
+        pass
     out_pdf = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PDF
-    text = open(SRC_MD, encoding="utf-8").read()
+    # 合并前两份时去掉各分册自带的「返回主手册」跳转块后拼接（保留标题层级）
+    parts = []
+    for i, path in enumerate(SRC_MDS):
+        if not os.path.exists(path):
+            print("[skip] 缺少分册:", path)
+            continue
+        parts.append(open(path, encoding="utf-8").read())
+    text = "\n\n<div style=\"break-before:page\"></div>\n\n".join(parts)
     body = md_to_html(text)
     title = "WebLockShot 完整使用指南"
     html = TEMPLATE.format(title=title, css=CSS, body=body)
     open(OUT_HTML, "w", encoding="utf-8").write(html)
-    print("[html] ->", OUT_HTML)
+    print("[html] ->", OUT_HTML, f"（合并 {len(parts)} 份 Markdown）")
 
     url = "file:///" + urllib.parse.quote(os.path.abspath(OUT_HTML).replace("\\", "/"))
     r = subprocess.run([EDGE, "--headless", "--disable-gpu", "--no-pdf-header-footer",

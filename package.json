@@ -26,6 +26,7 @@
     "perf": "node scripts/perf-canvas.mjs",
     "a11y": "node scripts/a11y-canvas.mjs",
     "degrade": "node scripts/degrade-matrix.mjs",
+    "shots": "node scripts/capture-screenshots.mjs",
     "test:chaos": "node scripts/chaos-smoke.mjs",
     "verify:providers": "node --experimental-strip-types scripts/verify-providers.mjs"
   },

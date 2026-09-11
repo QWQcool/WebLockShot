@@ -1,11 +1,32 @@
-# WEB锁镜 WebLockShot (v2.3)
+# WEB锁镜 WebLockShot (v2.4)
 
 > 🌐 **English**: [README.en.md](./README.en.md) · 使用指南英文版：[docs/HOW_TO_USE.en.md](./docs/HOW_TO_USE.en.md)
 
-面向电商带货与竖屏创作者的 **多 Agent 工业级视频生成与剪映工程交付工作台**，现已升级为 **Agent 创意画布**驱动的多元化创意工作室。
+**一个浏览器里跑完的创意生产工作台。** 主线是 **🎨 Agent 创意画布**（自由创作空间，v2.4 默认入口）；
+次线是 **🛒 电商带货全链路**（成熟稳定，六步工业化流程）；**🎭 剧情短剧粗剪台**为 legacy 模式
+（保留兼容与零回归，新创作建议走画布）。
 
-- **🎨 Agent 创意画布（新 · 自由创作空间）**：tldraw 无限画布上的第三工作模式。对话栏一句话（或五类场景模板：带货短视频/品牌视觉/短剧分镜/游戏宣传/App 界面）→ LLM/演示编排自动布置 Agent 节点拓扑（可一键整批撤销）→ 脚本创编（ScriptWriter+Critic）→ 9:16 GSAP 分镜预演 → Mock 多引擎逐镜出片（钱包两阶段事务上画布）→ 产物卡 → 剪映草稿 zip 一键打包。画布框选可**沉淀为 Skill 工作流包**（manifest JSON：节点拓扑 + 参数槽位 + 输入/输出声明，产物与大资产自动剥离），导入即重建节点组只填新输入（预置「六步爆款带货流」「单图快速出片」两个官方 Skill）；记忆系统按结构/钩子/品类胜率（Laplace 聚合）为脚本采样加权。数据流连线带类型契约校验，全画布 localStorage 持久化 + 多标签页同步。定位多元化创意工作室，电商带货只是场景之一。
-- **🛒 电商全链路六步爆款工作流**：商品多模态导入（链接/图片/视频抽帧）→ 5 大爆款结构与黄金 3 秒钩子库（JSON 数据资产 + 品类路由 + 胜率加权采样）→ 双 Agent 剧本创编与对立面评审 → `sell-stage` 9:16 GSAP 动态分镜预演 → 视觉提示词方案编译 → 任务队列并发调度出片 → 剪映草稿工程声画字微秒级对齐导出（含完整素材 zip 包）。
+- **🎨 Agent 创意画布（主线 · 默认入口）**：tldraw 无限画布上的自由创作空间。对话栏一句话（或开场层五类场景
+  tab / 六类创作场景画廊）→ LLM 或演示编排自动布置 Agent 节点拓扑（可一键整批撤销）→ 脚本创编
+  （ScriptWriter+Critic）→ 9:16 GSAP 分镜预演 → 多引擎逐镜出片（钱包两阶段事务上画布）→ 产物卡 →
+  剪映草稿 zip 一键打包。画布框选可**沉淀为 Skill 工作流包**（manifest JSON：节点拓扑 + 参数槽位 +
+  输入/输出声明，产物与大资产自动剥离），导入即重建节点组只填新输入（预置「六步爆款带货流」「单图快速出片」
+  两个官方 Skill）；记忆系统按结构/钩子/品类胜率（Laplace 聚合）为脚本采样加权。数据流连线带类型契约校验，
+  画布文档 localStorage 持久化 + 多标签页同步。**新增（三期）**：
+  - **🖌️ 指哪改哪（局部重绘）**：产物卡 → 笔刷/框选涂抹 → ComfyUI inpaint（FLUX.1 Fill / SD inpainting 预设）
+    或离线演示重绘（如实标注「非真实生成」）；产物以**版本堆叠**挂卡（上限 20 版，可回退继续叠加）
+  - **🎥 3D 运镜台**：内置 Quaternius CC0 素体（45 个真实动画片段）+ 六套程序化场景预设 + 多机位 +
+    关键帧轨迹 + 首/尾帧导出，接「视频生成」单镜直出或「分镜预演」自由镜数分镜（**本地预演 · 0 灵感币**）
+  - **🔌 连接器面板**：7 个推荐连接器卡片位 + 自定义连接器；协议层如实标注（纯前端模式 / 仅接口）
+  - **🧩 Skill 市场**：官方内置 + 已安装统一管理（安装/启停/卸载/发布到本地）
+  - **🧠 记忆图谱**：真实回流记录的可视化（空态不摆样例）；双模（伴生服务 sqlite / 纯前端 IndexedDB）如实标注
+  - **🗺️ 小地图 + 多画布项目**：右下角小地图导航；多项目独立存储，老单画布文档**零丢失迁移**
+  - **🤖 MCP 双向（可选依赖）**：本地 Agent 可读取画布拓扑并反向建节点/连线（未装 SDK 时 `mcp:off` + 501 指引）
+- **🛒 电商全链路六步爆款工作流（次线 · 成熟稳定）**：商品多模态导入（链接/图片/视频抽帧）→ 5 大爆款结构与
+  黄金 3 秒钩子库（JSON 数据资产 + 品类路由 + 胜率加权采样）→ 双 Agent 剧本创编与对立面评审 → `sell-stage`
+  9:16 GSAP 动态分镜预演 → 视觉提示词方案编译 → 任务队列并发调度出片 → 剪映草稿工程声画字微秒级对齐导出
+  （含完整素材 zip 包）。**引擎 6 选 1**：Mock / 快手可灵 / 字节即梦 / 🔥 ComfyUI 私有算力 /
+  **Runway（海外 · 契约先行）** / **Luma（海外 · 契约先行）**。
 - **⚡ 单 Agent 极速直出模式**：高转化提示词预设库、AI 运镜智能润色扩写、多模态参考底图/视频导入、1~60s 自由时长微调。
 - **🤖 多 Agent 协同编导研讨室**：接入真实 LLM 时进行导演 + 运镜 + 质检 + 调度四智体结构化推演并给出真实质检评分；未配置 API Key 时诚实标注「演示动画模式 · 评分非真实」，绝不伪造评分。
 - **📊 数据反馈闭环**：回流看板手动录入平台数据（3 秒完播率/完播率/转化），按结构/钩子/品类聚合胜率（Laplace 平滑），ScriptWriter 采样按真实胜率加权。
@@ -14,7 +35,8 @@
 - **📥 剪映 / CapCut 电脑版草稿交付**：视频轨 + 旁白音轨 + 花字字幕轨微秒级对齐的 `draft_content.json` 工程文件与完整素材 zip 包（视频素材 + 使用说明），解压放入剪映草稿目录即可导入；伴生服务在线时界面自动出现「发送到伴生服务落盘」按钮，一键解压到本地草稿目录；画布交付节点同样支持纯前端 zip 打包下载。
 - **🔊 Edge-TTS 语音合成（伴生服务）**：`POST /api/tts` 调用 Edge TTS（纯 JS 实现，无需 Python / API Key）合成旁白 mp3 落盘，浏览器直接回读；开关 `WLS_TTS`，默认开启。
 - **🎬 ffmpeg 服务端成片合成（伴生服务）**：`POST /api/render` 将分镜视频 + TTS 音轨 + 可选字幕合成为最终 mp4（音轨自动重编码、字幕软封），落盘后可直接回读下载；开关 `WLS_FFMPEG=auto` 自动探测 ffmpeg，镜像已内置。
-- **🎭 剧情短剧粗剪台（保留兼容）**：内置《门缝》《未读》《13层》6 镜剧情预演与提示词包导出，零回归。
+- **🌐 中英双语界面**：顶栏「🌐 中文 / EN」或设置面板「界面语言」一键切换并持久化，默认中文零回归。
+- **🎭 剧情短剧粗剪台（legacy）**：内置《门缝》《未读》《13层》6 镜剧情预演与提示词包导出，保留兼容、零回归；新创作建议走 Agent 画布。
 
 > 📖 **详尽实战手册请查阅**：[docs/HOW_TO_USE.md](./docs/HOW_TO_USE.md)（包含从零安装、ComfyUI 部署、剪映导入到踩坑排错的完整教程）。
 
@@ -37,30 +59,57 @@ npm install
 # 2. 启动本地开发服务 (默认监听 5173，自动开启 ComfyUI 反向代理)
 npm run dev
 
-# 3. 运行质量检测 (116 项自动化测试：node 101 + vitest UI 15)
+# 3. 运行质量检测（node 单测 + vitest UI 冒烟）
 npm test
 
 # 4. 生产打包验证
 npm run build
 ```
 
+> 完整测试与验证体系见下方「🧪 自动化测试验证」：`npm test` / `npm run e2e`（画布 E2E）/
+> `npm run test:coverage`（覆盖率基线）/ `npm run perf`（性能基准）/ `npm run a11y`（跨浏览器 + a11y）/
+> `npm run degrade`（降级迁移矩阵）/ `npm run test:chaos`（边缘情况冒烟）。
+
 ---
 
-## 🎨 Agent 创意画布（v2.1 新增模式）
+## 🎨 Agent 创意画布（主线）
 
-顶栏「🎨 Agent 画布」或深链 `?view=canvas` 进入（tldraw 懒加载独立 chunk，不影响带货/短剧主包）。画布规划详见 [CANVAS_PLAN.md](./CANVAS_PLAN.md)。
+**默认入口**：无参数访问即进入画布；深链 `?view=canvas` 直达，`?view=sell` / `?view=drama` 保留
+（tldraw 懒加载独立 chunk，不影响带货/短剧主包）。画布规划详见 [CANVAS_PLAN.md](./CANVAS_PLAN.md)，
+使用指南见 [docs/HOW_TO_USE.canvas.md](./docs/HOW_TO_USE.canvas.md)。
 
-**当前能力（一期 A+B + 二期 A/B 已交付）**：
-- **自由创作空间**：9 种 Agent 节点（需求 Brief / 素材导入 / 脚本创编 / 分镜预演 / 视频生成 / 局部重绘 / 图像生成† / 3D 运镜台† / 成片交付）自由摆放连线，画布文档 localStorage 持久化 + 多标签页同步（† 为后续阶段占位，灰态诚实标注）
-- **🖌️ 指哪改哪（v2.2 新增 · 局部重绘）**：产物卡连入重绘节点 → 笔刷涂抹 / 矩形框选涂抹重绘区（与源图同尺寸 mask PNG 落档，刷新可恢复继续编辑）→ 输入重绘指令执行 inpaint：ComfyUI 在线走真实工作流（FLUX.1 Fill / SD inpainting 预设 + 自定义 JSON，新增图像 inpaint Provider 与视频链路完全隔离），离线自动兜底演示重绘（mask 区域马赛克变换，「🧪 演示重绘 · 非真实生成」诚实标注）；重绘产物以**版本堆叠**挂在产物卡（‹ v k/N › 切换回退，上限 20 版，回退后可继续叠加重绘）
+![画布主界面](./docs/screenshots/16_canvas_workbench.png)
+
+**当前能力（一期 A+B、二期 A/B、三期 C/D/E 已交付）**：
+- **自由创作空间**：10 种 Agent 节点（需求 Brief / 素材导入 / 图像生成 / 脚本创编 / 分镜预演 / 视频生成 / 产物卡 / 局部重绘 / 3D 运镜台 / 成片交付）自由摆放连线，画布文档 localStorage 持久化 + 多标签页同步
+- **开场层 + 创作场景画廊**：首访叠加图1 风格开场层（五类场景 tab + 大输入卡 + 连接器条）；工具条「🎬 创作场景」提供六类场景卡片（品牌设计 / 电商物料 / 影视文娱 / 游戏内容 / 产品 UI-UX / 宣传物料），点击可预填对话栏或一键编排
 - **对话栏编排**：一句话或场景模板 → 无 Key 走确定性演示编排（「🧪 演示编排 · 非真实 LLM」标注），配置 Key 走真实 LLM 结构化拓扑（zod 校验 + 降级诚实标注）；整批节点支持「↩️ 撤销本次编排」与 Ctrl+Z 一次回滚
-- **🧩 Skill 沉淀与复用（v2.3 新增）**：画布框选 ≥2 节点 →「📦 导出 Skill」产出 manifest JSON（节点拓扑 + zod 校验的参数槽位白名单 + 输入/输出声明；产物引用、maskRef、导入历史等设备本地产物字段自动剥离，跨设备干净可用）→「📥 导入 Skill」在新画布重建节点组（节点 id 全量重映射与现有节点共存，Ctrl+Z 精确回滚导入批次），入口节点高亮「📥 填新输入」，其余参数延续——换张商品图/换句 brief 即可重跑同拓扑。预置 2 个官方 Skill：**六步爆款带货流**（brief→product→script→storyboard→generate→deliver）与**单图快速出片**（product→generate 直连，「⚡ 单图直出 · 演示引擎」单镜生成 + 诚实标注）
-- **🧠 记忆系统（v2.3 新增 · 结构化，不玄学）**：回流记录（结构与回流看板同源）经**同一 Laplace 聚合**（`computeWinRates`，全站只此一份，不另造）得出按结构/钩子/品类胜率，画布脚本创编节点采样时自动加权并展示「📊 本条建议来自你的历史数据」徽章（无历史数据如实不显示）。双模诚实运行：伴生服务 + `WLS_STORAGE=sqlite` 时记录走 `/api/memory/records`（healthz 能力位 `memory:'sqlite'`）；纯前端模式降级本机 IndexedDB 并标注「记忆仅存本地」。设置面板可查看（条数 + 三桶胜率 top）与一键清除（清除范围明示，清除后胜率回退 0.5 先验）
-- **节点即管线**：脚本创编复用 ScriptWriter+Critic（演示模式 Critic 评分标注「非真实」）、分镜预演内嵌 GSAP 9:16 舞台（零改动复用 sell 模式组件）、视频生成走 `useVideoPipeline` 全链路（钱包两阶段事务/熔断/幂等上画布，钱包账本与六步工作台同源）
-- **产物与交付**：出片产物自动成卡（视频转存 IndexedDB，`blob:` 拒绝持久化），素材导入三入口（图片上传/视频抽帧/链接存档），交付节点一键打包剪映草稿 zip（纯前端下载）+ 内嵌钱包余额显示
+- **🖌️ 指哪改哪（局部重绘）**：产物卡连入重绘节点 → 笔刷涂抹 / 矩形框选涂抹重绘区（与源图同尺寸 mask PNG 落档，刷新可恢复继续编辑）→ 输入重绘指令执行 inpaint：ComfyUI 在线走真实工作流（FLUX.1 Fill / SD inpainting 预设 + 自定义 JSON，与视频链路完全隔离），离线自动兜底演示重绘（「🧪 演示重绘 · 非真实生成」诚实标注）；重绘产物以**版本堆叠**挂在产物卡（‹ v k/N › 切换回退，上限 20 版）
+- **🧩 Skill 沉淀与复用**：画布框选 ≥2 节点 →「📦 导出 Skill」产出 manifest JSON（节点拓扑 + zod 参数槽位白名单 + 输入/输出声明；产物引用、maskRef、导入历史等本地产物字段自动剥离）→「📥 导入 Skill」在新画布重建节点组（id 全量重映射，Ctrl+Z 精确回滚），入口节点高亮「📥 填新输入」。预置 2 个官方 Skill：**六步爆款带货流**、**单图快速出片**（product→generate 直连，「⚡ 单图直出 · 演示引擎」+ 诚实标注）
+- **🧩 Skill 市场**：官方内置 + 已安装统一管理（安装 / 启停 / 卸载 / 发布到本地）；**不伪造下载量与社区数据**，「发布」= 下载 manifest JSON 并明确标注「无社区发布通道」
+- **🧠 记忆系统 + 记忆图谱**：回流记录经**同一 Laplace 聚合**（`computeWinRates`，全站只此一份）得出按结构/钩子/品类胜率，脚本节点采样加权并展示「📊 本条建议来自你的历史数据」徽章。双模诚实运行：伴生服务 + `WLS_STORAGE=sqlite` 走 `/api/memory/records`；纯前端模式降级本机 IndexedDB 并标注「记忆仅存本地」。图谱为空时如实空态（**永不摆样例数据**）
+- **🎥 3D 运镜台**：内置 Quaternius CC0 素体（45 个真实动画片段）+ 六套程序化场景预设（商品台 / 影棚 / 客厅 / 卧室 / 户外台阶 / 展台）+ 多机位 + 关键帧轨迹 + 首/尾帧导出；接「视频生成」单镜直出或「分镜预演」自由镜数分镜。**本地预演 · 0 灵感币**
+- **🔌 连接器面板**：7 个推荐连接器卡片位 + 自定义连接器；纯前端模式下如实标注「无功能可用」，伴生服务在线时标注「仅接口」
+- **🗺️ 小地图 + 多画布项目**：右下角小地图（Canvas2D 自绘，点击/拖动导航）；多项目独立存储，**老单画布文档零丢失迁移**（老键保留作安全网）
+- **🤖 MCP 双向（可选依赖）**：本地 Agent 可读取画布拓扑并反向建节点/连线；未装 `@modelcontextprotocol/sdk` 时 `/healthz` 报 `mcp:'off'` + 全部 501 安装指引（零依赖现状不变）
+- **节点即管线**：脚本创编复用 ScriptWriter+Critic、分镜预演内嵌 GSAP 9:16 舞台（零改动复用 sell 组件）、视频生成走 `useVideoPipeline` 全链路（钱包两阶段事务 / 熔断 / 幂等上画布）
+- **产物与交付**：出片产物自动成卡（视频转存 IndexedDB，`blob:` 拒绝持久化），素材导入三入口（图片上传 / 视频抽帧 / 链接存档），交付节点一键打包剪映草稿 zip + 内嵌钱包余额显示
 - **数据流契约**：连线带类型兼容校验（如 `分镜预演→视频生成` 合法、逆向拒绝并提示原因），边 id 跨刷新稳定，刷新后箭头自动物化恢复
 
-**诚实边界**：可灵/即梦在画布模式暂未开放（请走带货工作台，未配 Key 时如实禁用）；Mock 引擎 0 灵感币；ComfyUI 离线时局部重绘自动降级演示模式（如实标注非真实生成）；单图直出仅 Mock/演示引擎（真实引擎待真实环境）；记忆系统纯前端模式仅存本机且如实标注；图像生成/3D 运镜台为后续阶段占位；tldraw 免费版带 License 水印（商用 License 决策待定）。
+**诚实边界（逐条如实标注，不夸大）**：
+- **可灵 / 即梦 / ComfyUI 在画布模式暂未开放**（请走带货工作台）；画布出片走 Mock / 演示引擎
+- **「单图直出」与 3D 台出片仅演示引擎**：真实引擎链路待真实环境验证
+- **ComfyUI 离线**时局部重绘自动降级演示模式并标注「非真实生成」
+- **记忆纯前端模式仅存本机**（IndexedDB），接入 `WLS_STORAGE=sqlite` 伴生服务后升级为服务端记忆
+- **记忆图谱 / Skill 市场 / 记忆空态一律不摆样例数据、不伪造下载量**
+- **tldraw 免费版带 License 水印**，且**生产环境未配置 license key 时渲染约 5 秒后停止**——本项目接受该限制，
+  不包含任何绕过许可校验或去水印的手段（详见 [NOTICE](./NOTICE)）
+- **海外引擎 Runway / Luma 为契约先行**：请求/响应形状按官方文档实现并有 fixtures 契约测试，但
+  **尚未在真实账号下跑通出片**（无 Key 时不发起任何请求）
+- **i18n 覆盖「顶栏 / 工具条 / 节点面板 / 对话栏 / 开场层 / 设置面板骨架」**，节点内部业务控件与
+  部分覆盖层深层文案仍为中文（详见 [docs/i18n.md](./docs/i18n.md)）
+- **伴生服务的连接器 / MCP 等能力目前只有 API，没有画布内 UI 开关**（D8 的 MCP 徽章除外），
+  需要按 [docs/mcp.md](./docs/mcp.md) / [docs/connectors.md](./docs/connectors.md) 直调接口
 
 ## 🖥️ 本地伴生服务（npx 形态，可选）
 
@@ -145,7 +194,8 @@ docker compose up --build
 ```bash
 curl http://localhost:5174/healthz
 # {"ok":true,"version":"0.1.0","storage":"memory","uptimeSec":2,"node":"v22.x",
-#  "keyMode":"passthrough","llmProxy":"off","sentry":"off","tts":"on","ffmpeg":"on"}
+#  "keyMode":"passthrough","llmProxy":"off","sentry":"off","tts":"on","ffmpeg":"on",
+#  "memory":"off","connectors":"interface","mcp":"off"}
 ```
 
 > `tts` / `ffmpeg` 为能力位：前端据此决定是否显示「发送到伴生服务落盘」等新按钮（探测失败 = 纯前端模式，行为与现状一致）。
@@ -291,26 +341,42 @@ curl -X POST http://localhost:5174/api/render \
 ```
 WebLockShot/
 ├── docs/
-│   └── HOW_TO_USE.md                 # 完整使用指南与工业化实操手册
+│   ├── HOW_TO_USE.md                 # 主手册（定位 / 快速上手 / 三线导航 / 通用能力）
+│   ├── HOW_TO_USE.canvas.md          # 画布线分册（一主两分）
+│   ├── HOW_TO_USE.commerce.md        # 带货线分册（含短剧 legacy）
+│   ├── coverage.md / perf.md / a11y.md / degrade-matrix.md   # T 线实测基线
+│   ├── i18n.md / connectors.md / mcp.md                     # i18n 范围 / 连接器 / MCP 契约
+│   ├── screenshots/                  # 实机截图（npm run shots 生成）
+│   └── build_how_to_use_pdf.py       # 主手册 → HTML → A4 PDF
 ├── scripts/
+│   ├── e2e-canvas.mjs                # T1 画布 E2E 套件
+│   ├── coverage-canvas.mjs           # T2 覆盖率基线
+│   ├── perf-canvas.mjs               # T3 性能基准
+│   ├── a11y-canvas.mjs               # T4 跨浏览器 + axe 扫描
+│   ├── degrade-matrix.mjs            # T5 降级 / 迁移矩阵
+│   ├── capture-screenshots.mjs       # 收官实机截图
+│   ├── lib/browser-env.mjs           # 上述脚本共用环境（Playwright 解析 / 伴生服务）
+│   ├── chaos-smoke.mjs               # 边缘情况冒烟
 │   └── optimize-preset-images.mjs    # 预设图片瘦身工具 (sharp)
-├── server/                           # 零依赖伴生服务 (静态托管 + API 反代 + 剪映草稿落盘 + 记忆记录 API)
+├── server/                           # 零依赖伴生服务 (静态托管 + API 反代 + 剪映草稿落盘 + 记忆记录 API + MCP 桥接)
 ├── src/
 │   ├── ai/                           # AI 智体层 (ScriptWriter, ScriptCritic, PromptPolisher, Retry)
 │   ├── assets/
 │   │   ├── hooks/                    # 爆款结构与钩子句式 JSON 数据资产（品类/情绪轴/胜率元数据）
 │   │   └── presets/                  # 商业 Mock 预设资产与产品图源
-│   ├── canvas/                       # Agent 创意画布 (CanvasDoc 契约, tldraw shape, 序列化, 持久化, 节点 Body, Skill manifest, 记忆源)
+│   ├── canvas/                       # Agent 创意画布 (CanvasDoc 契约, tldraw shape, 序列化, 持久化, 节点 Body, Skill manifest, 记忆源, 3D 台契约, MCP 操作批)
 │   ├── director/                     # 导演中枢与执行引擎 (ExecutorEngine, StoryboardNode, VisualizerNode)
 │   ├── domain/                       # 领域驱动核心 (Wallet, FSM, Idempotency, Feedback, PollingConfig, ShotJob)
 │   ├── export/                       # 导出引擎 (剪映草稿三轨对齐 + 零依赖 zip 打包)
 │   ├── hooks/                        # 共享管线 Hook (useVideoPipeline, useRevocableObjectUrl)
-│   ├── media/                        # 媒体提供商 (ComfyUI, Kling, Jimeng, Mock, Audio TTS, AssetSize)
+│   ├── i18n/                         # 中英字典 + 语言 store（默认中文零回归）
+│   ├── media/                        # 媒体提供商 (ComfyUI, Kling, Jimeng, Runway, Luma, Mock, Audio TTS, AssetSize)
 │   ├── persist/                      # IndexedDB 资产存储 (base64 大资产外移)
-│   └── ui/                           # React 界面层 (WorkbenchHeader, SellWorkbench, Studios, FeedbackDashboard, Modals, canvas/)
+│   └── ui/                           # React 界面层 (WorkbenchHeader, SellWorkbench, Studios, FeedbackDashboard, Modals, canvas/, stage3d/)
 ├── vite.config.ts                    # Vite 构建配置 + API 代理 + vitest 配置
 ├── start-weblockshot.bat             # Windows 一键启动 (装依赖/构建/启动伴生服务)
 ├── CANVAS_PLAN.md                    # Agent 创意画布规划（一期~三期切片规格与验收标准）
+├── LICENSE / NOTICE                  # MIT + 依赖/素材许可如实清单
 └── package.json                      # 脚本定义与自动化测试配置
 ```
 
@@ -318,7 +384,7 @@ WebLockShot/
 
 ## 🧪 自动化测试验证
 
-本项目拥有完善的自动化测试保障，执行 `npm test` 验证（node 单测 234 项 + vitest UI 冒烟 18 项）：
+本项目拥有完善的自动化测试保障，执行 `npm test` 验证：
 ```bash
 > weblockshot@0.1.0 test
 # 提示词智能润色 Agent（含 LLM 输出 zod 校验）
@@ -333,9 +399,11 @@ WebLockShot/
 # 剪映草稿工程三轨微秒对齐 + 真实导入字段 + zip 打包往返
 # 品类元数据路由与胜率加权采样 / 回流 Laplace 聚合
 # TTS 引擎自适应语速算法
-# ComfyUI / 可灵 / 即梦 Provider（含网络失败显式抛错、未就绪资产不伪造）
+# ComfyUI / 可灵 / 即梦 / Runway / Luma Provider（含网络失败显式抛错、未就绪资产不伪造、无 Key 不发请求）
+# 画布契约 / Skill manifest / 3D 摆台 meta·动作·场景 / 记忆源 / 多画布存储 / 小地图 / MCP 操作批
+# i18n 字典（中英键对齐 / 无漏译 / 插值与持久化）
 # UI 冒烟（vitest + testing-library）：钱包交互 / 熔断徽章三态 / 共享管线
-# tests 362 (node) + 18 (vitest), fail 0
+# tests 400 (node) + 18 (vitest), fail 0
 ```
 
 ### 画布 E2E 套件（`npm run e2e`）
@@ -373,6 +441,41 @@ chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）�
 实机验证六类能力缺失路径（旧单画布迁移、无 WebGL、无伴生服务、无 LLM Key、
 `WLS_STORAGE=memory|sqlite`、ComfyUI 离线）是否优雅降级并如实标注，
 矩阵见 [`docs/degrade-matrix.md`](docs/degrade-matrix.md)（当前 **6/6 通过**）。
+
+### 实机截图（`npm run shots`）
+
+`scripts/capture-screenshots.mjs` 驱动**生产构建 + 伴生服务**真实操作后截图，落盘
+`docs/screenshots/`（画布 11 张 + 带货 1 张 + 短剧 1 张 + 既有 14 张），README / 使用指南 / PDF 全部引用实机图，
+不使用设计稿或手绘 mock。记忆图谱「有数据」截图的图注已如实写明「演示数据由截图脚本写入本地 IndexedDB」。
+
+### T 线结论（测试工程化 · 一句话汇总）
+
+| 切片 | 结论 |
+|---|---|
+| T1 E2E 固化 | `npm run e2e` 13 步全过（真实鼠标路径 + 隔离 storage）；Playwright 缺失时优雅跳过 exit 0 |
+| T2 覆盖率基线 | 关键纯函数层 **10/10 ≥ 80%**（补齐 `feedback.ts` 的 IndexedDB 分支，100% 行覆盖）；不伪造覆盖率 |
+| T3 性能基准 | 200 节点 54.5fps / 500 节点 25.7fps；记忆图谱 500 记录 79ms；3D chunk 957kB / 视口就绪 352ms；Skill 市场 100 项 86ms。**发现文档契约上限 200 节点、超限静默不落盘**（已记入优化建议，本期只测不改） |
+| T4 跨浏览器 + a11y | chromium / webkit 核心链路各 **5/5**；axe 严重项从 6 处**清零**（修 tablist 语义 + 8 处对比度），四态扫描 0 违规 |
+| T5 降级 / 迁移矩阵 | 六类能力缺失路径 **6/6** 优雅降级、标注诚实、无崩溃无白屏；旧单画布迁移零丢失 |
+
+---
+
+## 🧾 遗留台账（如实记录，不隐藏）
+
+当前版本**没有阻塞性遗留**；以下为已知的、已接受或已排期的小项，全部可在后续增量处理：
+
+1. **画布文档契约上限 200 节点 / 400 边**（`canvasDocSchema`）：超限时 `validateCanvasDoc` 返回 null、
+   `persistNow` 提前返回，**画布看起来正常但不再落盘且无提示**（T3 实测）。建议后续加超限如实提示。
+2. **i18n 覆盖为「关键文案」**：节点内部业务控件、Skill 市场 / 记忆图谱 / 连接器 / 3D 台深层文案仍为中文；
+   范围与原因见 [docs/i18n.md](./docs/i18n.md)。
+3. **海外引擎（Runway / Luma）待真实环境验证**：契约与 fixtures 已锁定，但未在真实账号跑通出片。
+4. **可灵 / 即梦真实出片连通**待真实环境（`npm run verify:providers`）。
+5. **3D 台动作预设缺「挥手 / 转身」**：内置 CC0 素体动画库无对应片段，**如实替代、不伪造**。
+6. **边提取为 O(n²)**（`editorPageToCanvasDraft` 内 `shapes.find` 线性查找）：节点/边规模增大时落盘耗时放大，
+   建议改为一次 Map 索引。
+7. **Skill 市场全量渲染**：100 项渲染 1340 个 DOM 节点，未做虚拟列表（规模继续增长时建议窗口化）。
+8. **tldraw 免费版水印 + 生产 5 秒停渲染**：需购买 license 或替换画布引擎（用户已拍板接受，不做绕过）。
+9. **`npm run test:node` 曾偶发 ECONNRESET 抖动**：已用 `duplex:'half'` 从测试侧消除（连续 4 次全量跑 0 失败）。
 
 ---
 

@@ -127,49 +127,43 @@ figcaption {
 a { color: #4f46e5; }
 </style></head>
 <body>
-<h1 id="weblockshot">WebLockShot 完整使用指南与工业化实战手册</h1>
+<h1 id="weblockshot">WebLockShot 完整使用指南与工业化实战手册（主手册）</h1>
 <blockquote>
-<p>本指南旨在帮助电商卖家、带货主播、编导创作者及 AI 视频开发人员，快速掌握 WebLockShot 的核心链路、双工作室工作流、私有化 ComfyUI 算力集成，以及剪映 / CapCut 自动化草稿对齐出片。</p>
+<p>🌐 <strong>English edition</strong>: <a href="./HOW_TO_USE.en.md">HOW_TO_USE.en.md</a></p>
+<p>本手册采用<strong>一主两分</strong>结构：
+- <strong>主手册（本文）</strong>：定位、快速上手、三线导航、通用能力（伴生服务 / Docker / PWA / 小程序 / 可靠性 / FAQ）
+- <strong>分册一</strong>：<a href="./HOW_TO_USE.canvas.md">Agent 创意画布（主线）</a> —— 画布全部能力与操作
+- <strong>分册二</strong>：<a href="./HOW_TO_USE.commerce.md">电商带货全链路（含短剧 legacy）</a> —— 六步工作流、双工作室、引擎配置、剪映交付、回流看板</p>
 </blockquote>
 <hr />
 <h2 id="_1">目录</h2><nav class="toc">
 <ul>
 <li><a href="#序介绍与定位">（序）介绍与定位</a></li>
 <li><a href="#一快速上手免安装在线版-vs-团队私有部署">（一）快速上手：免安装在线版 vs 团队私有部署</a></li>
-<li><a href="#二电商全链路六步爆款工作流">（二）电商全链路六步爆款工作流</a></li>
-<li><a href="#step-0商品信息多模态导入">Step 0：商品信息多模态导入</a></li>
-<li><a href="#step-15-大爆款结构与黄金-3-秒钩子选择">Step 1：5 大爆款结构与黄金 3 秒钩子选择</a></li>
-<li><a href="#step-2双-agent-剧本编导与对立面评审">Step 2：双 Agent 剧本编导与对立面评审</a></li>
-<li><a href="#step-3916-gsap-动态分镜视觉预演">Step 3：9:16 GSAP 动态分镜视觉预演</a></li>
-<li><a href="#step-4视觉提示词工程编译">Step 4：视觉提示词工程编译</a></li>
-<li><a href="#step-5串行任务队列与神经渲染调度">Step 5：串行任务队列与神经渲染调度</a></li>
-<li><a href="#step-6连续审片tts-口播与剪映草稿对齐导出">Step 6：连续审片、TTS 口播与剪映草稿对齐导出</a></li>
-<li><a href="#三双独立工作室模式">（三）双独立工作室模式</a></li>
-<li><a href="#模式-a单-agent-极速直出模式">模式 A：单 Agent 极速直出模式</a></li>
-<li><a href="#模式-b多-agent-协同编导研讨室">模式 B：多 Agent 协同编导研讨室</a></li>
-<li><a href="#四视频供应商配置与-comfyui-自建私有算力指南">（四）视频供应商配置与 ComfyUI 自建私有算力指南</a></li>
-<li><a href="#1-快手可灵-kling-api-直连">1. 快手可灵 (Kling) API 直连</a></li>
-<li><a href="#2-字节即梦-jimeng-api-直连">2. 字节即梦 (Jimeng) API 直连</a></li>
-<li><a href="#3-comfyui-本地局域网私有-gpu-算力集群wan-21--cogvideox">3. ComfyUI 本地/局域网私有 GPU 算力集群（Wan 2.1 / CogVideoX）</a></li>
-<li><a href="#五剪映--capcut-电脑版草稿工程导入与声画自动对齐实操">（五）剪映 / CapCut 电脑版草稿工程导入与声画自动对齐实操</a></li>
-<li><a href="#剪映草稿-zip-包导入实操推荐">剪映草稿 zip 包导入实操（推荐）</a></li>
-<li><a href="#六数据反馈闭环回流看板与钩子胜率加权">（六）数据反馈闭环：回流看板与钩子胜率加权</a></li>
-<li><a href="#七本地伴生服务部署与剪映草稿一键落盘">（七）本地伴生服务部署与剪映草稿一键落盘</a></li>
-<li><a href="#八工业级可靠性体系幂等防抖状态机与两阶段钱包闭环">（八）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</a></li>
-<li><a href="#九常见问题与避坑指南faq">（九）常见问题与避坑指南（FAQ）</a></li>
-<li><a href="#十手机端使用pwa-添加到主屏幕">（十）手机端使用：PWA 添加到主屏幕</a></li>
-<li><a href="#十一docker-生产部署">（十一）Docker 生产部署</a></li>
-<li><a href="#十二小程序版轻端">（十二）小程序版轻端</a></li>
+<li><a href="#二三条产品线导航">（二）三条产品线导航</a></li>
+<li><a href="#三本地伴生服务部署与剪映草稿一键落盘">（三）本地伴生服务部署与剪映草稿一键落盘</a></li>
+<li><a href="#四工业级可靠性体系幂等防抖状态机与两阶段钱包闭环">（四）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</a></li>
+<li><a href="#五常见问题与避坑指南faq">（五）常见问题与避坑指南（FAQ）</a></li>
+<li><a href="#六手机端使用pwa-添加到主屏幕">（六）手机端使用：PWA 添加到主屏幕</a></li>
+<li><a href="#七docker-生产部署">（七）Docker 生产部署</a></li>
+<li><a href="#八小程序版轻端">（八）小程序版轻端</a></li>
+<li><a href="#九质量验证与测试工程化">（九）质量验证与测试工程化</a></li>
 </ul>
 </nav>
 <h2 id="_2">（序）介绍与定位</h2>
-<p><strong>WebLockShot</strong> 是一款面向带货短视频与电商视觉创作者的 <strong>多 Agent 闭环短视频生成平台</strong>。</p>
-<p>过去创作一条符合平台推流机制的电商爆款短视频，通常面临如下痛点：
-1. <strong>创意开销大</strong>：依赖人工编写脚本，不懂前 3 秒黄金完播率套路；
-2. <strong>多工具断层</strong>：找商品图、打磨 Midjourney/Sora 提示词、可灵网页生片、下载再拖入剪映手动拼接剪辑，全流程分散低效；
-3. <strong>接口资费昂贵且无防重保障</strong>：云端视频 API 动辄几毛到几块钱一次，网络重试或连击经常造成重复扣费；
-4. <strong>声画割裂</strong>：生成的视频片段长度固定，与配音解说字幕时长不匹配，人工拉伸音频费时费力。</p>
-<p>WebLockShot 实现了全链路整合突破：<strong>从商品卖点输入、爆款结构套用、双 Agent 剧本研讨、9:16 动态预演、自建 ComfyUI / 商业 API 渲染生成，到剪映草稿工程声画字三轨微秒自动对齐，全流程浏览器内闭环！</strong></p>
+<p><strong>WebLockShot</strong> 是一款面向竖屏短视频与电商视觉创作者的 <strong>多 Agent 闭环短视频生成平台</strong>，
+v2.4 起以 <strong>Agent 创意画布</strong>为主线（自由创作空间），同时保留成熟的<strong>电商带货全链路</strong>与 legacy 的
+<strong>剧情短剧粗剪台</strong>。</p>
+<p>过去创作一条符合平台推流机制的电商爆款短视频，通常面临如下痛点：</p>
+<ol>
+<li><strong>创意开销大</strong>：依赖人工编写脚本，不懂前 3 秒黄金完播率套路；</li>
+<li><strong>多工具断层</strong>：找商品图、打磨 Midjourney/Sora 提示词、可灵网页生片、下载再拖入剪映手动拼接剪辑，全流程分散低效；</li>
+<li><strong>接口资费昂贵且无防重保障</strong>：云端视频 API 动辄几毛到几块钱一次，网络重试或连击经常造成重复扣费；</li>
+<li><strong>声画割裂</strong>：生成的视频片段长度固定，与配音解说字幕时长不匹配，人工拉伸音频费时费力。</li>
+</ol>
+<p>WebLockShot 实现了全链路整合突破：<strong>从商品卖点输入、爆款结构套用、双 Agent 剧本研讨、9:16 动态预演、
+自建 ComfyUI / 商业 API 渲染生成，到剪映草稿工程声画字三轨微秒自动对齐，全流程浏览器内闭环！</strong>
+画布模式进一步把这条链路拆成<strong>可自由摆放、可沉淀复用、可被本地 Agent 驱动</strong>的节点拓扑。</p>
 <h3 id="vs-weblockshot">传统工作流 vs WebLockShot 核心特性对比</h3>
 <table>
 <thead>
@@ -197,13 +191,13 @@ a { color: #4f46e5; }
 <td style="text-align: left;"><strong>生片前可控预演</strong></td>
 <td style="text-align: left;">脑内想象或黑屏等待</td>
 <td style="text-align: left;">无法预演，直接开盲盒</td>
-<td style="text-align: left;"><strong>9:16 GSAP 动态分镜舞台，毫秒级模拟镜头运镜与转场节奏</strong></td>
+<td style="text-align: left;"><strong>9:16 GSAP 动态分镜舞台</strong>，毫秒级模拟镜头运镜与转场节奏</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>渲染算力支持</strong></td>
 <td style="text-align: left;">仅能在特定官方网页手动点</td>
 <td style="text-align: left;">仅对接 1 家闭源云端 API</td>
-<td style="text-align: left;"><strong>四擎并行</strong>：快手可灵、字节即梦、<strong>ComfyUI 私有显卡 (Wan 2.1)</strong>、Mock 实验画布</td>
+<td style="text-align: left;"><strong>六擎可选</strong>：Mock、可灵、即梦、<strong>ComfyUI 私有显卡 (Wan 2.1)</strong>、Runway、Luma</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>出片成本</strong></td>
@@ -215,7 +209,13 @@ a { color: #4f46e5; }
 <td style="text-align: left;"><strong>防重与资金安全</strong></td>
 <td style="text-align: left;">连击重复扣费，失败不管</td>
 <td style="text-align: left;">失败扣点不予返还</td>
-<td style="text-align: left;"><strong>工业级两阶段事务钱包</strong>（预冻结 → 成功核销 / 失败回滚）+ SHA-256 幂等防抖</td>
+<td style="text-align: left;"><strong>工业级两阶段事务钱包</strong>（预冻结 → 成功核销 / 失败回滚）+ 意图指纹幂等</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>创意复用</strong></td>
+<td style="text-align: left;">每次从零开始</td>
+<td style="text-align: left;">无沉淀机制</td>
+<td style="text-align: left;"><strong>Skill 工作流包</strong>：框选节点导出 manifest，导入即重建拓扑只填新输入</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>剪辑工程交付</strong></td>
@@ -230,8 +230,9 @@ a { color: #4f46e5; }
 <h3 id="1">1. 纯前端零配置开箱体验</h3>
 <ul>
 <li>在线访问：https://qwqcool.github.io/WebLockShot/</li>
-<li><strong>零服务端依赖、免注册登录</strong>：所有密钥安全保存在浏览器本地 <code>sessionStorage</code>，绝不上传任何第三方服务器，保护企业数据隐私。</li>
-<li><strong>免 Key 畅玩</strong>：内置 Mock 实时画布录制引擎与 0-Key AI 规则模板引擎，无需充值即可体验完整生产链路。</li>
+<li><strong>零服务端依赖、免注册登录</strong>：所有密钥安全保存在浏览器本地 <code>sessionStorage</code>，绝不上传任何第三方服务器；</li>
+<li><strong>免 Key 畅玩</strong>：内置 Mock 实时画布录制引擎与 0-Key AI 规则模板引擎，无需充值即可体验完整生产链路；</li>
+<li><strong>默认进入 Agent 画布</strong>（无参数即画布），深链 <code>?view=sell</code> / <code>?view=drama</code> 进入另两条线。</li>
 </ul>
 <h3 id="2">2. 本地自建与二次开发</h3>
 <p>适合拥有本地高配 GPU（RTX 3090/4090/A100）或需内网部署的团队：</p>
@@ -244,195 +245,62 @@ npm install
 
 # 启动本地开发服务 (支持 ComfyUI 自动反向代理)
 npm run dev
+
+# 质量检测（node 单测 + vitest UI 冒烟）
+npm test
 </code></pre>
 <p>启动后在浏览器打开 <code>http://localhost:5173</code> 即可进入工作台。</p>
 <hr />
-<h2 id="_3">（二）电商全链路六步爆款工作流</h2>
-<p>点击顶部导航的 <strong>「🛒 电商全链路工作流」</strong>，即可按科学工业化步骤执行生成。每一个环节均经过百万级推流数据检验与严格 Schema 约束。</p>
-<h3 id="step-0">Step 0：商品信息多模态导入</h3>
-<figure><img alt="Step 0 商品信息多模态导入与卖点归纳" src="./screenshots/01_step0_product_import.png" /><figcaption>Step 0 商品信息多模态导入与卖点归纳</figcaption></figure>
+<h2 id="_3">（二）三条产品线导航</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">产品线</th>
+<th style="text-align: left;">进入方式</th>
+<th style="text-align: left;">定位</th>
+<th style="text-align: left;">详细指南</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>🎨 Agent 创意画布</strong></td>
+<td style="text-align: left;"><strong>默认入口</strong> / <code>?view=canvas</code></td>
+<td style="text-align: left;"><strong>主线</strong>：自由创作空间，节点即管线，Skill 沉淀复用，3D 运镜台，MCP 双向</td>
+<td style="text-align: left;"><a href="./HOW_TO_USE.canvas.md">分册一</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>🛒 电商带货全链路</strong></td>
+<td style="text-align: left;">顶栏「🎯 带货工作台」/ <code>?view=sell</code></td>
+<td style="text-align: left;"><strong>次线</strong>：成熟稳定的六步工业化流程 + 双工作室 + 剪映交付</td>
+<td style="text-align: left;"><a href="./HOW_TO_USE.commerce.md">分册二</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>🎭 剧情短剧粗剪台</strong></td>
+<td style="text-align: left;">顶栏「🎭 剧情短剧」/ <code>?view=drama</code></td>
+<td style="text-align: left;"><strong>legacy</strong>：保留兼容与零回归，新创作建议走画布</td>
+<td style="text-align: left;"><a href="./HOW_TO_USE.commerce.md#6-剧情短剧粗剪台legacy">分册二 · 第 6 节</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>该选哪条？</strong></p>
 <ul>
-<li><strong>链接导入</strong>：输入电商主图链接，系统如实归档并引导填写核心差异化卖点；</li>
-<li><strong>图片导入</strong>：支持上传高清商品白底图或透底图，内置 9 款 3C、美妆、服饰大厂级 Mock 预设图一键选用；</li>
-<li><strong>参考视频导入</strong>：支持上传本地爆款对标视频片段，内置 Canvas 自动抽帧引擎。</li>
-</ul>
-<h3 id="step-15-3">Step 1：5 大爆款结构与黄金 3 秒钩子选择</h3>
-<figure><img alt="Step 1 5大爆款结构套路与黄金3秒钩子库" src="./screenshots/02_step1_template_hook.png" /><figcaption>Step 1 5大爆款结构套路与黄金3秒钩子库</figcaption></figure>
-<p>针对短视频平台推流算法，内置经百万播放验证的 5 套 6 镜带货套路：
-1. <strong>痛点开场型 (Pain-Solution)</strong>：反常识开场 → 痛点共鸣放大 → 产品破局 → 核心功能微距 → 信任凭证背书 → 强引导限时下单；
-2. <strong>效果反差型 (Contrast-Shock)</strong>：震撼对比 → 揭秘关键机理 → 深度实测 → 体验升级 → 资质打消顾虑 → 行动号召；
-3. <strong>沉浸开箱型 (Sensory-Unboxing)</strong>：视听微距开箱 → 材质触感细节 → 交互仪式感 → 场景融入 → 性价比锚点 → 福利促单；
-4. <strong>短剧场景植入型 (Drama-Insert)</strong>：人物生活矛盾冲突 → 戏剧化窘境 → 救场神器亮相 → 危机化解 → 情感共鸣 → 购买指引；
-5. <strong>价格锚点型 (Price-Anchor)</strong>：大牌天价对比 → 打破暴利黑幕 → 极致做工对标 → 溯源源头成本 → 超值特惠释放 → 锁单催促。</p>
-<h3 id="step-2-agent">Step 2：双 Agent 剧本编导与对立面评审</h3>
-<figure><img alt="Step 2 双 Agent 剧本编导与对立面评审雷达打分" src="./screenshots/03_step2_script_critic.png" /><figcaption>Step 2 双 Agent 剧本编导与对立面评审雷达打分</figcaption></figure>
-<ul>
-<li><strong>编导智体 (ScriptWriter)</strong>：结合商品卖点与所选爆款套路，自动创作符合竖屏短视频传播节奏的 6 镜分镜台词与画面描述。</li>
-<li><strong>质检智体 (ScriptCritic)</strong>：化身挑剔的平台质检员，从「3 秒停留率、卖点可视化、完播节奏、合规风险」4 个维度严苛打分（0~100 分），并给出详尽的诊断雷达图与具体修改建议。</li>
-</ul>
-<h3 id="step-3916-gsap">Step 3：9:16 GSAP 动态分镜视觉预演</h3>
-<figure><img alt="Step 3 9:16 GSAP 动态分镜视觉预演舞台" src="./screenshots/04_step3_gsap_storyboard.png" /><figcaption>Step 3 9:16 GSAP 动态分镜视觉预演舞台</figcaption></figure>
-<ul>
-<li>在向昂贵算力派发任务前，WebLockShot 的 <code>sell-stage</code> 动态舞台会基于 GSAP 动画引擎进行 9:16 全真视觉模拟；</li>
-<li>能够直观预览每个镜头的景别（特写、中景、远景）、推拉摇移运镜动势、卖点文字弹幕浮现节奏。</li>
-</ul>
-<h3 id="step-4">Step 4：视觉提示词工程编译</h3>
-<figure><img alt="Step 4 视觉提示词方案工程编译与参数微调" src="./screenshots/05_step4_visual_compiler.png" /><figcaption>Step 4 视觉提示词方案工程编译与参数微调</figcaption></figure>
-<ul>
-<li>系统自动将分镜剧本编译为高精度中英文双语视觉提示词（Positive Prompt &amp; Negative Prompt）；</li>
-<li>自动规范画幅（9:16）、镜头秒数（3~6 秒）、渲染参数（8K、光影质感、运镜轨迹与物理防畸变约束）。</li>
-</ul>
-<h3 id="step-5">Step 5：串行任务队列与神经渲染调度</h3>
-<figure><img alt="Step 5 串行任务调度队列与进度实时监控" src="./screenshots/06_step5_render_queue.png" /><figcaption>Step 5 串行任务调度队列与进度实时监控</figcaption></figure>
-<ul>
-<li>单机串行任务调度引擎自动调度各镜头任务；</li>
-<li>支持快手可灵、字节即梦、<strong>ComfyUI 私有集群</strong> 或 Mock 本地录制出片；</li>
-<li>具备实时任务排队进度监控、单镜头独立失败重试与错误精准上报。</li>
-</ul>
-<h3 id="step-6tts">Step 6：连续审片、TTS 口播与剪映草稿对齐导出</h3>
-<figure><img alt="Step 6 连续审片播放器、自适应 TTS 口播与剪映草稿导出" src="./screenshots/07_step6_deliver_player.png" /><figcaption>Step 6 连续审片播放器、自适应 TTS 口播与剪映草稿导出</figcaption></figure>
-<ul>
-<li>6 镜视频无缝连播审片播放器，支持全屏预览与单镜头逐一审阅；</li>
-<li><strong>智能 TTS 配音</strong>：内置语速自适应算法，自动根据镜头秒数缩放台词语速，确保台词在镜头结束前精准收尾；</li>
-<li><strong>剪映草稿工程直出</strong>：一键导出对齐好的 <code>draft_content.json</code>，或直接下载含全部素材的完整 zip 包（详见「（五）剪映草稿 zip 包导入实操」）；</li>
-<li>素材失效时（页面刷新导致本地缓存丢失）会显示明确的失效占位提示，而非死链播放器。</li>
+<li>想自由组合创意流程、复用工作流、做 3D 预演或让本地 Agent 驱动画布 → <strong>画布</strong></li>
+<li>想按最成熟的六步流程快速产出一条带货视频、并直出剪映草稿 → <strong>带货工作台</strong></li>
+<li>已有短剧素材、需要 6 镜剧情预演与提示词包导出 → <strong>短剧台（legacy）</strong></li>
 </ul>
 <hr />
-<h2 id="_4">（三）双独立工作室模式</h2>
-<p>除了标准的六步全链路外，顶部工具栏还提供针对快速单挑和复杂编导的双工作室：</p>
-<h3 id="a-agent">模式 A：单 Agent 极速直出模式</h3>
-<figure><img alt="模式 A 单 Agent 极速直出工作室" src="./screenshots/08_single_agent_studio.png" /><figcaption>模式 A 单 Agent 极速直出工作室</figcaption></figure>
-<p>适合单镜头快速实验与电商图生视频（Image-to-Video）：
-- <strong>精选灵感库</strong>：内置 3C 数码金属光泽、美妆水润精华露微距、潮流穿搭光影等高转化提示词预设；
-- <strong>AI 智能运镜润色</strong>：输入简略构思（如“吹风机快速吹干水滴”），AI 自动扩写为运镜、布光、景深齐全的电影级 Prompt；
-- <strong>多模态参考素材面板</strong>：
-  - <strong>参考图片</strong>：支持拖拽上传本地图，支持点击九宫格快速载入高清 Mock 图，支持<strong>双击灯箱无损放大预览</strong>；
-  - <strong>参考视频</strong>：支持上传本地运镜视频片段，提取动作参考（Motion Mimic）。
-- <strong>时长自由调节</strong>：支持 5s、10s、15s 预设切换，或在微调框中键入 1~60 秒自定义时长。</p>
-<h3 id="b-agent">模式 B：多 Agent 协同编导研讨室</h3>
-<figure><img alt="模式 B 多 Agent 协同编导研讨室" src="./screenshots/09_multi_agent_studio.png" /><figcaption>模式 B 多 Agent 协同编导研讨室</figcaption></figure>
-<p>适合高定短片与复杂多镜头影视级创作：
-- <strong>两种推演模式（诚实标注，绝不伪装）</strong>：
-  - <strong>真实推演</strong>：在「⚙️ API 设置」配置大模型 Key 后，四智体由真实 LLM 结构化推演——编导 → 运镜 → 质检 → 调度依次产出，质检评分为真实差异化评分（0~100）；
-  - <strong>演示动画模式</strong>：未配置 Key 时，时间线首条消息与工程单徽章会明确标注「🧪 演示动画模式 · 评分非真实」，推演内容为预编排脚本，绝不伪造质检评分。
-- <strong>真实推演角色分工</strong>：
-  1. 🎬 <strong>导演 Agent (Director)</strong>：负责整体视觉调性、叙事弧线与核心抓手；
-  2. 🎥 <strong>运镜 Agent (Cinematographer)</strong>：设计机位走位、焦段切换与动态打光；
-  3. ⚖️ <strong>质检 Agent (Critic)</strong>：审输出风险并给出带扣分理由的真实评分；
-  4. ⚡ <strong>调度 Agent (Dispatcher)</strong>：综合三方成果合成终极提示词并派发至渲染引擎。
-- <strong>轮询窗口可调</strong>：顶部「轮询窗口」下拉（2/5/10/20 分钟），超时自动全额退款。</p>
-<hr />
-<h2 id="comfyui">（四）视频供应商配置与 ComfyUI 自建私有算力指南</h2>
-<figure><img alt="API 配置与 ComfyUI 私有算力 GPU 探测" src="./screenshots/10_token_settings_comfyui.png" /><figcaption>API 配置与 ComfyUI 私有算力 GPU 探测</figcaption></figure>
-<p>点击右上角 <strong>「⚙️ API 设置」</strong> 即可完成各生成渠道的配置。</p>
-<h3 id="1-kling-api">1. 快手可灵 (Kling) API 直连</h3>
-<ul>
-<li>申请快手可灵官方开发者平台 API 密钥（Access Key ID 与 Secret Key）；</li>
-<li>填入对应输入框并选择首选生片时长；</li>
-<li><strong>两种鉴权形态</strong>（M2 契约升级）：</li>
-<li>填入裸 Key 字符串 → Bearer 直传模式（历史行为）；</li>
-<li>填入 JSON <code>{"ak":"你的AK","sk":"你的SK"}</code> → 客户端按官方文档自动签发 JWT（HS512，<code>iss/exp/nbf</code> 载荷，请求头直接携带 token，无需 Bearer 前缀），签名实现已按官方向量做契约测试锁定；</li>
-<li>生成计费：在虚拟钱包中约 10 灵感币/镜头。</li>
-</ul>
-<h3 id="2-jimeng-api">2. 字节即梦 (Jimeng) API 直连</h3>
-<ul>
-<li>填入即梦开放平台 API Key 与端点地址；</li>
-<li><strong>两种鉴权形态</strong>（M2 契约升级）：</li>
-<li>填入裸 Key 字符串 → Bearer 直传模式（历史行为）；</li>
-<li>填入 JSON <code>{"ak":"你的AK","sk":"你的SK"}</code> → 客户端按火山引擎 V4 规范逐请求计算 HMAC-SHA256 签名（<code>X-Date</code> / <code>X-Content-Sha256</code> / <code>Authorization</code> 三头），签名实现已按官方向量做契约测试锁定；</li>
-<li>生成计费：在虚拟钱包中约 8 灵感币/镜头。</li>
-</ul>
-<h3 id="3-comfyui-gpu-wan-21-cogvideox">3. ComfyUI 本地/局域网私有 GPU 算力集群（Wan 2.1 / CogVideoX）</h3>
-<p>这是 WebLockShot 最强力的工业化亮点——<strong>连接您自己的显卡算力，享有 0 API 费用无限畅做短视频！</strong></p>
-<h4 id="1-comfyui">步骤 1：本地启动 ComfyUI</h4>
-<p>确保您的 ComfyUI 支持外部或局域网访问，启动命令行必须加上 <code>--listen</code> 参数：</p>
-<pre><code class="language-bash">python main.py --listen 127.0.0.1 --port 8188
-</code></pre>
-<p><em>(如部署在局域网 GPU 服务器，可使用 <code>--listen 0.0.0.0</code>)</em></p>
-<h4 id="2_1">步骤 2：推荐模型依赖</h4>
-<ul>
-<li><strong>阿里 Wan 2.1 (WanVideo I2V)</strong>：当前开源图生视频领域极度出色的模型，支持 14B / 1.3B 参数；</li>
-<li><strong>智谱 CogVideoX-5B</strong>：擅长大幅度动作动力学与电影感光影；</li>
-<li><strong>Stability SVD-XT</strong>：轻量化微距商品展示。</li>
-</ul>
-<h4 id="3-weblockshot">步骤 3：在 WebLockShot 中绑定并一键探测</h4>
-<ol>
-<li>打开右上角 <strong>「⚙️ API 设置」</strong>；</li>
-<li>视频提供商选择 <strong>「ComfyUI 自建/私有算力 (0接口费)」</strong>；</li>
-<li>输入实例地址（本地通常保持默认 <code>http://127.0.0.1:8188</code> 即可，Vite 会自动通过 <code>/api/comfyui</code> 反代穿透跨域）；</li>
-<li>点击 <strong>「🔍 测试连接 (Ping GPU)」</strong> 按钮；</li>
-<li>系统将调用 <code>/system_stats</code> 接口，瞬间返回显卡型号（例如 <code>NVIDIA GeForce RTX 4090</code>）以及当前剩余可用显存（VRAM），确认连通即可畅享无成本生片！</li>
-</ol>
-<hr />
-<h2 id="capcut">（五）剪映 / CapCut 电脑版草稿工程导入与声画自动对齐实操</h2>
-<p>在全链路最后一步 <strong>「✨ 审片交付」</strong>，点击 <strong>「📥 导出剪映电脑版草稿工程 (draft_content.json)」</strong>：</p>
-<h3 id="_5">剪映草稿对齐原理</h3>
-<p>WebLockShot 导出的 <code>draft_content.json</code> 是标准的 CapCut/剪映工程格式：
-1. <strong>三轨微秒对齐 (1s = 1,000,000us)</strong>：
-   - <code>track_video</code> (视频主轨)：6 镜视频无缝顺排；
-   - <code>track_audio</code> (旁白配音轨)：每个镜头的配音与视频起始点、终止点微秒严密吻合；
-   - <code>track_text</code> (花字字幕轨)：带货爆款花字，第 1 镜黄金钩子预设黄色高亮与更大字号。
-2. <strong>自适应防黑帧</strong>：精确计算 <code>source_timerange</code> 与 <code>target_timerange</code>，杜绝任何黑帧或音频爆音重叠。</p>
-<h3 id="_6">如何导入剪映电脑版：</h3>
-<ol>
-<li>打开您电脑上的剪映 / CapCut 电脑版，新建一个空白草稿并起名（例如 <code>吹风机带货</code>）；</li>
-<li>找到剪映本地草稿保存目录：
-   - <strong>Windows</strong>：<code>C:\Users\&lt;用户名&gt;\AppData\Local\JianyingPro\User Data\Projects\com.lveditor.draft\</code>
-   - <strong>macOS</strong>：<code>~/Movies/JianyingPro/User Data/Projects/com.lveditor.draft/</code></li>
-<li>进入对应工程名字的文件夹，将 WebLockShot 下载的 <code>draft_content.json</code> 替换原有文件；</li>
-<li>重新在剪映中打开该项目，所有分镜视频、配音解说与爆款字幕已在时间线上精确对齐就绪，直接导出高清成片！</li>
-</ol>
-<h3 id="zip">剪映草稿 zip 包导入实操（推荐）</h3>
-<blockquote>
-<p>推荐优先使用 zip 包方式：一次拿到「工程文件 + 全部已生成视频素材 + 使用说明」，无需手动逐个下载素材。</p>
-</blockquote>
-<p>在「✨ 审片交付」页点击 <strong>「📦 下载完整草稿 zip 包 (含素材)」</strong>：</p>
-<figure><img alt="剪映草稿 zip 包下载按钮" src="./screenshots/13_jianying_zip_export.png" /><figcaption>剪映草稿 zip 包下载按钮</figcaption></figure>
-<p>zip 包内容：
-- <code>draft_content.json</code> / <code>draft_meta_info.json</code>：剪映标准草稿工程（包内素材路径已改写为相对路径 <code>assets/...</code>）；
-- <code>assets/</code>：已生成的分镜视频素材（<code>Shot_N_&lt;镜号&gt;.mp4/webm</code>）与可选旁白音频（<code>voice_&lt;镜号&gt;.mp3</code>）；
-- <code>README-使用说明.txt</code>：本包专属素材清单（含缺失素材如实列出）与导入步骤。</p>
-<p>导入步骤：
-1. 解压 <code>&lt;工程名&gt;_剪映草稿.zip</code>；
-2. 打开剪映电脑版，新建一个空草稿（如 <code>吹风机带货</code>），然后关闭剪映；
-3. 进入剪映草稿目录（Windows 默认 <code>%LOCALAPPDATA%\JianyingPro\User Data\Projects\com.lveditor.draft\&lt;草稿名&gt;\</code>）；
-4. 将解压出的 <code>draft_content.json</code>、<code>draft_meta_info.json</code> 与 <code>assets/</code> 文件夹复制进该目录（同名文件覆盖）；
-5. 重新打开剪映，三轨对齐的完整工程即可就绪。</p>
-<blockquote>
-<p>注：浏览器 Web Speech TTS 无法导出音频文件。若包内缺 <code>assets/voice_*.mp3</code>，可自行录制同名旁白放入 assets/，或在剪映中删除空音频片段。</p>
-</blockquote>
-<hr />
-<h2 id="_7">（六）数据反馈闭环：回流看板与钩子胜率加权</h2>
-<p>WebLockShot 内置「投放 → 回流 → 加权 → 再生成」的数据闭环，让钩子选择从经验主义走向数据驱动。</p>
-<h3 id="_8">钩子库与元数据路由</h3>
-<p>5 套爆款结构（痛点提问 / 效果反差 / 沉浸开箱 / 短剧反转 / 价格锚点）连同钩子句式库，被抽取为 <strong>JSON 数据资产</strong>（<code>src/assets/hooks/structures.data.json</code>），每套结构带三类元数据：
-- <strong>适用品类（categories）</strong>：如 美妆护肤 / 数码潮玩 / 平替好物——ScriptWriter 按商品种类自动路由最匹配的结构模板；
-- <strong>情绪轴（emotionArc）</strong>：6 拍各自的情绪锚点（如 焦虑→共鸣→惊喜→专注→信任→紧迫）；
-- <strong>历史胜率（baselineWinRate / hookWinRates）</strong>：先验权重，回流数据可实时覆盖。</p>
-<h3 id="_9">回流看板使用步骤</h3>
-<figure><img alt="回流看板：数据录入与胜率看板" src="./screenshots/12_reflow_board.png" /><figcaption>回流看板：数据录入与胜率看板</figcaption></figure>
-<ol>
-<li>点击顶部导航 <strong>「📊 回流看板」</strong>；</li>
-<li>在录入表单填写：视频标题、命中的结构模板与钩子（下拉选择）、商品种类、平台的 <strong>3 秒完播率 / 完播率 / 转化数</strong>；</li>
-<li>点击 <strong>「📥 录入回流数据」</strong>，数据存入本地 IndexedDB；</li>
-<li>下方看板自动按 <strong>结构 / 钩子 / 品类</strong> 三个维度聚合胜率（纯 CSS 条形图，从高到低排序）；</li>
-<li>胜率采用 <strong>Laplace 平滑</strong>：<code>(胜出次数 + 1) / (样本数 + 2)</code>，其中 3 秒完播率 ≥ 30% 记为一次「胜出」，避免小样本过拟合；</li>
-<li>之后每次生成脚本，ScriptWriter 的钩子采样会按真实胜率加权——高胜率钩子被优先选中。</li>
-</ol>
-<blockquote>
-<p>数据仅存本地浏览器 IndexedDB，不上传任何服务器。</p>
-</blockquote>
-<hr />
-<h2 id="_10">（七）本地伴生服务部署与剪映草稿一键落盘</h2>
-<p>纯前端版在 GitHub Pages 上无法直连 ComfyUI 与视频平台 API（跨域限制），也无法替你把草稿写进本地磁盘。<strong>伴生服务</strong>（纯 Node，运行时仅依赖 pino 日志库）解决这两件事，并提供一系列「预留开关」能力（不设置任何 <code>WLS_*</code> 环境变量 = 与纯前端现状完全一致的本地默认模式）：</p>
+<h2 id="_4">（三）本地伴生服务部署与剪映草稿一键落盘</h2>
+<p>纯前端版在 GitHub Pages 上无法直连 ComfyUI 与视频平台 API（跨域限制），也无法替你把草稿写进本地磁盘。
+<strong>伴生服务</strong>（纯 Node，运行时仅依赖 pino 日志库）解决这两件事，并提供一系列「预留开关」能力
+（不设置任何 <code>WLS_*</code> 环境变量 = 与纯前端现状完全一致的本地默认模式）：</p>
 <figure><img alt="伴生服务启动与剪映落盘" src="./screenshots/14_companion_server.png" /><figcaption>伴生服务启动与剪映落盘</figcaption></figure>
-<h3 id="_11">一行命令启动</h3>
+<h3 id="_5">一行命令启动</h3>
 <pre><code class="language-bash">npm run build &amp;&amp; npm run start:server    # 默认 http://localhost:5174
 # 等价 npx 形态：npx weblockshot
 # 自定义参数：node server/weblockshot-server.mjs --port 8080 --dist ./dist --draft-dir ./jianying-drafts
 </code></pre>
 <p>Windows 用户可直接双击根目录 <strong><code>start-weblockshot.bat</code></strong>（自动安装依赖 → 构建 → 启动）。</p>
-<h3 id="_12">能力清单</h3>
+<h3 id="_6">能力清单</h3>
 <table>
 <thead>
 <tr>
@@ -447,15 +315,35 @@ npm run dev
 </tr>
 <tr>
 <td style="text-align: left;">API 反代</td>
-<td style="text-align: left;"><code>/api/kling</code>、<code>/api/jimeng</code>、<code>/api/comfyui</code> 三个前缀反向代理，生产环境也能直连 ComfyUI 与视频平台</td>
+<td style="text-align: left;"><code>/api/kling</code>、<code>/api/jimeng</code>、<code>/api/comfyui</code> 三个前缀反向代理</td>
 </tr>
 <tr>
 <td style="text-align: left;">剪映草稿落盘</td>
-<td style="text-align: left;"><code>POST /api/jianying/draft-zip</code>（body 为 zip 二进制），自动解压到 <code>--draft-dir</code> 指定目录，免去手动解压复制</td>
+<td style="text-align: left;"><code>POST /api/jianying/draft-zip</code>（body 为 zip 二进制），自动解压到 <code>--draft-dir</code> 指定目录</td>
+</tr>
+<tr>
+<td style="text-align: left;">语音合成</td>
+<td style="text-align: left;"><code>POST /api/tts</code>：Edge-TTS 合成旁白 mp3 落盘（默认开；<code>WLS_TTS=off</code> 关闭），<code>GET /files/tts/&lt;file&gt;.mp3</code> 回读</td>
+</tr>
+<tr>
+<td style="text-align: left;">成片合成</td>
+<td style="text-align: left;"><code>POST /api/render</code>：ffmpeg 合成视频 + 音轨 + 字幕成 mp4（默认 auto 探测；<code>WLS_FFMPEG=off</code> 关闭），<code>GET /files/render/&lt;file&gt;.mp4</code> 回读</td>
+</tr>
+<tr>
+<td style="text-align: left;">记忆记录 API</td>
+<td style="text-align: left;"><code>GET/POST/DELETE /api/memory/records</code>：<code>WLS_STORAGE=sqlite</code> 时启用，否则 501（前端自动降级本地 IndexedDB）</td>
+</tr>
+<tr>
+<td style="text-align: left;">连接器 API</td>
+<td style="text-align: left;"><code>GET /api/connectors</code> + <code>POST /api/connectors/:id/auth|run</code>：能力位 <code>connectors: 'interface' \| 'ready'</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">MCP 桥接（可选依赖）</td>
+<td style="text-align: left;"><code>/api/mcp/*</code>：画布拓扑镜像 + Agent 操作队列；未装 SDK 时 501 + 安装指引</td>
 </tr>
 <tr>
 <td style="text-align: left;">健康检查（预留）</td>
-<td style="text-align: left;"><code>GET /healthz</code> 返回版本 / 存储模式 / uptime / 密钥注入模式等 JSON 自观测</td>
+<td style="text-align: left;"><code>GET /healthz</code> 返回版本 / 存储模式 / uptime / 密钥注入模式 / 能力位（tts、ffmpeg、memory、connectors、mcp）</td>
 </tr>
 <tr>
 <td style="text-align: left;">会话存储 API（预留）</td>
@@ -476,80 +364,128 @@ npm run dev
 </tbody>
 </table>
 <blockquote>
-<p>全部预留开关的环境变量表见主仓 README「🚀 生产部署」章节；本指南末尾「（十一）Docker 生产部署」有一键部署实操。</p>
+<p>全部预留开关的环境变量表见主仓 README「🚀 生产部署」章节。</p>
 </blockquote>
-<h3 id="_13">剪映草稿一键落盘实操</h3>
+<h3 id="_7">剪映草稿一键落盘实操</h3>
+<p><strong>方式 A：工作台内一键落盘（推荐）</strong></p>
 <ol>
-<li>按上文启动伴生服务（记下启动日志中的「草稿落盘」目录）；</li>
-<li>用任意 HTTP 客户端（或 curl）将「📦 下载完整草稿 zip 包」得到的 zip 原样 POST 到 <code>http://localhost:5174/api/jianying/draft-zip</code>；</li>
-<li>服务返回 <code>{ ok: true, dir: "...", files: [...] }</code>，按返回的 <code>dir</code> 路径把内容挪进剪映草稿目录（或直接将 <code>--draft-dir</code> 指向剪映草稿目录），打开剪映即可。</li>
+<li>启动伴生服务；</li>
+<li>打开「交付播放器」页，前端自动探测 <code>/healthz</code>——在线时导出卡片出现 <strong>📤 发送到伴生服务落盘</strong> 按钮；</li>
+<li>点击后前端把完整草稿 zip（含素材）POST 到 <code>/api/jianying/draft-zip</code>，服务端自动解压；
+   按钮下方显示落盘路径（<code>savedPath</code>）；</li>
+<li>探测失败（纯前端模式）按钮不显示，体验与之前完全一致——用方式 B。</li>
 </ol>
+<p><strong>方式 B：curl 手动落盘</strong></p>
+<pre><code class="language-bash">curl -X POST http://localhost:5174/api/jianying/draft-zip \
+  -H &quot;Content-Type: application/zip&quot; --data-binary @&lt;工程名&gt;_剪映草稿.zip
+# → { ok: true, savedPath: &quot;...&quot;, files: [...] }
+</code></pre>
+<h3 id="edge-tts">Edge-TTS 语音合成实操</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:5174/api/tts \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;text&quot;:&quot;你的旁白台词&quot;,&quot;voice&quot;:&quot;zh-CN-XiaoxiaoNeural&quot;,&quot;rate&quot;:&quot;+10%&quot;}'
+# → { &quot;url&quot;: &quot;/files/tts/xxx.mp3&quot;, &quot;bytes&quot;: 38736, ... }
+</code></pre>
+<ul>
+<li>声音：任意 Edge TTS ShortName（默认 <code>zh-CN-XiaoxiaoNeural</code>）；<code>rate</code> 支持相对语速（如 <code>+20%</code>）；</li>
+<li>限长：<code>text</code> ≤ 5000 字符；产物经 <code>GET /files/tts/&lt;file&gt;.mp3</code> 回读；</li>
+<li>剪映内使用：把 mp3 拖入音频轨，或重命名为 <code>voice_&lt;镜号&gt;.mp3</code> 放进草稿包 <code>assets/</code> 补齐缺失旁白。</li>
+</ul>
+<h3 id="ffmpeg">ffmpeg 服务端成片实操</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:5174/api/render \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;videoUrl&quot;:&quot;/files/tts/video.mp4&quot;,&quot;audioUrl&quot;:&quot;/files/tts/xxx.mp3&quot;,&quot;title&quot;:&quot;我的成片&quot;}'
+# → { &quot;url&quot;: &quot;/files/render/render_xxx.mp4&quot;, &quot;bytes&quot;: ... }
+</code></pre>
+<ul>
+<li>视频流 copy + 音频重编码 aac（容器不兼容时自动回退 libx264）；字幕软封 <code>mov_text</code>；</li>
+<li>同一时间仅 1 个渲染任务（忙时 429），单任务默认 10 分钟超时（<code>WLS_RENDER_TIMEOUT_SEC</code> 可调）；</li>
+<li>安全：禁止 <code>file://</code> 与内网地址（SSRF 防护），远程下载上限 500MB。</li>
+</ul>
 <hr />
-<h2 id="_14">（八）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</h2>
-<p>为了支撑商业生产环境的稳定性，WebLockShot 构筑了多重安全防护网：</p>
+<h2 id="_8">（四）工业级可靠性体系：幂等防抖、状态机与两阶段钱包闭环</h2>
 <h3 id="1-idempotency-debounce">1. 任务幂等性与防连击锁 (Idempotency &amp; Debounce)</h3>
 <ul>
 <li><strong>结构化意图签名</strong>：根据规范化 <code>(intent, shotId, provider, prompt, duration, ratio)</code> 计算唯一幂等指纹；</li>
-<li><strong>In-flight 互斥锁</strong>：任务在后台处理期间，拦截一切重复连击，防止并发风暴。</li>
+<li><strong>In-flight 互斥锁</strong>：任务在后台处理期间拦截一切重复连击，防止并发风暴。</li>
 </ul>
 <h3 id="2-fsm-circuit-breaker">2. 状态机流转与边界容错 (FSM &amp; Circuit Breaker)</h3>
 <ul>
-<li><strong>ShotJob 状态机管控</strong>：任务状态严格按 <code>queued → running → succeeded/failed</code>（失败后允许 <code>failed → queued</code> 重试）流转，由 <code>JOB_STATUS_TRANSITIONS</code> 转移表守卫；非法迁移（含 <code>succeeded</code> 终态自迁移、越级迁移）直接抛错拦截；</li>
-<li><strong>自动熔断器 (Circuit Breaker)</strong>：若某一云端 API 连续出现 3 次失败，熔断器自动跳闸保护并阻断同渠道任务，30 秒后自动半开探测；工作室顶栏徽章实时显示「正常 / 熔断保护中 / 半开探测中」（Mock 与 ComfyUI 自建算力免熔断）。</li>
+<li><strong>ShotJob 状态机管控</strong>：<code>queued → running → succeeded/failed</code>（失败后允许 <code>failed → queued</code> 重试）
+  由 <code>JOB_STATUS_TRANSITIONS</code> 转移表守卫；非法迁移（含 <code>succeeded</code> 终态自迁移、越级迁移）直接抛错拦截；</li>
+<li><strong>自动熔断器</strong>：某一云端 API 连续 3 次失败自动跳闸并阻断同渠道任务，30 秒后自动半开探测；
+  顶栏徽章实时显示「正常 / 熔断保护中 / 半开探测中」（Mock 与 ComfyUI 自建算力免熔断）。</li>
 </ul>
 <h3 id="3-two-phase-commit-wallet">3. 虚拟钱包两阶段提交事务 (Two-Phase Commit Wallet)</h3>
 <figure><img alt="工业级虚拟钱包两阶段结算与审计流水中心" src="./screenshots/11_virtual_wallet.png" /><figcaption>工业级虚拟钱包两阶段结算与审计流水中心</figcaption></figure>
 <ul>
-<li>顶部导航常驻 <strong>「💰 虚拟钱包」</strong>，钱包采用 <strong>per-refId 冻结账本</strong>（记录每笔冻结的金额/供应商/时间）；</li>
-<li><strong>阶段 1：预冻结 (Freeze)</strong>：点击生成时，若余额充足，将预估费用移入「任务冻结中」，锁定资金防并发超支；</li>
-<li><strong>阶段 2A：成功核销 (Settle)</strong>：出片成功后正式划扣冻结款项；</li>
-<li><strong>阶段 2B：失败回滚 (Refund)</strong>：一旦发生网络中断、接口超时或生成异常，冻结款项全额退回可用余额；</li>
-<li><strong>凭据安全</strong>：无冻结凭据的核销/退款一律拒绝；同一任务重复结算幂等（不重复扣款）；已核销任务不可再退款；</li>
+<li>顶部导航常驻 <strong>「💰 虚拟钱包」</strong>，采用 <strong>per-refId 冻结账本</strong>（记录每笔冻结的金额/供应商/时间）；</li>
+<li><strong>阶段 1：预冻结 (Freeze)</strong>：点击生成时若余额充足，将预估费用移入「任务冻结中」；</li>
+<li><strong>阶段 2A：成功核销 (Settle)</strong>：出片成功后正式划扣冻结款；</li>
+<li><strong>阶段 2B：失败回滚 (Refund)</strong>：网络中断、接口超时或生成异常时全额退回可用余额；</li>
+<li><strong>凭据安全</strong>：无冻结凭据的核销/退款一律拒绝；重复结算幂等；已核销任务不可再退款；</li>
 <li><strong>孤儿冻结回收</strong>：页面意外重启后无人认领的冻结款，30 分钟后自动原路退回；</li>
-<li><strong>多标签页同步</strong>：多开标签页时钱包余额与流水实时一致；</li>
-<li>具备完整的资金交易收支流水审计明细，支持一键模拟充值与重置体验金。</li>
+<li><strong>多标签页同步</strong>：多开标签页时余额与流水实时一致；</li>
+<li>完整的资金交易收支流水审计明细，支持一键模拟充值与重置体验金。</li>
 </ul>
+<blockquote>
+<p><strong>画布与带货共用同一条钱包管线</strong>（<code>useVideoPipeline</code>，全站只此一份实现）。</p>
+</blockquote>
 <hr />
-<h2 id="faq">（九）常见问题与避坑指南（FAQ）</h2>
+<h2 id="faq">（五）常见问题与避坑指南（FAQ）</h2>
 <h4 id="q1-comfyui">Q1：调用本地 ComfyUI 时提示网络错误或连接超时？</h4>
 <ul>
-<li><strong>排查 A</strong>：请确认启动 ComfyUI 时是否添加了 <code>--listen</code> 参数（必须为 <code>python main.py --listen 127.0.0.1 --port 8188</code>）；</li>
-<li><strong>排查 B</strong>：WebLockShot 在开发环境下通过 Vite 内置反向代理 <code>/api/comfyui</code> 穿透跨域，请确认通过 <code>http://localhost:5173</code> 访问工作台，而不是直接双击打开本地 HTML 文件。</li>
+<li><strong>排查 A</strong>：确认启动 ComfyUI 时加了 <code>--listen</code> 参数（<code>python main.py --listen 127.0.0.1 --port 8188</code>）；</li>
+<li><strong>排查 B</strong>：开发环境下 WebLockShot 通过 Vite 内置反向代理 <code>/api/comfyui</code> 穿透跨域，
+  请确认通过 <code>http://localhost:5173</code> 访问，而不是直接双击打开本地 HTML 文件。</li>
 </ul>
-<h4 id="q2">Q2：为什么点击生成按钮提示“钱包可用余额不足”？</h4>
+<h4 id="q2">Q2：为什么点击生成按钮提示「钱包可用余额不足」？</h4>
 <ul>
-<li>WebLockShot 引入了工业级资金防透支机制。点击顶部导航栏的 <strong>「💰 虚拟钱包」</strong>，点击 <strong>「+ 1,000 币」</strong> 模拟充值或 <strong>「重置 2,000 体验金」</strong>，即可立即恢复生成。若使用 ComfyUI 或 Mock 模式，资费为 0，永不扣费。</li>
+<li>这是资金防透支机制。点击顶部「💰 虚拟钱包」→「+ 1,000 币」模拟充值或「重置 2,000 体验金」即可。
+  ComfyUI 与 Mock 模式资费为 0，永不扣费。</li>
 </ul>
-<h4 id="q3">Q3：如果某个镜头生成的画面不满意怎么办？</h4>
+<h4 id="q3">Q3：某个镜头生成的画面不满意怎么办？</h4>
 <ul>
-<li>在第 6 步「审片交付」阶段，无需全部重跑！针对不满意的单个镜头，点击右侧的 <strong>「🔄 局部重生成」</strong>，系统将仅对该单镜重新调度生成，其余满意的镜头保持不变，极大节约算力与时间。</li>
+<li>带货线：第 6 步「审片交付」点该镜头的「🔄 局部重生成」，只重跑这一镜；</li>
+<li>画布线：对<strong>产物卡</strong>做局部重绘（见<a href="./HOW_TO_USE.canvas.md#6-指哪改哪局部重绘与版本堆叠">分册一 · 第 6 节</a>），
+  或直接删掉该节点重跑。</li>
 </ul>
 <h4 id="q4">Q4：导出的剪映草稿打开后素材显示离线？</h4>
 <ul>
-<li>剪映草稿中记录了各视频素材的本地路径或网络 URL。若为本地录制的 Blob URL，请将下载的视频素材文件保存在剪映草稿同级目录下，剪映将自动完成重链接。</li>
+<li>草稿记录的是素材本地路径或 URL。若源为本地录制的 Blob URL，请把下载的素材文件放在草稿同级目录，
+  剪映会自动重链接。</li>
 </ul>
-<hr />
-<h2 id="pwa">（十）手机端使用：PWA 添加到主屏幕</h2>
-<p>WebLockShot 已支持 PWA（Progressive Web App），手机浏览器即可安装为「类原生应用」：</p>
-<h3 id="_15">添加到主屏幕步骤</h3>
-<ol>
-<li>手机浏览器（iOS Safari / Android Chrome）访问你的部署地址（在线版或自建域名均可）；</li>
-<li><strong>iOS Safari</strong>：点击底部「分享」按钮 → 选择「添加到主屏幕」→ 确认，桌面出现 WLS 图标；</li>
-<li><strong>Android Chrome</strong>：地址栏右侧「⋮」菜单 → 「添加到主屏幕 / 安装应用」→ 确认；</li>
-<li>从主屏幕图标打开后即为 <strong>standalone 独立全屏窗口</strong>（无浏览器地址栏），主题色为 WebLockShot 青（#22d3ee）。</li>
-</ol>
-<h3 id="_16">使用要点</h3>
+<h4 id="q5">Q5：为什么画布上「节点看起来正常，但刷新后改动没保存」？</h4>
 <ul>
-<li><strong>版本自更新</strong>：发布新版本后，应用内会弹出「🚀 发现新版本，刷新即可更新」底部提示条，点击「刷新」即完成更新（prompt 模式不会打断进行中的生成任务，可等任务出片后再更新）；</li>
-<li><strong>密钥与数据</strong>：与桌面端一致，API Key 仅存于浏览器 <code>sessionStorage</code>，会话数据存 IndexedDB，均不上传第三方服务器；</li>
-<li><strong>响应式布局</strong>：&lt;768px 自动切换单栏堆叠（六步横条变紧凑步骤指示器、引擎条可折叠、表格横向滑动），≥768px 与桌面体验一致；</li>
-<li><strong>触控适配</strong>：触屏设备所有可点击区域 ≥44px，商品录入页直接调起后置相机拍摄商品图（<code>capture="environment"</code>，仅触屏生效）；</li>
-<li><strong>后台正确性</strong>：生成任务切后台再回前台，轮询状态会立即刷新一次，不傻等剩余间隔。</li>
+<li>画布文档契约上限为 <strong>200 节点 / 400 边</strong>；超过上限时不再落盘且当前 UI 没有提示（见 README 遗留台账）。
+  请拆分到多个画布项目，或减少单画布节点数。</li>
+</ul>
+<h4 id="q6">Q6：语言切换后为什么还有中文？</h4>
+<ul>
+<li>i18n 当前覆盖「顶栏 / 工具条 / 节点面板 / 节点头部 / 对话栏 / 开场层 / 设置面板骨架」；
+  节点内部业务控件与部分覆盖层深层文案仍是中文，范围见 <a href="./i18n.md">i18n.md</a>。</li>
 </ul>
 <hr />
-<h2 id="docker">（十一）Docker 生产部署</h2>
-<p>适合服务器部署 / 团队内网共享 / 私有化交付场景。</p>
-<h3 id="_17">一键启动</h3>
+<h2 id="pwa">（六）手机端使用：PWA 添加到主屏幕</h2>
+<h3 id="_9">添加到主屏幕步骤</h3>
+<ol>
+<li>手机浏览器（iOS Safari / Android Chrome）访问你的部署地址；</li>
+<li><strong>iOS Safari</strong>：底部「分享」→「添加到主屏幕」→ 确认；</li>
+<li><strong>Android Chrome</strong>：地址栏右侧「⋮」→「添加到主屏幕 / 安装应用」→ 确认；</li>
+<li>从主屏幕图标打开后即为 <strong>standalone 独立全屏窗口</strong>（无地址栏），主题色为 WebLockShot 青（#22d3ee）。</li>
+</ol>
+<h3 id="_10">使用要点</h3>
+<ul>
+<li><strong>版本自更新</strong>：新版本发布后应用内弹出「🚀 发现新版本，刷新即可更新」底部提示条，
+  点击「刷新」即完成更新（prompt 模式不打断进行中的生成任务）；</li>
+<li><strong>密钥与数据</strong>：API Key 仅存 <code>sessionStorage</code>，会话数据存 IndexedDB，均不上传第三方服务器；</li>
+<li><strong>响应式布局</strong>：&lt;768px 自动单栏堆叠（六步横条变紧凑步骤指示器、引擎条可折叠、表格横向滑动）；</li>
+<li><strong>触控适配</strong>：可点击区域 ≥44px，商品录入页直接调起后置相机拍摄商品图；</li>
+<li><strong>后台正确性</strong>：生成任务切后台再回前台，轮询状态立即刷新一次。</li>
+</ul>
+<hr />
+<h2 id="docker">（七）Docker 生产部署</h2>
+<h3 id="_11">一键启动</h3>
 <pre><code class="language-bash">git clone https://github.com/QWQcool/WebLockShot.git
 cd WebLockShot
 docker compose up --build      # 首次构建约 2~4 分钟
@@ -557,49 +493,580 @@ docker compose up --build      # 首次构建约 2~4 分钟
 <p>启动成功后：</p>
 <ul>
 <li>应用地址：<code>http://localhost:8080</code>（端口在 <code>docker-compose.yml</code> 的 <code>ports</code> 中调整）</li>
-<li>健康检查：<code>http://localhost:8080/healthz</code>，返回版本 / 存储模式 / uptime 等自观测 JSON</li>
+<li>健康检查：<code>http://localhost:8080/healthz</code></li>
 <li>compose 已内置 healthcheck（30s 间隔探测 <code>/healthz</code>），异常自动重启</li>
 </ul>
 <h3 id="compose-environment">预留开关配置（compose environment）</h3>
-<p>所有 <code>WLS_*</code> 环境变量均为「预留接口做好不用」原则的实现——<strong>不设置任何变量 = 本地默认模式，行为与纯前端现状完全一致</strong>。常用配置：</p>
+<p>所有 <code>WLS_*</code> 环境变量均为「预留接口做好不用」原则的实现——<strong>不设置任何变量 = 本地默认模式</strong>：</p>
 <pre><code class="language-yaml">environment:
   - PORT=5174
   # 会话持久化（预留）：sqlite 落盘到容器 /app/data 卷
   - WLS_STORAGE=sqlite
+  # 语音合成（默认 on）：/api/tts Edge-TTS 出 mp3，产物落 /app/data/tts 卷
+  # - WLS_TTS=off
+  # 成片合成（默认 auto）：镜像已内置 ffmpeg，/api/render 出 mp4
+  # - WLS_FFMPEG=auto
   # LLM 反代（预留）：设置后 /api/llm 反代到目标
   - WLS_LLM_TARGET=https://api.openai.com
   # 密钥注入（预留）：服务端持有真实密钥，客户端免配 Key（小程序轻端依赖此机制）
   - WLS_KEYS={&quot;kling&quot;:&quot;Bearer ak-xxx&quot;,&quot;llm&quot;:&quot;Bearer sk-xxx&quot;}
 </code></pre>
 <h3 id="https">HTTPS 上线</h3>
-<p>compose 内含 Caddy 反代注释模板：取消注释、编写 <code>Caddyfile</code>（<code>your-domain.com { reverse_proxy weblockshot:5174 }</code>），Caddy 将自动签发并续期 Let's Encrypt 证书；也可按同思路换 nginx + certbot。</p>
-<h3 id="_18">镜像结构</h3>
-<p>多阶段构建：阶段 1（node:22-alpine）<code>npm ci</code> + <code>tsc -b &amp;&amp; vite build</code> 产出 <code>dist/</code>；阶段 2 运行层仅含 <code>dist/</code>、<code>server/</code> 与生产依赖（不含任何 devDependency）。CI 每次 push 均执行「只 build 不 push」的镜像构建验证 job。</p>
+<p>compose 内含 Caddy 反代注释模板：取消注释、编写 <code>Caddyfile</code>
+（<code>your-domain.com { reverse_proxy weblockshot:5174 }</code>），Caddy 将自动签发并续期 Let's Encrypt 证书；
+也可按同思路换 nginx + certbot。</p>
+<h3 id="_12">镜像结构</h3>
+<p>多阶段构建：阶段 1（node:22-slim）<code>npm ci</code> + <code>tsc -b &amp;&amp; vite build</code> 产出 <code>dist/</code>；
+阶段 2 运行层（node:22-alpine，<strong>已内置 ffmpeg</strong>）仅含 <code>dist/</code>、<code>server/</code> 与生产依赖（不含任何 devDependency）。
+<code>./data</code>（TTS 音频/成片/sqlite 会话库）与 <code>./jianying-drafts</code>（剪映落盘）已挂载持久化卷。
+CI 每次 push 均执行「只 build 不 push」的镜像构建验证 job。</p>
 <hr />
-<h2 id="_19">（十二）小程序版轻端</h2>
-<p><code>miniapp/</code> 目录提供微信小程序（weapp）轻端（Taro 4 + React 18，主分支目录而非独立分支），覆盖「录入商品 → 任务进度 → 看片交付」轻链路。</p>
-<h3 id="_20">能力边界（诚实标注）</h3>
-<p>小程序端<strong>不做</strong>剪映草稿导出（需桌面文件系统能力）、<strong>不做</strong> Mock 引擎与 GSAP 动画体系；看片后复制视频链接，回桌面工作台「审片交付」继续完成剪映交付。完整边界说明见 <a href="../miniapp/README.md">miniapp/README.md</a>。</p>
-<h3 id="_21">与桌面端的复用关系</h3>
+<h2 id="_13">（八）小程序版轻端</h2>
+<p><code>miniapp/</code> 目录提供微信小程序（weapp）轻端（Taro 4 + React 18，主分支目录而非独立分支），
+覆盖「录入商品 → 任务进度 → 看片交付」轻链路。</p>
+<h3 id="_14">能力边界（诚实标注）</h3>
+<p>小程序端<strong>不做</strong>剪映草稿导出（需桌面文件系统能力）、<strong>不做</strong> Mock 引擎与 GSAP 动画体系；
+看片后复制视频链接，回桌面工作台「审片交付」继续完成剪映交付。
+完整边界说明见 <a href="../miniapp/README.md">miniapp/README.md</a>。</p>
+<h3 id="_15">与桌面端的复用关系</h3>
 <ul>
 <li>通过 <code>@domain</code> 别名直接复用主仓 <code>src/domain</code> 零依赖领域模块（轮询窗口 <code>pollingConfig</code> 等），主仓 src 层面零改动；</li>
 <li>依赖完全独立（miniapp 自有 package.json，React 锁 18.3.1 保证 Taro 兼容），不污染根 package.json。</li>
 </ul>
-<h3 id="_22">后端依赖与密钥安全</h3>
+<h3 id="_16">后端依赖与密钥安全</h3>
 <ul>
 <li>所有任务请求经 <code>TARO_APP_API_BASE</code> 指向的后端 <code>/api</code> 反代提交（伴生 server 或云端网关）；</li>
-<li><strong>小程序端不持有任何 API Key</strong>——密钥由服务端 <code>WLS_KEYS</code> 注入（见上文 Docker 部署）；未配置 <code>WLS_KEYS</code> 时为透传模式，远端将显式返回 401。</li>
+<li><strong>小程序端不持有任何 API Key</strong>——密钥由服务端 <code>WLS_KEYS</code> 注入；未配置时为透传模式，远端将显式返回 401。</li>
 </ul>
-<h3 id="_23">构建与部署要求</h3>
+<h3 id="_17">构建与部署要求</h3>
 <pre><code class="language-bash">cd miniapp
 npm install
 npm run build:weapp    # 不依赖微信开发者工具即可完成编译，产物在 miniapp/dist/
 </code></pre>
 <ul>
-<li><strong>request 合法域名</strong>：小程序后台需将后端域名加入 request 合法域名列表（要求 <strong>HTTPS + ICP 备案域名</strong>）；</li>
-<li><strong>账号主体</strong>：<code>touristappid</code>（游客模式）仅限本地开发者工具预览；<code>web-view</code> 与部分高级接口需<strong>企业主体</strong>账号；</li>
-<li>构建产物结构：<code>dist/app.json</code> 三页注册 + 每页 js/json/wxml/wxss 四件套（无需微信开发者工具即可校验）。</li>
+<li><strong>request 合法域名</strong>：需把后端域名加入 request 合法域名列表（要求 <strong>HTTPS + ICP 备案域名</strong>）；</li>
+<li><strong>账号主体</strong>：<code>touristappid</code> 仅限本地开发者工具预览；<code>web-view</code> 与部分高级接口需<strong>企业主体</strong>账号。</li>
 </ul>
 <hr />
-<p><em>WebLockShot 致力于为每一位电商创作者打造顺滑、可信、低成本的 AI 短视频工业化流水线。</em></p>
+<h2 id="_18">（九）质量验证与测试工程化</h2>
+<p>本版本补齐了完整的测试工程化（T 线），全部可一键复跑：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">命令</th>
+<th style="text-align: left;">作用</th>
+<th style="text-align: left;">当前结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>npm test</code></td>
+<td style="text-align: left;">node 单测 + vitest UI 冒烟</td>
+<td style="text-align: left;">400 + 18 项，<strong>0 失败</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run e2e</code></td>
+<td style="text-align: left;">画布 E2E 套件（真实鼠标路径 + 隔离 storage）</td>
+<td style="text-align: left;"><strong>13/13 步通过</strong>；Playwright 缺失时优雅跳过</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run test:coverage</code></td>
+<td style="text-align: left;">关键纯函数层覆盖率基线（80% 门槛）</td>
+<td style="text-align: left;"><strong>10/10 达标</strong>（<a href="./coverage.md">coverage.md</a>）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run perf</code></td>
+<td style="text-align: left;">画布 / 记忆图谱 / 3D chunk / Skill 市场性能基准</td>
+<td style="text-align: left;">见 <a href="./perf.md">perf.md</a>（含优化建议）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run a11y</code></td>
+<td style="text-align: left;">chromium + webkit 核心链路 + axe（WCAG 2.0 A/AA）</td>
+<td style="text-align: left;">双引擎 <strong>5/5</strong>，axe 严重项 <strong>0</strong>（<a href="./a11y.md">a11y.md</a>）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run degrade</code></td>
+<td style="text-align: left;">六类能力缺失路径的降级 / 迁移矩阵</td>
+<td style="text-align: left;"><strong>6/6 通过</strong>（<a href="./degrade-matrix.md">degrade-matrix.md</a>）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run test:chaos</code></td>
+<td style="text-align: left;">边缘情况冒烟（畸形 URL / 超限 body / 上游断流）</td>
+<td style="text-align: left;">进程全程存活</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run shots</code></td>
+<td style="text-align: left;">实机截图采集（本手册与 README 的配图来源）</td>
+<td style="text-align: left;">落盘 <code>docs/screenshots/</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>本手册的 PDF 版本由 <code>python docs/build_how_to_use_pdf.py</code> 生成（主手册 + 两分册合并排版）。</p>
+</blockquote>
+<hr />
+<blockquote>
+<p>📄 开源许可：自有代码 <a href="../LICENSE">MIT</a>；<strong>第三方依赖各自许可</strong>（tldraw 为商业许可、GSAP 为自有免费许可），
+完整清单见 <a href="../NOTICE"><code>NOTICE</code></a>。</p>
+</blockquote>
+<div style="break-before:page"></div>
+
+<h1 id="agent">分册一 · Agent 创意画布（主线）</h1>
+<blockquote>
+<p>主手册：<a href="./HOW_TO_USE.md">HOW_TO_USE.md</a> · 带货线分册：<a href="./HOW_TO_USE.commerce.md">HOW_TO_USE.commerce.md</a>
+English: <a href="./HOW_TO_USE.canvas.en.md">HOW_TO_USE.canvas.en.md</a></p>
+</blockquote>
+<hr />
+<h2 id="_19">目录</h2>
+<ul>
+<li><a href="#1-进入画布">1. 进入画布</a></li>
+<li><a href="#2-开场层与创作场景画廊">2. 开场层与创作场景画廊</a></li>
+<li><a href="#3-对话栏编排一句话上画布">3. 对话栏编排（一句话上画布）</a></li>
+<li><a href="#4-节点与数据流契约">4. 节点与数据流契约</a></li>
+<li><a href="#5-出片从脚本到产物卡">5. 出片：从脚本到产物卡</a></li>
+<li><a href="#6-指哪改哪局部重绘与版本堆叠">6. 指哪改哪：局部重绘与版本堆叠</a></li>
+<li><a href="#7-3d-运镜台">7. 3D 运镜台</a></li>
+<li><a href="#8-skill-沉淀--复用--市场">8. Skill 沉淀 / 复用 / 市场</a></li>
+<li><a href="#9-记忆系统与记忆图谱">9. 记忆系统与记忆图谱</a></li>
+<li><a href="#10-连接器面板">10. 连接器面板</a></li>
+<li><a href="#11-多画布项目与小地图">11. 多画布项目与小地图</a></li>
+<li><a href="#12-mcp-双向驱动可选依赖">12. MCP 双向驱动（可选依赖）</a></li>
+<li><a href="#13-中英双语与设置面板">13. 中英双语与设置面板</a></li>
+<li><a href="#14-诚实边界与已知限制">14. 诚实边界与已知限制</a></li>
+</ul>
+<hr />
+<h2 id="1_1">1. 进入画布</h2>
+<p><strong>默认入口就是画布</strong>——访问部署地址（或 <code>npm run dev</code> 的 <code>http://localhost:5173</code>）即进入 Agent 画布；
+深链 <code>?view=canvas</code> 直达，<code>?view=sell</code> / <code>?view=drama</code> 进入另两条线。</p>
+<figure><img alt="画布主界面" src="./screenshots/16_canvas_workbench.png" /><figcaption>画布主界面</figcaption></figure>
+<p>界面分区：</p>
+<table>
+<thead>
+<tr>
+<th>区域</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>顶栏</td>
+<td>品牌、模式切换（带货 / 短剧 / 画布）、语言切换</td>
+</tr>
+<tr>
+<td>左侧</td>
+<td>Agent 节点面板（点击即在画布中央落节点，标题悬停显示该节点能力说明）</td>
+</tr>
+<tr>
+<td>中间</td>
+<td>tldraw 无限画布（页面 / 缩放 / 撤销重做 / 便签图形等原生能力全部可用）</td>
+</tr>
+<tr>
+<td>工具条</td>
+<td>项目切换与新建删除、画布名称、导出/导入 Skill、官方 Skill 快捷入口、清空、记忆图谱、Skill 市场、连接器、创作场景、MCP 徽章、语言、保存状态</td>
+</tr>
+<tr>
+<td>右下</td>
+<td>小地图（Canvas2D 自绘，点击/拖动导航）</td>
+</tr>
+<tr>
+<td>底部</td>
+<td>对话栏（可一键收起为右下角胶囊，露出 tldraw 底部工具条）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>画布文档保存在浏览器 <code>localStorage</code>，400ms 防抖落盘，多标签页通过 storage 事件实时同步。</p>
+</blockquote>
+<h2 id="2_1">2. 开场层与创作场景画廊</h2>
+<p><strong>开场层</strong>（首访叠加，之后折叠为底部对话栏）：</p>
+<figure><img alt="开场层" src="./screenshots/15_canvas_onboarding.png" /><figcaption>开场层</figcaption></figure>
+<ul>
+<li>五类场景 tab：品牌设计 / 影视创意 / 电商广告 / 互动游戏 / 网页应用——点击即预填输入框</li>
+<li>大输入卡：一句话描述需求，Enter 发送（Shift+Enter 换行）</li>
+<li>连接器条：常用应用入口（未接入，点击打开连接器面板）</li>
+<li>「进入画布 →」关闭并写入已读标记；「更多创作场景 →」打开画廊</li>
+</ul>
+<p><strong>创作场景画廊</strong>（工具条「🎬 创作场景」）：</p>
+<figure><img alt="创作场景画廊" src="./screenshots/21_canvas_scene_gallery.png" /><figcaption>创作场景画廊</figcaption></figure>
+<p>六类场景卡片（品牌设计 / 电商物料 / 影视文娱 / 游戏内容 / 产品 UI-UX / 宣传物料），每张卡片两个动作：</p>
+<ul>
+<li><strong>预填对话栏</strong>：把该场景的推荐需求文案写进输入框，你可改完再发送</li>
+<li><strong>一键编排</strong>：直接按该场景路由执行编排（走下方第 3 节链路）</li>
+</ul>
+<h2 id="3">3. 对话栏编排（一句话上画布）</h2>
+<figure><img alt="对话栏编排" src="./screenshots/17_canvas_orchestration.png" /><figcaption>对话栏编排</figcaption></figure>
+<ol>
+<li>在底部对话栏输入一句话（或点模板 chips / 场景卡片预填）；</li>
+<li>发送后：
+   - <strong>配置了 LLM Key</strong>：真实 LLM 返回结构化拓扑建议（zod 校验，不合格自动重试 ≤2 次）；
+   - <strong>未配置 Key</strong>：走<strong>确定性演示编排</strong>，提示条明确标注「🧪 演示编排 · 非真实 LLM」；</li>
+<li>整批节点与连线一次性落位，提示条给出「已布置 N 个节点、M 条连线」；</li>
+<li>不满意可点「↩️ 撤销本次编排」整批回滚（与 Ctrl+Z 等效——编程式布置已显式打 history mark）。</li>
+</ol>
+<blockquote>
+<p>编排只会创建「已就绪」的节点类型；灰态节点不会被编排创建。</p>
+</blockquote>
+<h2 id="4">4. 节点与数据流契约</h2>
+<p>10 种节点：需求 Brief、素材导入、图像生成、脚本创编、分镜预演、视频生成、产物卡、局部重绘、
+3D 运镜台、成片交付。</p>
+<ul>
+<li><strong>连线即数据流</strong>：拖箭头连接两个节点。类型不兼容会被<strong>立即拒绝并删除</strong>，画布顶部提示条给出中文原因
+  （例如「视频生成不能连接自身：数据流自上游向下游」）。</li>
+<li><strong>合法链</strong>：<code>brief → product → script → storyboard → generate → asset → deliver</code>；
+  <code>product → generate</code>（单图直出）、<code>asset → edit</code>（重绘）、<code>stage3d → storyboard|generate</code>（3D 出片）等。</li>
+<li><strong>刷新恢复</strong>：边 id 稳定，刷新后箭头自动物化重建，不会丢线。</li>
+<li><strong>节点内控件</strong>：节点里的输入框/下拉/按钮都做了<strong>控件级</strong>事件阻断，不影响你从节点空白处起笔画线。</li>
+</ul>
+<h2 id="5">5. 出片：从脚本到产物卡</h2>
+<ul>
+<li><strong>脚本创编</strong>：连入 Brief（或直接输入需求）→ ScriptWriter 生成 6 镜脚本 + Critic 评审。
+  演示模式下 Critic 评分会标注「非真实」。</li>
+<li><strong>分镜预演</strong>：连入 script → 一键生成 6 镜分镜，内嵌 9:16 GSAP 预演（本地预演 · 非成片）。</li>
+<li><strong>视频生成</strong>：连入 storyboard 后逐镜生成，走与带货工作台<strong>同一条</strong> <code>useVideoPipeline</code>
+  （钱包两阶段事务 / 熔断 / 幂等 / 轮询 / 退款）。</li>
+<li><strong>产物卡</strong>：出片自动成卡。视频大资产转存 IndexedDB，<strong><code>blob:</code> 一律拒绝持久化</strong>（跨刷新失效），
+  画布文档里只存轻量引用。</li>
+<li><strong>成片交付</strong>：连入产物卡后一键打包剪映草稿 zip（纯前端下载），节点内显示钱包余额。</li>
+</ul>
+<h2 id="6">6. 指哪改哪：局部重绘与版本堆叠</h2>
+<ol>
+<li>把<strong>产物卡</strong>连到<strong>局部重绘</strong>节点；</li>
+<li>在节点绘图区用<strong>笔刷</strong>涂抹或<strong>矩形框选</strong>涂抹要重绘的区域（mask 与源图同尺寸，刷新后可继续编辑）；</li>
+<li>填重绘指令并执行：
+   - <strong>ComfyUI 在线</strong> → 走真实 inpaint 工作流（FLUX.1 Fill / SD inpainting 预设，或自定义 JSON）；
+   - <strong>ComfyUI 离线</strong> → 自动降级为<strong>演示重绘</strong>（mask 区域马赛克变换），并标注「🧪 演示重绘 · 非真实生成」；</li>
+<li>结果以<strong>版本堆叠</strong>挂在产物卡上：<code>‹ v 2/3 ›</code> 可来回切换、回退；上限 20 版，回退后可继续叠加新重绘。</li>
+</ol>
+<h2 id="7-3d">7. 3D 运镜台</h2>
+<figure><img alt="3D 运镜台" src="./screenshots/20_canvas_stage3d.png" /><figcaption>3D 运镜台</figcaption></figure>
+<ol>
+<li>左侧节点面板点「🎥 3D 运镜台」落一个节点 → 节点内点「🎬 进入 3D 运镜台」；</li>
+<li>左栏能力：
+   - <strong>角色树 / 对象</strong>：加素体人物、加方块/圆柱/球体占位、导入自定义模型（<strong>模型文件由你自行获取，许可自负</strong>）；
+   - <strong>相机机位</strong>：新增机位、点击机位飞至该视角、把当前导演视角「写入」该机位；
+   - <strong>环境</strong>：导入全景背景（等距柱状投影图）；
+   - <strong>场景预设</strong>：六套<strong>程序化 primitive 布景</strong>（商品台 / 影棚 / 客厅 / 卧室 / 户外台阶 / 展台）——
+     替换几何体、<strong>保留角色</strong>；超过上限会整体拒绝而不是半渲染；
+   - <strong>出片帧</strong>：导出选中机位（或全部机位）的<strong>首/尾帧</strong>；</li>
+<li>右栏属性：选中对象的位移/旋转/缩放（数值编辑实时生效）、机位 FOV、<strong>运镜关键帧时间轴</strong>（≤60 帧）；</li>
+<li>底部工具条：移动 / 加人物 / 方块 / 圆柱 / 球体 / 框选；</li>
+<li>右下角常驻诚实标注：<strong>摆台不耗积分 · 0 灵感币 · 全程本地渲染</strong>；</li>
+<li>导出后接下游：
+   - 接「视频生成」→ 「⚡ 3D 单镜直出 · 演示引擎」（有参考底图走 image2video，否则 text2video）；
+   - 接「分镜预演」→ 「🎬 生成 3D 自由分镜」（<strong>镜数 = 机位数</strong>，1~12）。</li>
+</ol>
+<blockquote>
+<p><strong>动作预设</strong>提供 8 种（待机 / 走路 / 慢跑 / 冲刺 / 跳舞 / 坐姿 / 跳跃 / 交谈），全部来自内置素体
+的<strong>真实动画片段</strong>；参考稿里的「挥手 / 转身」在 CC0 素材库中无对应片段，<strong>如实替代、不伪造</strong>。
+播放动画期间会暂停姿势叠加（绝对姿态会打架）。</p>
+</blockquote>
+<h2 id="8-skill">8. Skill 沉淀 / 复用 / 市场</h2>
+<p><strong>沉淀</strong>：框选 ≥2 个节点 → 工具条「📦 导出 Skill」→ 得到 manifest JSON：</p>
+<ul>
+<li>节点拓扑用<strong>槽位 id</strong>（slot-1..N，按坐标确定性分配），可跨设备复用；</li>
+<li>参数只保留白名单槽位（brief.text / product.title / script.scriptScene），<strong>产物引用、maskRef、
+  导入历史等设备本地字段自动剥离</strong>；</li>
+<li>含输入 / 输出声明（入口节点可填参数、终点节点是产物）。</li>
+</ul>
+<p><strong>复用</strong>：工具条「📥 导入 Skill」→ 校验通过后整批上画布：</p>
+<ul>
+<li>节点 id 全量重映射，与现有节点共存不冲突；</li>
+<li>入口节点高亮「📥 填新输入」，其余参数延续；</li>
+<li>Ctrl+Z 精确回滚<strong>这一次导入</strong>，不牵连之前的操作。</li>
+</ul>
+<p><strong>市场</strong>（工具条「🧩 Skill 市场」）：</p>
+<figure><img alt="Skill 市场" src="./screenshots/18_canvas_skill_market.png" /><figcaption>Skill 市场</figcaption></figure>
+<ul>
+<li>「Skills」列表 + 来源筛选（全部 / 官方 / 导入 / 对话创建）+ 搜索；</li>
+<li>已安装分区：启停开关（停用的官方 Skill 会从画布快捷入口消失，但<strong>不影响已布置的节点</strong>）、
+  布置到画布、发布到本地、卸载；</li>
+<li>未安装分区：一键安装；</li>
+<li>也能<strong>通过对话创建</strong> Skill（走同一套编排 prompt）或<strong>上传</strong>已有 manifest；</li>
+<li><strong>诚实</strong>：没有社区发布通道，也不伪造下载量；「发布」= 下载 manifest JSON 并明确标注。</li>
+</ul>
+<h2 id="9">9. 记忆系统与记忆图谱</h2>
+<p><strong>记忆系统</strong>：脚本创编时按你的历史胜率加权采样钩子；命中历史数据时节点上显示
+「📊 本条建议来自你的历史数据」徽章（没有历史数据就不显示）。</p>
+<ul>
+<li><strong>服务端模式</strong>：伴生服务以 <code>WLS_STORAGE=sqlite</code> 启动 → 记录走 <code>/api/memory/records</code>，
+  <code>/healthz</code> 能力位 <code>memory:'sqlite'</code>；</li>
+<li><strong>纯前端模式</strong>：记录存本机 IndexedDB，UI 如实标注「记忆仅存本地」；</li>
+<li>两种模式共用<strong>同一套 Laplace 聚合</strong>（<code>computeWinRates</code>，全站只此一份）。</li>
+</ul>
+<p><strong>记忆图谱</strong>（工具条「🧠 记忆图谱」）：</p>
+<figure><img alt="记忆图谱 · 真实空态" src="./screenshots/19_canvas_memory_graph_empty.png" /><figcaption>记忆图谱 · 真实空态</figcaption></figure>
+<ul>
+<li>空记录时如实显示空态——<strong>永不摆样例数据</strong>；</li>
+<li>有记录时按「结构 / 钩子 / 品类」三桶展示胜率，最近回流以气泡呈现，画布里的图片素材作为缩略叶；</li>
+<li>支持缩放（±）、一键开关记忆；</li>
+<li>设置面板「3. 记忆」区块可查看条数 + 三桶胜率 top，并一键清除（清除后胜率回退 0.5 先验）。</li>
+</ul>
+<h2 id="10">10. 连接器面板</h2>
+<figure><img alt="连接器面板" src="./screenshots/22_canvas_connectors.png" /><figcaption>连接器面板</figcaption></figure>
+<ul>
+<li>7 个推荐连接器卡片位（效率办公 / 开发工具 / 营销推广三类）+ 自定义连接器（本地保存）；</li>
+<li>顶部模式标签如实反映当前能力：纯前端模式显示「无功能可用」，伴生服务在线显示「仅接口」；</li>
+<li>点击「＋」在无伴生服务时会得到明确的 501 文案，不会假装成功。</li>
+</ul>
+<h2 id="11">11. 多画布项目与小地图</h2>
+<ul>
+<li>工具条左侧下拉切换项目，<code>＋ 新项目</code> / <code>🗑 删除项目</code>（至少保留一个）；</li>
+<li><strong>每个项目独立存储键</strong>，切换不串数据；画布名称与项目名同步；</li>
+<li><strong>老单画布文档零丢失迁移</strong>：首次读取时把老键内容复制进「默认项目」，老键保留作安全网；</li>
+<li>右下角<strong>小地图</strong>显示全部节点与当前视口，点击/拖动即导航。</li>
+</ul>
+<h2 id="12-mcp">12. MCP 双向驱动（可选依赖）</h2>
+<ul>
+<li>伴生服务检测到 <code>@modelcontextprotocol/sdk</code> 时 <code>/healthz</code> 报 <code>mcp:'ready'</code>，画布工具条出现
+  「🤖 MCP 已就绪」徽章；</li>
+<li>就绪后画布每 2 秒同步一次：拉取本地 Agent 提交的操作批 → 校验 → 单个 <code>editor.run</code> 批量应用；
+  同时把画布拓扑镜像推送给服务端供 Agent 读取；</li>
+<li>Agent 侧 id 会加盐隔离，重复下发不会重复建节点；被拒的操作批会在画布上给出中文原因；</li>
+<li><strong>未装 SDK</strong> 时全部接口 501 + 安装指引，服务器零报错（零依赖现状不变）。</li>
+</ul>
+<p>接口细节见 <a href="./mcp.md">mcp.md</a>。</p>
+<h2 id="13">13. 中英双语与设置面板</h2>
+<ul>
+<li>顶栏右侧「🌐 中文 / EN」一键切换；设置面板顶部「0. 界面语言」区块提供中/英单选；</li>
+<li>切换<strong>即时生效并持久化</strong>（<code>localStorage</code> 键 <code>weblockshot.language</code>），脏值一律回落中文；</li>
+<li>覆盖范围（顶栏 / 工具条 / 节点面板 / 节点头部 / 对话栏 / 开场层 / 设置面板骨架）与未覆盖部分，
+  见 <a href="./i18n.md">i18n.md</a>。</li>
+</ul>
+<figure><img alt="英文界面" src="./screenshots/23_canvas_en.png" /><figcaption>英文界面</figcaption></figure>
+<h2 id="14">14. 诚实边界与已知限制</h2>
+<ol>
+<li><strong>可灵 / 即梦 / ComfyUI 未接入画布出片</strong>（请走带货工作台）；画布出片走 Mock / 演示引擎。</li>
+<li><strong>「单图直出」与 3D 台出片仅演示引擎</strong>，真实引擎链路待真实环境验证。</li>
+<li><strong>ComfyUI 离线</strong>时局部重绘降级演示模式并标注「非真实生成」。</li>
+<li><strong>记忆纯前端模式仅存本机</strong>；接入 <code>WLS_STORAGE=sqlite</code> 伴生服务后升级为服务端记忆。</li>
+<li><strong>画布文档契约上限 200 节点 / 400 边</strong>：超限后不再落盘（T3 实测，UI 暂无提示，见主手册遗留台账）。</li>
+<li><strong>tldraw 免费版带水印</strong>，生产环境未配置 license key 时渲染约 5 秒后停止；本项目不做任何绕过。</li>
+<li><strong>i18n 为「关键文案」覆盖</strong>，节点内部业务控件等仍为中文。</li>
+<li><strong>MCP / 连接器目前只有 API 与有限 UI</strong>（MCP 徽章 + 连接器面板），更深的双向编排需要按文档直调接口。</li>
+</ol>
+<div style="break-before:page"></div>
+
+<h1 id="legacy">分册二 · 电商带货全链路（含短剧 legacy）</h1>
+<blockquote>
+<p>主手册：<a href="./HOW_TO_USE.md">HOW_TO_USE.md</a> · 画布线分册：<a href="./HOW_TO_USE.canvas.md">HOW_TO_USE.canvas.md</a>
+English: <a href="./HOW_TO_USE.commerce.en.md">HOW_TO_USE.commerce.en.md</a></p>
+</blockquote>
+<hr />
+<h2 id="_20">目录</h2>
+<ul>
+<li><a href="#1-六步爆款工作流">1. 六步爆款工作流</a></li>
+<li><a href="#2-两个独立工作室">2. 两个独立工作室</a></li>
+<li><a href="#3-视频供应商配置与-comfyui-私有算力">3. 视频供应商配置与 ComfyUI 私有算力</a></li>
+<li><a href="#4-剪映--capcut-草稿导入与声画自动对齐">4. 剪映 / CapCut 草稿导入与声画自动对齐</a></li>
+<li><a href="#5-数据反馈闭环回流看板与胜率加权">5. 数据反馈闭环：回流看板与胜率加权</a></li>
+<li><a href="#6-剧情短剧粗剪台legacy">6. 剧情短剧粗剪台（legacy）</a></li>
+<li><a href="#7-诚实边界">7. 诚实边界</a></li>
+</ul>
+<p>进入方式：顶栏「🎯 带货工作台」或深链 <code>?view=sell</code>。</p>
+<hr />
+<h2 id="1_2">1. 六步爆款工作流</h2>
+<p>点击顶部导航的「🛒 电商全链路工作流」，按工业化步骤执行。每个环节都有严格 Schema 约束。</p>
+<h3 id="step-0">Step 0：商品信息多模态导入</h3>
+<figure><img alt="Step 0 商品信息多模态导入与卖点归纳" src="./screenshots/01_step0_product_import.png" /><figcaption>Step 0 商品信息多模态导入与卖点归纳</figcaption></figure>
+<ul>
+<li><strong>链接导入</strong>：输入电商主图链接，系统如实归档并引导填写核心差异化卖点；</li>
+<li><strong>图片导入</strong>：支持上传高清商品白底图/透底图，内置 9 款 3C、美妆、服饰大厂级 Mock 预设图一键选用；</li>
+<li><strong>参考视频导入</strong>：支持上传本地爆款对标视频片段，内置 Canvas 自动抽帧引擎。</li>
+</ul>
+<h3 id="step-15-3">Step 1：5 大爆款结构与黄金 3 秒钩子选择</h3>
+<figure><img alt="Step 1 5大爆款结构套路与黄金3秒钩子库" src="./screenshots/02_step1_template_hook.png" /><figcaption>Step 1 5大爆款结构套路与黄金3秒钩子库</figcaption></figure>
+<p>内置经百万播放验证的 5 套 6 镜带货套路：</p>
+<ol>
+<li><strong>痛点开场型 (Pain-Solution)</strong>：反常识开场 → 痛点共鸣放大 → 产品破局 → 核心功能微距 → 信任凭证背书 → 强引导限时下单；</li>
+<li><strong>效果反差型 (Contrast-Shock)</strong>：震撼对比 → 揭秘关键机理 → 深度实测 → 体验升级 → 资质打消顾虑 → 行动号召；</li>
+<li><strong>沉浸开箱型 (Sensory-Unboxing)</strong>：视听微距开箱 → 材质触感细节 → 交互仪式感 → 场景融入 → 性价比锚点 → 福利促单；</li>
+<li><strong>短剧场景植入型 (Drama-Insert)</strong>：人物生活矛盾冲突 → 戏剧化窘境 → 救场神器亮相 → 危机化解 → 情感共鸣 → 购买指引；</li>
+<li><strong>价格锚点型 (Price-Anchor)</strong>：大牌天价对比 → 打破暴利黑幕 → 极致做工对标 → 溯源源头成本 → 超值特惠释放 → 锁单催促。</li>
+</ol>
+<h3 id="step-2-agent">Step 2：双 Agent 剧本编导与对立面评审</h3>
+<figure><img alt="Step 2 双 Agent 剧本编导与对立面评审雷达打分" src="./screenshots/03_step2_script_critic.png" /><figcaption>Step 2 双 Agent 剧本编导与对立面评审雷达打分</figcaption></figure>
+<ul>
+<li><strong>编导智体 (ScriptWriter)</strong>：结合商品卖点与所选套路，自动创作符合竖屏短视频传播节奏的 6 镜分镜台词与画面描述；</li>
+<li><strong>质检智体 (ScriptCritic)</strong>：从「3 秒停留率、卖点可视化、完播节奏、合规风险」4 个维度严苛打分（0~100），
+  并给出诊断雷达图与具体修改建议。</li>
+</ul>
+<h3 id="step-3916-gsap">Step 3：9:16 GSAP 动态分镜视觉预演</h3>
+<figure><img alt="Step 3 9:16 GSAP 动态分镜视觉预演舞台" src="./screenshots/04_step3_gsap_storyboard.png" /><figcaption>Step 3 9:16 GSAP 动态分镜视觉预演舞台</figcaption></figure>
+<ul>
+<li>在向昂贵算力派发任务前，<code>sell-stage</code> 动态舞台基于 GSAP 进行 9:16 全真视觉模拟；</li>
+<li>直观预览每个镜头的景别、推拉摇移运镜动势、卖点文字弹幕浮现节奏。</li>
+</ul>
+<h3 id="step-4">Step 4：视觉提示词工程编译</h3>
+<figure><img alt="Step 4 视觉提示词方案工程编译与参数微调" src="./screenshots/05_step4_visual_compiler.png" /><figcaption>Step 4 视觉提示词方案工程编译与参数微调</figcaption></figure>
+<ul>
+<li>自动将分镜剧本编译为高精度中英文双语视觉提示词（Positive / Negative Prompt）；</li>
+<li>自动规范画幅（9:16）、镜头秒数（3~6 秒）、渲染参数（8K、光影质感、运镜轨迹与物理防畸变约束）。</li>
+</ul>
+<h3 id="step-5">Step 5：串行任务队列与神经渲染调度</h3>
+<figure><img alt="Step 5 串行任务调度队列与进度实时监控" src="./screenshots/06_step5_render_queue.png" /><figcaption>Step 5 串行任务调度队列与进度实时监控</figcaption></figure>
+<ul>
+<li>单机串行任务调度引擎自动调度各镜头任务；</li>
+<li>支持可灵、即梦、<strong>ComfyUI 私有集群</strong>、Mock 本地录制、<strong>Runway / Luma（海外 · 契约先行）</strong>；</li>
+<li>具备实时排队进度监控、单镜头独立失败重试与错误精准上报。</li>
+</ul>
+<h3 id="step-6tts">Step 6：连续审片、TTS 口播与剪映草稿对齐导出</h3>
+<figure><img alt="Step 6 连续审片播放器、自适应 TTS 口播与剪映草稿导出" src="./screenshots/07_step6_deliver_player.png" /><figcaption>Step 6 连续审片播放器、自适应 TTS 口播与剪映草稿导出</figcaption></figure>
+<ul>
+<li>6 镜视频无缝连播审片播放器，支持全屏预览与单镜头逐一审阅；</li>
+<li><strong>智能 TTS 配音</strong>：语速自适应算法，按镜头秒数缩放台词语速，确保台词在镜头结束前精准收尾；</li>
+<li><strong>剪映草稿工程直出</strong>：一键导出对齐好的 <code>draft_content.json</code>，或下载含全部素材的完整 zip 包；</li>
+<li>素材失效时（刷新导致本地缓存丢失）显示明确的失效占位提示，而非死链播放器。</li>
+</ul>
+<hr />
+<h2 id="2_2">2. 两个独立工作室</h2>
+<h3 id="a-agent">模式 A：单 Agent 极速直出模式</h3>
+<figure><img alt="模式 A 单 Agent 极速直出工作室" src="./screenshots/08_single_agent_studio.png" /><figcaption>模式 A 单 Agent 极速直出工作室</figcaption></figure>
+<p>适合单镜头快速实验与图生视频：</p>
+<ul>
+<li><strong>精选灵感库</strong>：3C 数码金属光泽、美妆水润精华露微距、潮流穿搭光影等高转化提示词预设；</li>
+<li><strong>AI 智能运镜润色</strong>：输入简略构思（如「吹风机快速吹干水滴」），自动扩写为运镜、布光、景深齐全的电影级 Prompt；</li>
+<li><strong>多模态参考素材面板</strong>：参考图片（拖拽上传 / 九宫格 Mock 载入 / 双击灯箱无损放大）、
+  参考视频（提取动作参考 Motion Mimic）；</li>
+<li><strong>时长自由调节</strong>：5s / 10s / 15s 预设，或微调框输入 1~60 秒。</li>
+</ul>
+<h3 id="b-agent">模式 B：多 Agent 协同编导研讨室</h3>
+<figure><img alt="模式 B 多 Agent 协同编导研讨室" src="./screenshots/09_multi_agent_studio.png" /><figcaption>模式 B 多 Agent 协同编导研讨室</figcaption></figure>
+<ul>
+<li><strong>两种推演模式（诚实标注）</strong>：</li>
+<li><strong>真实推演</strong>：配置 LLM Key 后四智体由真实 LLM 结构化推演（编导 → 运镜 → 质检 → 调度），质检为真实差异化评分；</li>
+<li><strong>演示动画模式</strong>：未配置 Key 时时间线首条消息与徽章明确标注「🧪 演示动画模式 · 评分非真实」，<strong>绝不伪造评分</strong>；</li>
+<li><strong>轮询窗口可调</strong>：顶部下拉 2/5/10/20 分钟，超时自动全额退款。</li>
+</ul>
+<hr />
+<h2 id="3-comfyui">3. 视频供应商配置与 ComfyUI 私有算力</h2>
+<figure><img alt="API 配置与 ComfyUI 私有算力 GPU 探测" src="./screenshots/10_token_settings_comfyui.png" /><figcaption>API 配置与 ComfyUI 私有算力 GPU 探测</figcaption></figure>
+<p>点击右上角「⚙️ API 设置」。引擎共 6 个选项：</p>
+<table>
+<thead>
+<tr>
+<th>引擎</th>
+<th>凭据</th>
+<th>计费</th>
+<th>验证层级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mock 实验画布</td>
+<td>无需</td>
+<td>0 灵感币</td>
+<td>✅ 本机验证</td>
+</tr>
+<tr>
+<td>快手可灵 (Kling)</td>
+<td>裸 Key（Bearer）或 JSON <code>{"ak","sk"}</code>（官方 JWT 签名）</td>
+<td>~10 币/镜</td>
+<td>✅ 契约验证 / ⏳ 待真实环境</td>
+</tr>
+<tr>
+<td>字节即梦 (Jimeng)</td>
+<td>裸 Key 或 JSON <code>{"ak","sk"}</code>（火山 V4 HMAC-SHA256 签名）</td>
+<td>~8 币/镜</td>
+<td>✅ 契约验证 / ⏳ 待真实环境</td>
+</tr>
+<tr>
+<td>🔥 ComfyUI 私有算力</td>
+<td>Base URL（本地/局域网）</td>
+<td><strong>0 接口费</strong></td>
+<td>✅ 本机验证</td>
+</tr>
+<tr>
+<td><strong>Runway (Gen-4)</strong></td>
+<td>Bearer API Key</td>
+<td>按官方积分</td>
+<td>✅ 契约验证 / ⏳ <strong>待真实环境验证</strong></td>
+</tr>
+<tr>
+<td><strong>Luma (Dream Machine)</strong></td>
+<td>Bearer API Key</td>
+<td>按官方积分</td>
+<td>✅ 契约验证 / ⏳ <strong>待真实环境验证</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>海外引擎为「契约先行」</strong>：请求体 / 端点 / 请求头 / 轮询状态映射 / 错误文案全部按官方文档实现，
+并由 <code>test/fixtures/runway|luma/</code> + <code>src/media/__tests__/providerContract.test.ts</code> 锁定；
+<strong>但尚未在真实账号下跑通出片</strong>，UI 与文档均如实标注。未填 Key 时<strong>不会发起任何请求</strong>，
+而是给出「未检测到 … API Key」的明确提示。如需自建网关，可设置 sessionStorage
+<code>weblockshot.runway_base</code> / <code>weblockshot.luma_base</code> 覆盖 Base URL。</p>
+</blockquote>
+<h3 id="comfyui-0">ComfyUI 私有算力（0 接口费）</h3>
+<ol>
+<li><strong>启动 ComfyUI</strong>（必须带 <code>--listen</code>）：</li>
+</ol>
+<p><code>bash
+   python main.py --listen 127.0.0.1 --port 8188</code></p>
+<ol start="2">
+<li><strong>推荐底模</strong>：阿里 Wan 2.1（WanVideo I2V，14B / 1.3B）、智谱 CogVideoX-5B、Stability SVD-XT；</li>
+<li><strong>绑定并探测</strong>：设置面板 → 视频提供商选「ComfyUI 自建/私有算力」→ 填实例地址（本地默认
+   <code>http://127.0.0.1:8188</code>）→ 点「🔍 测试连接 (Ping GPU)」→ 返回显卡型号与可用显存。</li>
+</ol>
+<hr />
+<h2 id="4-capcut">4. 剪映 / CapCut 草稿导入与声画自动对齐</h2>
+<p>在最后一步「✨ 审片交付」点击「📥 导出剪映电脑版草稿工程 (draft_content.json)」。</p>
+<h3 id="_21">对齐原理</h3>
+<ol>
+<li><strong>三轨微秒对齐（1s = 1,000,000us）</strong>：
+   - <code>track_video</code>：6 镜视频无缝顺排；
+   - <code>track_audio</code>：每镜配音与视频起止点微秒吻合；
+   - <code>track_text</code>：带货花字，第 1 镜黄金钩子预设黄色高亮与更大字号；</li>
+<li><strong>自适应防黑帧</strong>：精确计算 <code>source_timerange</code> 与 <code>target_timerange</code>，杜绝黑帧与音频爆音重叠。</li>
+</ol>
+<h3 id="zip">导入步骤（推荐 zip 包）</h3>
+<figure><img alt="剪映草稿 zip 包下载按钮" src="./screenshots/13_jianying_zip_export.png" /><figcaption>剪映草稿 zip 包下载按钮</figcaption></figure>
+<p>在「✨ 审片交付」页点击「📦 下载完整草稿 zip 包 (含素材)」，包内：</p>
+<ul>
+<li><code>draft_content.json</code> / <code>draft_meta_info.json</code>：标准草稿工程（素材路径已改写为相对 <code>assets/...</code>）；</li>
+<li><code>assets/</code>：已生成的分镜视频素材与可选旁白音频；</li>
+<li><code>README-使用说明.txt</code>：本包素材清单（<strong>缺失素材如实列出</strong>）与导入步骤。</li>
+</ul>
+<p>导入：</p>
+<ol>
+<li>解压 <code>&lt;工程名&gt;_剪映草稿.zip</code>；</li>
+<li>打开剪映电脑版新建空草稿后关闭；</li>
+<li>进入草稿目录（Windows 默认 <code>%LOCALAPPDATA%\JianyingPro\User Data\Projects\com.lveditor.draft\&lt;草稿名&gt;\</code>）；</li>
+<li>把 <code>draft_content.json</code>、<code>draft_meta_info.json</code> 与 <code>assets/</code> 复制进去（同名覆盖）；</li>
+<li>重新打开剪映即可看到三轨对齐的完整工程。</li>
+</ol>
+<blockquote>
+<p>伴生服务在线时，页面会出现「📤 发送到伴生服务落盘」按钮，一键解压到本地草稿目录（见主手册伴生服务章节）。</p>
+</blockquote>
+<hr />
+<h2 id="5_1">5. 数据反馈闭环：回流看板与胜率加权</h2>
+<figure><img alt="回流看板：数据录入与胜率看板" src="./screenshots/12_reflow_board.png" /><figcaption>回流看板：数据录入与胜率看板</figcaption></figure>
+<ol>
+<li>点击顶部导航「📊 回流看板」；</li>
+<li>填写：视频标题、命中的结构模板与钩子、商品种类、平台的 <strong>3 秒完播率 / 完播率 / 转化数</strong>；</li>
+<li>点「📥 录入回流数据」，数据存入本地 IndexedDB；</li>
+<li>看板按<strong>结构 / 钩子 / 品类</strong>三维聚合胜率（纯 CSS 条形图，从高到低）；</li>
+<li>胜率采用 <strong>Laplace 平滑</strong>：<code>(胜出次数 + 1) / (样本数 + 2)</code>，其中 3 秒完播率 ≥ 30% 记为一次「胜出」；</li>
+<li>之后每次生成脚本，钩子采样按真实胜率加权——高胜率钩子优先被选中。</li>
+</ol>
+<blockquote>
+<p>数据仅存本地浏览器 IndexedDB，不上传任何服务器。画布的记忆系统与这里<strong>共用同一套聚合</strong>。</p>
+</blockquote>
+<hr />
+<h2 id="6-legacy">6. 剧情短剧粗剪台（legacy）</h2>
+<figure><img alt="剧情短剧粗剪台" src="./screenshots/25_drama_legacy.png" /><figcaption>剧情短剧粗剪台</figcaption></figure>
+<ul>
+<li>进入方式：顶栏「🎭 剧情短剧」或深链 <code>?view=drama</code>；</li>
+<li>内置《门缝》《未读》《13层》6 镜剧情预演与提示词包导出；</li>
+<li><strong>定位</strong>：保留兼容与零回归（sell / drama 管线不在画布化改造范围内）；
+  <strong>新创作建议走 Agent 画布</strong>（同样的分镜预演与出片能力，且支持自由拓扑与 Skill 复用）。</li>
+</ul>
+<hr />
+<h2 id="7">7. 诚实边界</h2>
+<ul>
+<li><strong>可灵 / 即梦真实出片连通待真实环境</strong>：签名与请求形状已契约验证，真实出片需你自备 Key 后
+  <code>npm run verify:providers -- --kling-key=AK:SK --jimeng-key=AK:SK</code>；</li>
+<li><strong>Runway / Luma 待真实环境验证</strong>（契约已实现并锁定，未跑通真实出片）；</li>
+<li><strong>Mock 引擎 0 灵感币</strong>，其余引擎按各自定价走虚拟钱包两阶段事务；</li>
+<li>未配置 Key 时相关引擎<strong>如实禁用并提示</strong>，不会假装可用。</li>
+</ul>
 </body></html>
