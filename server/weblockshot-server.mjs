@@ -10,6 +10,8 @@
  * 5. （预留）PUT/GET/DELETE /api/sessions/:id：会话快照存取（BackendAdapter rest 模式后端）
  * 6. （预留）/api/llm 反代：设置 WLS_LLM_TARGET 后启用，未设置返回 501
  * 7. （预留）WLS_KEYS：设置后反代注入真实密钥 Authorization 头；未设置 = 透传模式（现状）
+ * 8. /api/connectors（D4）：连接器目录 + auth/run 占位（协议层 mock，不引 SDK，不接真实第三方）
+ *    /healthz 能力位 connectors: 'interface' | 'ready'（D8 检测到 @modelcontextprotocol/sdk 后切 ready）
  *
  * 用法：
  *   npx weblockshot                 # 默认端口 5174
@@ -37,6 +39,7 @@ import { createStorage } from './storage.mjs'
 import { createTtsHandler, createTtsFileHandler } from './tts.mjs'
 import { createRenderHandler, createRenderFileHandler, detectFfmpeg, RENDER_DEFAULT_TIMEOUT_SEC } from './render.mjs'
 import { createMemoryHandler } from './memory.mjs'
+import { createConnectorsHandler } from './connectors.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const STARTED_AT = Date.now()
@@ -510,6 +513,11 @@ export async function startServer(opts = {}) {
   const memoryEnabled = opts.memory !== undefined ? opts.memory : storage.mode === 'sqlite'
   const memoryHandler = createMemoryHandler({ enabled: memoryEnabled, storage, logger })
 
+  // D4 连接器面板：协议层 mock（不引 SDK，不接真实第三方）；healthz 能力位 connectors: interface|ready
+  // D8 将在检测到 @modelcontextprotocol/sdk 后传 'ready'（本期恒 'interface'）
+  const connectorsMode = opts.connectorsMode !== undefined ? opts.connectorsMode : 'interface'
+  const connectorsHandler = createConnectorsHandler({ mode: connectorsMode, logger })
+
   const healthPayload = () => ({
     ok: true,
     version: PKG_VERSION,
@@ -524,6 +532,7 @@ export async function startServer(opts = {}) {
     tts: args.tts,
     ffmpeg: ffmpegEnabled && ffmpegPath ? 'on' : 'off',
     memory: memoryEnabled ? 'sqlite' : 'off',
+    connectors: connectorsMode,
   })
 
   /** 校验共享 token：x-wls-token 头或 Authorization: Bearer <token> */
@@ -579,6 +588,19 @@ export async function startServer(opts = {}) {
       // 预留接口：未配置 WLS_LLM_TARGET 时明确 501，而非静默 404
       sendJson(res, 501, {
         error: 'LLM 反代未启用（预留接口）。设置 WLS_LLM_TARGET 后本路由将反向代理至目标 LLM API。',
+      })
+      return
+    }
+
+    // 连接器面板（D4）：/api/connectors[/:id/auth|run]（协议层 mock，未接入如实 501）
+    if (urlPath === '/api/connectors' || urlPath.startsWith('/api/connectors/')) {
+      connectorsHandler(req, res, urlPath).catch((err) => {
+        logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, 'connectors 处理异常')
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: 'connectors 内部错误' })
+        } else {
+          res.end()
+        }
       })
       return
     }

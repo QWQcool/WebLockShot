@@ -45,6 +45,7 @@ import { WlsNodeUtil } from '../../canvas/WlsNodeUtil.tsx'
 import { MemoryGraphView } from './MemoryGraphView.tsx'
 import type { MemoryGraphThumbInput } from '../../canvas/memoryGraph.ts'
 import { SkillMarketView } from './SkillMarketView.tsx'
+import { ConnectorPanelView } from './ConnectorPanelView.tsx'
 import { findInstalledByName, readSkillLibrary, type InstalledSkill } from '../../canvas/skillLibrary.ts'
 import { Stage3DStudio } from '../stage3d/Stage3DStudio.tsx'
 import {
@@ -375,6 +376,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   const refreshInstalledSkills = useCallback(() => {
     setInstalledSkills(readSkillLibrary())
   }, [])
+
+  // D4 连接器面板（Miora 图6 回炉）：工具条入口 + 全屏覆盖层（协议层 mock，诚实标注未接入）
+  const [isConnectorPanelOpen, setIsConnectorPanelOpen] = useState(false)
 
   // D1 3D 运镜台：stage3d 节点按钮派发 window 事件 → 打开全屏 Stage3DStudio；
   // 摆台数据经 writeStage3DMetaPayload 写回节点 meta.stage3d（走既有 shape 变更 → 持久化链路）
@@ -1005,6 +1009,15 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             >
               🧩 Skill 市场
             </button>
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="open-connectors"
+              title="连接器：推荐连接器目录 + 自定义添加（本期仅接口 + 协议层 mock，未接入）"
+              onClick={() => setIsConnectorPanelOpen(true)}
+            >
+              🔌 连接器
+            </button>
             <span className="wls-canvas-save-state">已保存 {savedAt}</span>
           </div>
           <div className="wls-canvas-root">
@@ -1149,6 +1162,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
           onChanged={refreshInstalledSkills}
         />
       )}
+
+      {/* D4 连接器面板全屏覆盖层（图6 浅色主题；协议层 mock，卡片如实标注未接入） */}
+      {isConnectorPanelOpen && <ConnectorPanelView onClose={() => setIsConnectorPanelOpen(false)} />}
 
       {/* D1 3D 运镜台全屏页（图7；R3F 视口在 Studio 内 React.lazy 懒加载，主包不含 three） */}
       {stage3dTarget && (
