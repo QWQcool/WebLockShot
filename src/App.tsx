@@ -9,15 +9,16 @@ const CanvasWorkbench = lazy(() =>
 )
 
 export default function App() {
-  // 顶层模式：'sell' 多 Agent 带货工作台（P0 核心）/'drama' 原剧情短剧粗剪台（兼容）/'canvas' Agent 创意画布（CANVAS_PLAN.md 一期 A）
-  // 支持 ?view=canvas 深链直达（与 sell 模式 ?mode=&step= 的 URL 参数惯例一致）
+  // 顶层模式：'canvas' Agent 创意画布（默认入口，画布优先）/'sell' 多 Agent 带货工作台 /'drama' 剧情短剧粗剪台
+  // 深链：?view=sell | drama | canvas（与 sell 模式 ?mode=&step= 的 URL 参数惯例一致）；
+  // 无参数或参数非法时默认进入 Agent 画布（用户拍板：画布优先，带货次之）
   const [mode, setMode] = useState<'sell' | 'drama' | 'canvas'>(() => {
     try {
-      return new URLSearchParams(window.location.search).get('view') === 'canvas'
-        ? 'canvas'
-        : 'sell'
+      const v = new URLSearchParams(window.location.search).get('view')
+      if (v === 'sell' || v === 'drama' || v === 'canvas') return v
+      return 'canvas'
     } catch {
-      return 'sell'
+      return 'canvas'
     }
   })
 
