@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RECOMMENDED_CONNECTORS } from '../../canvas/connectors.ts'
 import { ONBOARDING_SCENE_TABS, onboardingPromptFor } from '../../canvas/canvasOnboarding.ts'
+import { useLanguage, useT } from '../../i18n/useLanguage.ts'
+import { onboardingTabLabel } from '../../i18n/strings.ts'
 import './canvasOnboarding.css'
 
 /**
@@ -32,6 +34,8 @@ export const CanvasOnboardingView: React.FC<Props> = ({
   onOpenConnectors,
   onOpenScenes,
 }) => {
+  const lang = useLanguage()
+  const t = useT()
   const [draft, setDraft] = useState('')
   const [activeTab, setActiveTab] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -63,22 +67,22 @@ export const CanvasOnboardingView: React.FC<Props> = ({
     <div className="co-root" data-testid="canvas-onboarding">
       <div className="co-card">
         <header className="co-head">
-          <h1>Agent 创意画布</h1>
-          <p>一句话描述你想要什么，Agent 帮你把创作流程摆上画布</p>
+          <h1>{t('onboarding.title')}</h1>
+          <p>{t('onboarding.subtitle')}</p>
         </header>
 
-        <div className="co-tabs" role="tablist" aria-label="创作场景">
-          {ONBOARDING_SCENE_TABS.map((t) => (
+        <div className="co-tabs" role="tablist" aria-label={t('onboarding.tabsAria')}>
+          {ONBOARDING_SCENE_TABS.map((tab) => (
             <button
-              key={t.id}
+              key={tab.id}
               type="button"
               role="tab"
-              aria-selected={activeTab === t.id}
-              className={`co-tab${activeTab === t.id ? ' active' : ''}`}
-              data-testid={`co-tab-${t.id}`}
-              onClick={() => handleTab(t.id, t.scene)}
+              aria-selected={activeTab === tab.id}
+              className={`co-tab${activeTab === tab.id ? ' active' : ''}`}
+              data-testid={`co-tab-${tab.id}`}
+              onClick={() => handleTab(tab.id, tab.scene)}
             >
-              <span aria-hidden>{t.icon}</span> {t.label}
+              <span aria-hidden>{tab.icon}</span> {onboardingTabLabel(lang, tab.id)}
             </button>
           ))}
         </div>
@@ -88,7 +92,7 @@ export const CanvasOnboardingView: React.FC<Props> = ({
             ref={inputRef}
             className="co-input"
             data-testid="co-input"
-            placeholder="描述你的创作需求，例如：给「填入商品」拍一条 30 秒竖屏带货短视频…"
+            placeholder={t('onboarding.inputPlaceholder')}
             maxLength={500}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -100,17 +104,15 @@ export const CanvasOnboardingView: React.FC<Props> = ({
             }}
           />
           <div className="co-input-foot">
-            <span className="co-input-hint">
-              Enter 发送 · Shift+Enter 换行 · 无 LLM Key 时走「演示编排 · 非真实 LLM」并如实标注
-            </span>
+            <span className="co-input-hint">{t('onboarding.inputHint')}</span>
             <button type="button" className="co-send" data-testid="co-send" onClick={handleSend}>
-              ↗ 发送
+              {t('onboarding.send')}
             </button>
           </div>
         </div>
 
         <div className="co-connectors">
-          <span className="co-connectors-label">🔌 将你的常用应用接入</span>
+          <span className="co-connectors-label">{t('onboarding.connectorsLabel')}</span>
           <div className="co-connector-icons">
             {RECOMMENDED_CONNECTORS.map((c) => (
               <button
@@ -118,8 +120,8 @@ export const CanvasOnboardingView: React.FC<Props> = ({
                 type="button"
                 className="co-connector-icon"
                 style={{ background: c.tint }}
-                title={`${c.name}（未接入 · 点击查看连接器面板）`}
-                aria-label={`${c.name}（未接入）`}
+                title={t('onboarding.connectorTitle', { name: c.name })}
+                aria-label={t('onboarding.connectorAria', { name: c.name })}
                 data-testid={`co-connector-${c.id}`}
                 onClick={onOpenConnectors}
               >
@@ -132,21 +134,21 @@ export const CanvasOnboardingView: React.FC<Props> = ({
               data-testid="co-connectors-more"
               onClick={onOpenConnectors}
             >
-              全部连接器 →
+              {t('onboarding.connectorsMore')}
             </button>
           </div>
         </div>
 
         <div className="co-actions">
           <button type="button" className="co-enter" data-testid="co-enter" onClick={onClose}>
-            进入画布 →
+            {t('onboarding.enter')}
           </button>
           {onOpenScenes && (
             <button type="button" className="co-scenes-link" data-testid="co-open-scenes" onClick={onOpenScenes}>
-              更多创作场景 →
+              {t('onboarding.moreScenes')}
             </button>
           )}
-          <span className="co-actions-note">首次进入显示本页；之后折叠为底部对话栏</span>
+          <span className="co-actions-note">{t('onboarding.actionsNote')}</span>
         </div>
       </div>
     </div>

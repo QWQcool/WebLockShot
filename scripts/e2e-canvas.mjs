@@ -281,7 +281,34 @@ async function main() {
       await page.waitForSelector('[data-testid=scene-gallery]', { state: 'detached', timeout: 5000 })
     })
 
-    await step('⑥ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
+    await step('⑥ i18n：切英文即时生效 + 刷新持久化 + 切回中文零残留', async () => {
+      const paletteTitle = () => page.textContent('.wls-palette-title')
+      const chatPlaceholder = () => page.getAttribute('.wls-chat-input', 'placeholder')
+      assert((await paletteTitle()) === 'Agent 节点', `默认应为中文：${await paletteTitle()}`)
+
+      await page.click('[data-testid=toggle-language]')
+      await page.waitForFunction(() => document.querySelector('.wls-palette-title')?.textContent === 'Agent nodes', null, {
+        timeout: 8000,
+      })
+      assert(/Describe what you want/.test((await chatPlaceholder()) || ''), `对话栏未切英文：${await chatPlaceholder()}`)
+      // 节点面板标签也走 i18n（切语言后画布节点标题同步）
+      assert(
+        /WebLockShot · Agent Canvas/.test((await page.textContent('.brand-text h1')) || ''),
+        '顶栏品牌未切英文'
+      )
+
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('[data-testid=chat-dock]', { timeout: 20_000 })
+      assert((await paletteTitle()) === 'Agent nodes', `刷新后语言未持久化：${await paletteTitle()}`)
+
+      await page.click('[data-testid=toggle-language]')
+      await page.waitForFunction(() => document.querySelector('.wls-palette-title')?.textContent === 'Agent 节点', null, {
+        timeout: 8000,
+      })
+      assert((await paletteTitle()) === 'Agent 节点', '切回中文失败')
+    })
+
+    await step('⑦ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
       assert(pageErrors.length === 0, `捕获到 ${pageErrors.length} 条 pageerror：${pageErrors.slice(0, 3).join(' | ')}`)
     })
   } finally {

@@ -79,6 +79,9 @@ import {
   writeStage3DFrameSequence,
   type Stage3DFrameSequence,
 } from '../../canvas/stage3dFrames.ts'
+import { useLanguage, useT } from '../../i18n/useLanguage.ts'
+import { setLanguage } from '../../i18n/language.ts'
+import { nodeHint, nodeLabel, templateLabel } from '../../i18n/strings.ts'
 
 /**
  * Agent 创意画布 · 一期 A（CANVAS_PLAN.md §4.1-1/2/6/7 + v1.1 变更）。
@@ -154,6 +157,9 @@ function enforceEdgeCompat(editor: Editor): string | null {
 }
 
 export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDrama }) => {
+  // I1：界面语言（默认中文；切换后顶栏/工具条/节点面板/对话栏即时重渲染）
+  const lang = useLanguage()
+  const t = useT()
   const editorRef = useRef<Editor | null>(null)
   const saveTimerRef = useRef<number | null>(null)
   const suppressSaveRef = useRef(false)
@@ -320,7 +326,10 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
 
   /** D9：新建项目并切过去 */
   const handleCreateProject = useCallback(() => {
-    const name = window.prompt('新项目名称：', `项目 ${projectIndex.projects.length + 1}`)
+    const name = window.prompt(
+      t('project.newPrompt'),
+      t('project.defaultName', { n: projectIndex.projects.length + 1 })
+    )
     if (name === null) return
     // 切走前先把当前项目落盘（否则未落盘内容会随 docRef 重置丢失）
     persistNow()
@@ -336,7 +345,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     const editor = editorRef.current
     if (editor) replaceCanvasShapes(editor, doc)
     setProjectNotice(`✓ 已新建项目「${doc.name}」`)
-  }, [projectIndex.projects.length, persistNow, replaceCanvasShapes])
+  }, [projectIndex.projects.length, persistNow, replaceCanvasShapes, t])
 
   /** D9：删除当前项目（至少保留一个；删后自动切到剩余项目） */
   const handleDeleteProject = useCallback(() => {
@@ -345,7 +354,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       return
     }
     const current = projectIndex.projects.find((p) => p.id === activeProjectId)
-    if (!window.confirm(`删除项目「${current?.name ?? ''}」？该项目的画布内容将一并删除。`)) return
+    if (!window.confirm(t('project.deleteConfirm', { name: current?.name ?? '' }))) return
     const r = deleteProject(undefined, activeProjectId)
     if (!r.ok) {
       setProjectNotice(`⛔ ${r.reason}`)
@@ -358,7 +367,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     const editor = editorRef.current
     if (editor) replaceCanvasShapes(editor, doc)
     setProjectNotice(`已删除项目并切换到「${doc.name}」`)
-  }, [projectIndex.projects, activeProjectId, replaceCanvasShapes])
+  }, [projectIndex.projects, activeProjectId, replaceCanvasShapes, t])
 
   const handleMount = useCallback(
     (editor: Editor) => {
@@ -863,7 +872,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       // P2-1：busy 可见反馈——提示条常驻「布置中」，输入框 placeholder 同步切换
       orchestrationIdsRef.current = null
       setHasUndoable(false)
-      showOrchestrationNotice('🤖 Agent 正在布置画布，请稍候…')
+      showOrchestrationNotice(t('orch.busy'))
       if (hasKey && token) {
         // 真实 LLM 编排：结构化 JSON 拓扑建议，≤2 次重试后降级演示
         mode = 'llm'
@@ -905,19 +914,20 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       orchestrationIdsRef.current = created // P1：布置时记录 shapeIds 快照，撤销按钮直接读 ref
       setHasUndoable(created.length > 0)
       editor.zoomToFit()
-      const modeLabel = mode === 'llm' ? '✓ LLM 编排' : '🧪 演示编排 · 非真实 LLM'
+      const modeLabel = mode === 'llm' ? t('orch.llm') : t('orch.demo')
       showOrchestrationNotice(
-        `${modeLabel}：已布置 ${plan.nodes.length} 个节点、${plan.edges.length} 条连线` +
-          (degraded ? '（LLM 编排不合格，已降级演示）' : '')
+        modeLabel +
+          t('orch.placed', { n: plan.nodes.length, e: plan.edges.length }) +
+          (degraded ? t('orch.degraded') : '')
       )
       setChatDraft('')
       chatInputRef.current?.focus()
     } catch (err) {
-      showOrchestrationNotice(`⚠️ 编排失败：${err instanceof Error ? err.message : '未知错误'}`)
+      showOrchestrationNotice(t('orch.failed', { msg: err instanceof Error ? err.message : 'unknown error' }))
     } finally {
       setOrchestrating(false)
     }
-  }, [applyOrchestrationPlan, orchestrating, showOrchestrationNotice])
+  }, [applyOrchestrationPlan, orchestrating, showOrchestrationNotice, t])
 
   /** 底部对话栏发送（读取当前输入框内容） */
   const onChatSend = useCallback(() => {
@@ -1121,12 +1131,11 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       orchestrationIdsRef.current = created
       setHasUndoable(true)
       showOrchestrationNotice(
-        `✓ 已导入 Skill「${manifest.name}」：${plan.nodes.length} 节点 / ${plan.edges.length} 边 · ` +
-          '入口节点请「填新输入」（其余参数延续），产物需重新生成'
+        t('orch.imported', { name: manifest.name, n: plan.nodes.length, e: plan.edges.length })
       )
       editor.zoomToFit()
     },
-    [showOrchestrationNotice, showSkillNotice]
+    [showOrchestrationNotice, showSkillNotice, t]
   )
 
   // S2：文件导入（非法 JSON / 不合格 manifest 整体拒绝并给中文原因，不半渲染）
@@ -1151,8 +1160,17 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   )
 
   const paletteItems = useMemo(
-    () => CANVAS_NODE_KINDS.map((kind) => ({ kind, ...CANVAS_NODE_META[kind] })),
-    []
+    () =>
+      CANVAS_NODE_KINDS.map((kind) => ({
+        kind,
+        icon: CANVAS_NODE_META[kind].icon,
+        accent: CANVAS_NODE_META[kind].accent,
+        phase: CANVAS_NODE_META[kind].phase,
+        // I1：标签/提示走 i18n（切语言后随 lang 变化重建）
+        label: nodeLabel(lang, kind),
+        hint: nodeHint(lang, kind),
+      })),
+    [lang]
   )
 
   return (
@@ -1162,28 +1180,28 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
         <div className="header-brand">
           <span className="logo-badge">WLS</span>
           <div className="brand-text">
-            <h1>WebLockShot · Agent 创意画布</h1>
-            <span className="wls-canvas-phase-tag">一期 A · 初意工作室（自由创作空间）</span>
+            <h1>{t('app.brand')}</h1>
+            <span className="wls-canvas-phase-tag">{t('app.subtitle')}</span>
           </div>
         </div>
 
-        <div className="mode-toggle" role="tablist" aria-label="工作模式">
+        <div className="mode-toggle" role="tablist" aria-label={t('mode.aria')}>
           <button type="button" role="tab" aria-selected={false} className="mode-btn" onClick={onSwitchToSell}>
-            🎯 带货工作台
+            {t('mode.sell')}
           </button>
           <button type="button" role="tab" aria-selected={false} className="mode-btn" onClick={onSwitchToDrama}>
-            🎭 剧情短剧
+            {t('mode.drama')}
           </button>
           <button type="button" role="tab" aria-selected={true} className="mode-btn active" aria-current="page">
-            🎨 Agent 画布
+            {t('mode.canvas')}
           </button>
         </div>
       </header>
 
       <div className="wls-canvas-body">
         {/* 左侧节点面板 */}
-        <aside className="wls-node-palette" aria-label="Agent 节点面板">
-          <div className="wls-palette-title">Agent 节点</div>
+        <aside className="wls-node-palette" aria-label={t('palette.aria')}>
+          <div className="wls-palette-title">{t('palette.title')}</div>
           {paletteItems.map((item) => (
             <button
               key={item.kind}
@@ -1198,9 +1216,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               <span className="wls-palette-phase">{item.phase}</span>
             </button>
           ))}
-          <div className="wls-palette-tip">
-            点击添加节点到画布中央；灰态节点为后续阶段占位（诚实标注，不装可用）。
-          </div>
+          <div className="wls-palette-tip">{t('palette.tip')}</div>
         </aside>
 
         {/* tldraw 画布 */}
@@ -1210,7 +1226,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             <select
               className="wls-project-select"
               data-testid="project-select"
-              aria-label="画布项目"
+              aria-label={t('project.aria')}
               value={activeProjectId}
               onChange={(e) => switchProject(e.target.value)}
             >
@@ -1224,25 +1240,25 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               type="button"
               className="wls-canvas-btn"
               data-testid="project-new"
-              title="新建画布项目（独立存储，切换不串数据）"
+              title={t('project.newTitle')}
               onClick={handleCreateProject}
             >
-              ＋ 新项目
+              {t('project.new')}
             </button>
             <button
               type="button"
               className="wls-canvas-btn"
               data-testid="project-delete"
-              title="删除当前项目（至少保留一个）"
+              title={t('project.deleteTitle')}
               onClick={handleDeleteProject}
             >
-              🗑 删除项目
+              {t('project.delete')}
             </button>
             <input
               className="wls-canvas-name"
               value={docName}
               maxLength={120}
-              aria-label="画布名称"
+              aria-label={t('project.nameAria')}
               onChange={(e) => onRename(e.target.value)}
             />
             <button
@@ -1252,12 +1268,13 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               disabled={selectedNodeCount < 2}
               title={
                 selectedNodeCount < 2
-                  ? '框选 ≥2 个画布节点后可导出 Skill 包（产物/大资产字段自动剥离）'
-                  : `导出选中的 ${selectedNodeCount} 个节点为 Skill 包（JSON 下载）`
+                  ? t('toolbar.exportSkillNeedTwo')
+                  : t('toolbar.exportSkillReady', { n: selectedNodeCount })
               }
               onClick={handleExportSkill}
             >
-              📦 导出 Skill{selectedNodeCount >= 2 ? `（${selectedNodeCount}）` : ''}
+              {t('toolbar.exportSkill')}
+              {selectedNodeCount >= 2 ? `（${selectedNodeCount}）` : ''}
             </button>
             <input
               ref={importInputRef}
@@ -1275,10 +1292,10 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               type="button"
               className="wls-canvas-btn"
               data-testid="import-skill"
-              title="导入 Skill 包 JSON：校验通过后整批上画布（可一键撤销），入口节点高亮「填新输入」"
+              title={t('toolbar.importSkillTitle')}
               onClick={() => importInputRef.current?.click()}
             >
-              📥 导入 Skill
+              {t('toolbar.importSkill')}
             </button>
             {/* E2：官方快捷按钮——已安装但停用的 Skill 从快捷入口消失（启停语义，dev 裁量）；
                 未安装的官方 Skill 仍可快捷布置（保持 S2 既有行为，与市场「获取并安装」并存不冲突） */}
@@ -1298,57 +1315,67 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               </button>
             ))}
             <button type="button" className="wls-canvas-btn" onClick={onClear}>
-              🧹 清空画布
+              {t('toolbar.clear')}
             </button>
             <button
               type="button"
               className="wls-canvas-btn"
               data-testid="open-memory-graph"
-              title="记忆图谱：真实回流记录可视化（暗色全屏视图，摆样例数据为零）"
+              title={t('toolbar.memoryTitle')}
               onClick={openMemoryGraph}
             >
-              🧠 记忆图谱
+              {t('toolbar.memory')}
             </button>
             <button
               type="button"
               className="wls-canvas-btn"
               data-testid="open-skill-market"
-              title="Skill 市场：已安装/官方内置统一管理（安装/启停/卸载/发布到本地）"
+              title={t('toolbar.marketTitle')}
               onClick={() => {
                 refreshInstalledSkills()
                 setIsSkillMarketOpen(true)
               }}
             >
-              🧩 Skill 市场
+              {t('toolbar.market')}
             </button>
             <button
               type="button"
               className="wls-canvas-btn"
               data-testid="open-connectors"
-              title="连接器：推荐连接器目录 + 自定义添加（本期仅接口 + 协议层 mock，未接入）"
+              title={t('toolbar.connectorsTitle')}
               onClick={() => setIsConnectorPanelOpen(true)}
             >
-              🔌 连接器
+              {t('toolbar.connectors')}
             </button>
             <button
               type="button"
               className="wls-canvas-btn"
               data-testid="open-scene-gallery"
-              title="创作场景：六类创作场景卡片（点击预填对话栏 / 一键编排，复用 B6 编排路由）"
+              title={t('toolbar.scenesTitle')}
               onClick={() => setIsSceneGalleryOpen(true)}
             >
-              🎬 创作场景
+              {t('toolbar.scenes')}
             </button>
             {mcpReady && (
               <span
                 className="wls-canvas-mcp-chip"
                 data-testid="mcp-chip"
-                title="MCP 反向驱动已就绪：本地 Agent 可读取画布拓扑并建节点/连线"
+                title={t('toolbar.mcpReadyTitle')}
               >
-                🤖 MCP 已就绪
+                {t('toolbar.mcpReady')}
               </span>
             )}
-            <span className="wls-canvas-save-state">已保存 {savedAt}</span>
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="toggle-language"
+              title={t('toolbar.langTitle')}
+              aria-label={t('toolbar.langTitle')}
+              onClick={() => setLanguage(lang === 'zh' ? 'en' : 'zh')}
+            >
+              🌐 {lang === 'zh' ? '中文' : 'EN'}
+            </button>
+            <span className="wls-canvas-save-state">{t('toolbar.savedAt', { time: savedAt })}</span>
           </div>
           <div className="wls-canvas-root">
             <Tldraw shapeUtils={[WlsNodeUtil]} onMount={handleMount}>
@@ -1416,7 +1443,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={handleOrchestrationUndo}
                     >
-                      ↩️ 撤销本次编排
+                      {t('orch.undo')}
                     </button>
                   )}
                 <button
@@ -1443,14 +1470,14 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
                   type="button"
                   className="wls-chat-collapse-pill"
                   data-testid="chat-expand"
-                  aria-label="展开对话栏"
-                  title="展开对话栏"
+                  aria-label={t('chat.expand')}
+                  title={t('chat.expand')}
                   onClick={() => {
                     setChatCollapsed(false)
                     chatInputRef.current?.focus()
                   }}
                 >
-                  💬 对话
+                  {t('chat.expand')}
                 </button>
               ) : (
                 <>
@@ -1460,12 +1487,8 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
                       className="wls-chat-input"
                       value={chatDraft}
                       maxLength={500}
-                      placeholder={
-                        orchestrating
-                          ? '🤖 Agent 正在布置画布，请稍候…'
-                          : '描述你想要什么，Agent 帮你上画布…'
-                      }
-                      aria-label="对话栏：一句话生成 Brief 节点"
+                      placeholder={orchestrating ? t('chat.placeholderBusy') : t('chat.placeholder')}
+                      aria-label={t('chat.aria')}
                       onChange={(e) => setChatDraft(e.target.value)}
                       onKeyDown={onChatKeyDown}
                     />
@@ -1475,14 +1498,14 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
                       disabled={orchestrating}
                       onClick={() => void onChatSend()}
                     >
-                      {orchestrating ? '🤖 编排中…' : '发送 ↗'}
+                      {orchestrating ? t('chat.sendBusy') : t('chat.send')}
                     </button>
                     <button
                       type="button"
                       className="wls-chat-collapse"
                       data-testid="chat-collapse"
-                      aria-label="收起对话栏"
-                      title="收起对话栏（露出底部工具条）"
+                      aria-label={t('chat.collapse')}
+                      title={t('chat.collapseTitle')}
                       onClick={() => setChatCollapsed(true)}
                     >
                       ▾
@@ -1497,7 +1520,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
                         title={tpl.prompt}
                         onClick={() => onTemplatePick(tpl.prompt)}
                       >
-                        {tpl.icon} {tpl.label}
+                        {tpl.icon} {templateLabel(lang, tpl.id)}
                       </button>
                     ))}
                   </div>
@@ -1584,9 +1607,10 @@ function miniEqual(
 
 /** 画布内诚实标注条（tldraw 左上菜单下方，单一信息位） */
 function CanvasEmptyHint() {
+  const t = useT()
   return (
     <div className="wls-canvas-hint" dir="ltr">
-      对话栏一期 A 只落 Brief 节点 · 连线与业务管线为一期 B · 灰态节点为二/三期占位 · License 水印为 tldraw 免费版
+      {t('canvas.emptyHint')}
     </div>
   )
 }

@@ -2399,6 +2399,14 @@ textarea:focus-visible {
   border-color: #38bdf8;
 }
 
+/* I1：语言切换选中态（与预设 chip 同一视觉语言） */
+.preset-btn-chip.active {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  color: #fff;
+  font-weight: 600;
+}
+
 .form-item {
   margin-bottom: 0.85rem;
 }

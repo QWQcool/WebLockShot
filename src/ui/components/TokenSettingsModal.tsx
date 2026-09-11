@@ -9,6 +9,8 @@ import {
 import { resolveMemorySource, type MemorySource } from '../../canvas/memorySource.ts'
 import { clearMemoryRecords } from '../../services/companion/memoryClient.ts'
 import { clearAllFeedbackRecords } from '../../domain/feedback.ts'
+import { useLanguage, useSetLanguage, useT } from '../../i18n/useLanguage.ts'
+import { LANGUAGES, type Language } from '../../i18n/strings.ts'
 
 type Props = {
   isOpen: boolean
@@ -47,6 +49,10 @@ export const TokenSettingsModal: React.FC<Props> = ({
   onSaved,
   onOpenMemoryGraph,
 }) => {
+  // I1：界面语言（默认中文；切换即时生效并持久化，零业务数据影响）
+  const lang = useLanguage()
+  const setLang = useSetLanguage()
+  const t = useT()
   const [tokenConfig, setTokenConfig] = useState<TokenConfig>({
     baseUrl: 'https://api.siliconflow.cn/v1',
     apiKey: '',
@@ -207,7 +213,7 @@ export const TokenSettingsModal: React.FC<Props> = ({
         <div className="modal-header">
           <div className="modal-title-group">
             <span className="modal-icon">⚙️</span>
-            <h3>API 与模型接入设置</h3>
+            <h3>{t('settings.title')}</h3>
           </div>
           <button type="button" className="btn-close-modal" onClick={onClose}>
             ×
@@ -215,6 +221,31 @@ export const TokenSettingsModal: React.FC<Props> = ({
         </div>
 
         <div className="modal-body">
+          {/* I1：界面语言切换（默认中文；切换即时生效并持久化） */}
+          <div className="settings-section" data-testid="language-section">
+            <div className="section-title-bar">
+              <h4>{t('settings.langSection')}</h4>
+            </div>
+            <div className="presets-row" role="radiogroup" aria-label={t('settings.langSection')}>
+              {LANGUAGES.map((code: Language) => (
+                <button
+                  key={code}
+                  type="button"
+                  role="radio"
+                  aria-checked={lang === code}
+                  className={`preset-btn-chip${lang === code ? ' active' : ''}`}
+                  data-testid={`language-${code}`}
+                  onClick={() => setLang(code)}
+                >
+                  {code === 'zh' ? t('settings.langZh') : t('settings.langEn')}
+                </button>
+              ))}
+            </div>
+            <div className="security-text">
+              <small>{t('settings.langHint')}</small>
+            </div>
+          </div>
+
           {/* 安全告知 */}
           <div className="security-notice-box">
             <span className="security-icon">🔒</span>
@@ -227,7 +258,7 @@ export const TokenSettingsModal: React.FC<Props> = ({
           {/* 模块 A：LLM 提示词与扩写模型 */}
           <div className="settings-section">
             <div className="section-title-bar">
-              <h4>1. 大语言模型（LLM）配置（提示词扩写 & 编导审稿）</h4>
+              <h4>{t('settings.sectionLlm')}</h4>
               <span className="section-tag">OpenAI 兼容接口</span>
             </div>
 
@@ -285,7 +316,7 @@ export const TokenSettingsModal: React.FC<Props> = ({
           {/* 模块 B：视频生成 Provider 配置 */}
           <div className="settings-section">
             <div className="section-title-bar">
-              <h4>2. 视频生成引擎（Media Provider）</h4>
+              <h4>{t('settings.sectionVideo')}</h4>
               <span className="section-tag">出片端</span>
             </div>
 
@@ -461,7 +492,7 @@ export const TokenSettingsModal: React.FC<Props> = ({
           {/* 模块 C：S3 记忆系统（结构化，不玄学） */}
           <div className="settings-section">
             <div className="section-title-bar">
-              <h4>3. 记忆（回流偏好 · 结构化胜率）</h4>
+              <h4>{t('settings.sectionMemory')}</h4>
               <span className="section-tag">
                 {memory ? (memory.mode === 'server' ? '伴生服务 sqlite' : '纯前端模式') : '探测中…'}
               </span>

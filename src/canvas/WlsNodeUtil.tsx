@@ -16,6 +16,8 @@ import {
   type CanvasNodeKind,
 } from './contract.ts'
 import { STAGE3D_OPEN_EVENT } from './stage3dMeta.ts'
+import { useT } from '../i18n/useLanguage.ts'
+import { nodeHintKey, nodeLabelKey } from '../i18n/strings.ts'
 import { AssetNodeBody } from './AssetNodeBody.tsx'
 import { GenerateNodeBody } from './GenerateNodeBody.tsx'
 import { ScriptNodeBody } from './ScriptNodeBody.tsx'
@@ -91,15 +93,27 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
     }
   }
 
+  /**
+   * I1：渲染体抽为独立函数组件。tldraw 本就在 React 树内渲染 shape component，但 lint 的
+   * rules-of-hooks 无法识别 class 方法内的 hooks 调用——抽离后既合法，运行时行为不变。
+   */
   override component(shape: WlsNodeShape) {
+    return <WlsNodeBody shape={shape} />
+  }
+}
+
+/** 节点渲染体（函数组件；切换界面语言时随 useT 即时重渲染） */
+// oxlint-disable-next-line react/only-export-components -- 与 ShapeUtil 同文件（项目既定模式）
+function WlsNodeBody({ shape }: { shape: WlsNodeShape }) {
+    const t = useT()
     const meta = CANVAS_NODE_META[shape.props.kind]
     const availability = nodeAvailability(shape.props.kind)
     const availabilityLabel =
       availability === 'ready'
-        ? '就绪'
+        ? t('node.badge.ready')
         : availability === 'pending'
-          ? '一期 B 接通'
-          : `${meta.phase} 期开放`
+          ? t('node.badge.pending')
+          : t('node.badge.phase', { phase: meta.phase })
     // 对话栏生成的 Brief 文本存在 meta.text（script 节点沿边读取上游 Brief，见 ScriptNodeBody）
     const briefText =
       typeof shape.props.meta.text === 'string' && shape.props.meta.text.trim().length > 0
@@ -122,14 +136,15 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
         <div className="wls-node-accent" style={{ background: meta.accent }} />
         <div className="wls-node-head">
           <span className="wls-node-icon">{meta.icon}</span>
-          <span className="wls-node-title">{meta.label}</span>
-          <span className={`wls-node-badge wls-node-badge-${availability}`} title={meta.hint}>
+          <span className="wls-node-title">{t(nodeLabelKey(shape.props.kind))}</span>
+          <span className={`wls-node-badge wls-node-badge-${availability}`} title={t(nodeHintKey(shape.props.kind))}>
             {availabilityLabel}
           </span>
         </div>
         {skillInputKeys.length > 0 && (
-          <div className="wls-node-input-hint" title="Skill 导入：此节点的输入未填写，请补全后再运行">
-            📥 填新输入：{skillInputKeys.map((k) => SKILL_PARAM_LABELS[k] ?? k).join('、')}
+          <div className="wls-node-input-hint" title={t('node.skillInputHint')}>
+            {t('node.fillNewInput')}
+            {skillInputKeys.map((k) => SKILL_PARAM_LABELS[k] ?? k).join('、')}
           </div>
         )}
         <div className="wls-node-body">
@@ -176,7 +191,6 @@ export class WlsNodeUtil extends BaseBoxShapeUtil<WlsNodeShape> {
         </div>
       </HTMLContainer>
     )
-  }
 }
 
 /**

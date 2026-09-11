@@ -1,5 +1,7 @@
 # WebLockShot 完整使用指南与工业化实战手册
 
+> 🌐 **English edition**: [HOW_TO_USE.en.md](./HOW_TO_USE.en.md)
+
 > 本指南旨在帮助电商卖家、带货主播、编导创作者及 AI 视频开发人员，快速掌握 WebLockShot 的核心链路、双工作室工作流、私有化 ComfyUI 算力集成，以及剪映 / CapCut 自动化草稿对齐出片。
 
 ---
