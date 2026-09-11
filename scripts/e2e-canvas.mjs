@@ -453,7 +453,62 @@ async function main() {
       assert(/已下载剪映草稿 zip/.test(await nodeText('deliver')), 'deliver 节点未给出打包成功反馈')
     })
 
-    await step('⑩ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
+    // ---- ⑩ 悬浮提示可读性守卫（白底白字回归） ----
+    // 2026-09-11 用户实机反馈「鼠标移过去提示描述为空」。根因是浅色皮肤把 tldraw 的
+    // `--tl-color-tooltip` 覆盖成白色，却没有同时改 `--tl-color-text-shadow`（light 主题下为白），
+    // 于是 tooltip 变成**白底白字**——看起来就是一个空提示框。
+    // 这条守卫直接量测 tooltip 的实际计算色并算 WCAG 对比度，杜绝同类「配色变量覆盖」回归。
+    await step('⑩ 悬浮提示可读性：tooltip 文字/底色对比度 ≥ 4.5:1（白底白字回归）', async () => {
+      await page.goto(base, { waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('[data-testid=chat-dock]', { timeout: 20_000 })
+
+      const tool = page.locator('.tlui-button__tool').first()
+      const box = await tool.boundingBox()
+      assert(box, '底部工具条未渲染')
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await page.waitForSelector('.tlui-tooltip', { timeout: 8000 })
+
+      const probe = await page.evaluate(() => {
+        const el = document.querySelector('.tlui-tooltip')
+        if (!el) return null
+        const cs = getComputedStyle(el)
+        // 逐级向上找第一个不透明的底色（tooltip 自身可能就是透明的）
+        let bg = cs.backgroundColor
+        let node = el
+        while (node && /rgba?\([^)]*,\s*0\)/.test(bg)) {
+          node = node.parentElement
+          bg = node ? getComputedStyle(node).backgroundColor : bg
+        }
+        return { text: (el.textContent || '').trim(), color: cs.color, bg }
+      })
+      assert(probe, 'tooltip 元素未找到')
+      assert(probe.text.length > 0, 'tooltip 文案为空（提示描述缺失）')
+
+      const parse = (v) => {
+        const m = v.match(/rgba?\(([^)]+)\)/)
+        if (!m) return null
+        const p = m[1].split(',').map((x) => Number(x.trim()))
+        return { r: p[0], g: p[1], b: p[2] }
+      }
+      const lum = ({ r, g, b }) => {
+        const f = (c) => {
+          const s = c / 255
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+        }
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+      }
+      const fg = parse(probe.color)
+      const bgc = parse(probe.bg)
+      assert(fg && bgc, `无法解析 tooltip 配色（color=${probe.color} bg=${probe.bg}）`)
+      const [l1, l2] = [lum(fg), lum(bgc)].sort((a, b) => b - a)
+      const ratio = (l1 + 0.05) / (l2 + 0.05)
+      assert(
+        ratio >= 4.5,
+        `tooltip 对比度不足（${ratio.toFixed(2)}:1，文字 ${probe.color} / 底色 ${probe.bg}）——「${probe.text}」看起来会是空框`
+      )
+    })
+
+    await step('⑪ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
       assert(pageErrors.length === 0, `捕获到 ${pageErrors.length} 条 pageerror：${pageErrors.slice(0, 3).join(' | ')}`)
     })
   } finally {

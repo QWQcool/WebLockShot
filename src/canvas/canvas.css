@@ -454,7 +454,14 @@
   --tl-color-overlay: rgba(22, 50, 63, 0.25);
   --tl-color-focus: #ff7eb6;
   --tl-color-hint: #39c5bb;
-  --tl-color-tooltip: #ffffff;
+  /* 注意：**不要**覆盖 `--tl-color-tooltip`。
+     tldraw 的 `.tlui-tooltip` 是 `background: var(--tl-color-tooltip)` +
+     `color: var(--tl-color-text-shadow)` 成对使用的：
+       · `.tl-theme__light` → tooltip 深色 + text-shadow 白（白字，正确）
+       · `.tl-theme__dark`  → tooltip 白 + text-shadow 深（深字，正确）
+     本皮肤此前把 tooltip 底改成了 `#ffffff`，却没有同时改 text-shadow（light 主题下仍是白色），
+     于是变成**白底白字**——提示框看起来是「空的」（2026-09-11 用户实机截图反馈）。
+     删掉该覆盖即回到 tldraw 自带的正确配对（light 主题 = 深色提示框 + 白字）。 */
   --tl-layer-canvas-background: #f6fafb;
 }
 
