@@ -308,7 +308,44 @@ async function main() {
       assert((await paletteTitle()) === 'Agent 节点', '切回中文失败')
     })
 
-    await step('⑦ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
+    await step('⑦ 海外引擎（M1）：引擎条可选 + 无 Key 灰态如实提示', async () => {
+      // 引擎条在全链路工作台（sell + mode=pipeline）常驻
+      await page.goto(`${base}/?view=sell&mode=pipeline`, { waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('.pill-btn', { timeout: 25_000 })
+      const runwayBtn = page.locator('.pill-btn', { hasText: 'Runway' })
+      assert((await runwayBtn.count()) === 1, '引擎条缺少 Runway 选项')
+      assert((await page.locator('.pill-btn', { hasText: 'Luma' }).count()) === 1, '引擎条缺少 Luma 选项')
+      const title = await runwayBtn.getAttribute('title')
+      assert(/待真实环境验证/.test(title || ''), `海外引擎未如实标注验证状态：${title}`)
+
+      // 无 Key 选中 → 必须给出「未检测到 … API Key」而非静默接受
+      await runwayBtn.click()
+      await page.waitForFunction(
+        () => /未检测到 Runway API Key/.test(document.body.textContent || ''),
+        null,
+        { timeout: 8000 }
+      )
+    })
+
+    await step('⑧ 海外引擎（M1）：设置面板 Key 输入 + 诚实标注', async () => {
+      await page.goto(`${base}/?view=sell&mode=pipeline&settings=open`, { waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('input[value=runway]', { timeout: 20_000 })
+      await page.check('input[value=runway]')
+      await page.waitForSelector('[data-testid=runway-key]', { timeout: 8000 })
+      const hint = await page
+        .locator('.form-item', { has: page.locator('[data-testid=runway-key]') })
+        .textContent()
+      assert(/待真实环境验证/.test(hint || ''), `Runway Key 区未标注验证状态：${hint?.slice(0, 140)}`)
+
+      await page.check('input[value=luma]')
+      await page.waitForSelector('[data-testid=luma-key]', { timeout: 8000 })
+      const lumaHint = await page
+        .locator('.form-item', { has: page.locator('[data-testid=luma-key]') })
+        .textContent()
+      assert(/待真实环境验证/.test(lumaHint || ''), `Luma Key 区未标注验证状态：${lumaHint?.slice(0, 140)}`)
+    })
+
+    await step('⑨ 全程无未捕获页面异常（真实鼠标路径零 pageerror）', async () => {
       assert(pageErrors.length === 0, `捕获到 ${pageErrors.length} 条 pageerror：${pageErrors.slice(0, 3).join(' | ')}`)
     })
   } finally {

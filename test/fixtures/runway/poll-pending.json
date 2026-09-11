@@ -1,0 +1,6 @@
+{
+  "_comment": "Runway 轮询契约：status=PENDING → 前端映射 queued",
+  "id": "runway-task-1",
+  "status": "PENDING",
+  "progress": 0
+}

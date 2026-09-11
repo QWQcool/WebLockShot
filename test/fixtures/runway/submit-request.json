@@ -1,0 +1,16 @@
+{
+  "_comment": "Runway text_to_video 提交请求契约（按官方 api.dev.runwayml.com 文档整理；字段与 src/media/providers/runway.ts 的 bodyPayload 一一对应）",
+  "endpoint": "/v1/text_to_video",
+  "method": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer test-key",
+    "X-Runway-Version": "2024-11-06"
+  },
+  "body": {
+    "model": "gen4_turbo",
+    "promptText": "电商产品主图缓慢环绕运镜，青色霓虹光效",
+    "ratio": "720:1280",
+    "duration": 5
+  }
+}

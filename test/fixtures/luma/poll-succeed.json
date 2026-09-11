@@ -1,0 +1,8 @@
+{
+  "_comment": "Luma 轮询契约：state=completed，视频位于 assets.video",
+  "id": "luma-gen-1",
+  "state": "completed",
+  "assets": {
+    "video": "https://cdn.lumalabs.ai/output/luma-gen-1.mp4"
+  }
+}

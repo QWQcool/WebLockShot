@@ -1,5 +1,6 @@
 import React from 'react'
 import type { ShotJob } from '../../domain/shotJob.ts'
+import { ENGINE_OPTIONS } from '../components/PipelineEngineBar.tsx'
 
 type Props = {
   jobs: ShotJob[]
@@ -82,7 +83,10 @@ export const GenerateBoard: React.FC<Props> = ({
               <div className="job-body">
                 <div className="job-meta-row">
                   <span className="meta-label">Provider：</span>
-                  <span className="meta-val">{job.provider === 'kling' ? '快手可灵 (Kling)' : 'Mock 真实录制'}</span>
+                  {/* M1：按引擎 id 如实展示（此前只识别 kling，其余一律显示 Mock，海外引擎会误标） */}
+                  <span className="meta-val">
+                    {ENGINE_OPTIONS.find((o) => o.id === job.provider)?.label ?? job.provider}
+                  </span>
                 </div>
                 <div className="job-meta-row">
                   <span className="meta-label">重试次数：</span>

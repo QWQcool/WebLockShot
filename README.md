@@ -89,6 +89,7 @@ Windows 用户可直接双击 `start-weblockshot.bat`（自动安装依赖/构�
 | 可灵 JWT 签名（HS512/HS256，官方头/载荷结构） | ✅ 契约验证 | 独立参考实现（node:crypto）向量锁定 + 交叉验证，见 `src/media/__tests__/authVectors.test.ts` |
 | 即梦 V4 HMAC-SHA256 签名（火山引擎规范） | ✅ 契约验证 | 同上，完整 Authorization 串向量锁定 |
 | 请求体形状 / 响应解析 / 错误码映射 | ✅ 契约验证 | `test/fixtures/kling|jimeng/` + `src/media/__tests__/providerContract.test.ts` |
+| **Runway / Luma 海外引擎（M1）** | ✅ 契约验证 / ⏳ 待真实环境 | 请求体 / 端点 / 请求头 / 轮询状态映射 / 错误文案全部按官方文档实现并锁定 fixtures（`test/fixtures/runway|luma/`）；**尚未在真实账号下跑通出片**，无 Key 时不发起任何请求 |
 | 可灵 / 即梦真实出片连通 | ⏳ 待真实环境 | `npm run verify:providers -- --kling-key=AK:SK --jimeng-key=AK:SK` 真实探测 |
 | Docker 镜像构建 | ✅ CI 验证 | `.github/workflows/docker-build.yml`（只 build 不 push）；本地 `docker compose up --build` 可完整跑通 |
 | Edge-TTS 语音合成（`/api/tts`） | ✅ 本机验证 | 真实出 mp3（zh-CN-XiaoxiaoNeural，38KB）；协议层 mock 单测不依赖网络 |

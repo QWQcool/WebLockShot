@@ -1,0 +1,13 @@
+{
+  "_comment": "Luma failure_reason 文案映射契约：命中关键词 → 中文可读信息；未命中 → 透传原文",
+  "cases": [
+    { "failure": "content moderation flagged the prompt", "message": "内容审核未通过：请调整提示词或参考图后重试" },
+    { "failure": "rate limit reached", "message": "触发 Luma 限流：请降低生成频率后重试" },
+    { "failure": "insufficient credits", "message": "Luma 账户额度不足：请在官方后台充值后重试" },
+    { "failure": "unexpected upstream glitch", "message": "unexpected upstream glitch" }
+  ],
+  "empty": {
+    "state": "failed",
+    "message": "Luma 任务失败（state=failed）"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "_comment": "Luma 提交成功响应契约（官方结构：顶层 id + state）",
+  "id": "luma-gen-1",
+  "state": "queued"
+}

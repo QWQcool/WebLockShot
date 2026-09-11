@@ -1,0 +1,6 @@
+{
+  "_comment": "Runway 轮询契约：status=THROTTLED（限流等待）→ 前端映射 running",
+  "id": "runway-task-1",
+  "status": "THROTTLED",
+  "progress": 0.1
+}

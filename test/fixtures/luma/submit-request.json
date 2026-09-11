@@ -1,0 +1,16 @@
+{
+  "_comment": "Luma text-to-video 提交请求契约（按官方 api.lumalabs.ai/dream-machine/v1 文档整理；字段与 src/media/providers/luma.ts 的 bodyPayload 一一对应）",
+  "endpoint": "/generations",
+  "method": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer test-key"
+  },
+  "body": {
+    "model": "ray-2",
+    "prompt": "电商产品主图缓慢环绕运镜，青色霓虹光效",
+    "aspect_ratio": "9:16",
+    "duration": "5s",
+    "loop": false
+  }
+}

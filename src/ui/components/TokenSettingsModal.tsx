@@ -11,6 +11,8 @@ import { clearMemoryRecords } from '../../services/companion/memoryClient.ts'
 import { clearAllFeedbackRecords } from '../../domain/feedback.ts'
 import { useLanguage, useSetLanguage, useT } from '../../i18n/useLanguage.ts'
 import { LANGUAGES, type Language } from '../../i18n/strings.ts'
+import { RUNWAY_KEY_STORAGE } from '../../media/providers/runway.ts'
+import { LUMA_KEY_STORAGE } from '../../media/providers/luma.ts'
 
 type Props = {
   isOpen: boolean
@@ -58,9 +60,14 @@ export const TokenSettingsModal: React.FC<Props> = ({
     apiKey: '',
     model: 'deepseek-ai/DeepSeek-V3',
   })
-  const [videoProvider, setVideoProvider] = useState<'mock' | 'kling' | 'jimeng' | 'comfyui'>('mock')
+  const [videoProvider, setVideoProvider] = useState<
+    'mock' | 'kling' | 'jimeng' | 'comfyui' | 'runway' | 'luma'
+  >('mock')
   const [klingKey, setKlingKey] = useState('')
   const [jimengKey, setJimengKey] = useState('')
+  // M1 海外引擎（契约先行，待真实环境验证）
+  const [runwayKey, setRunwayKey] = useState('')
+  const [lumaKey, setLumaKey] = useState('')
   const [comfyUrl, setComfyUrl] = useState('http://127.0.0.1:8188')
   const [comfyPreset, setComfyPreset] = useState<string>('wan2.1-i2v')
   const [comfyTestStatus, setComfyTestStatus] = useState<{
@@ -126,13 +133,23 @@ export const TokenSettingsModal: React.FC<Props> = ({
         })
       }
       const savedProvider = sessionStorage.getItem('weblockshot.video_provider')
-      if (savedProvider === 'kling' || savedProvider === 'jimeng' || savedProvider === 'comfyui') {
+      if (
+        savedProvider === 'kling' ||
+        savedProvider === 'jimeng' ||
+        savedProvider === 'comfyui' ||
+        savedProvider === 'runway' ||
+        savedProvider === 'luma'
+      ) {
         setVideoProvider(savedProvider)
       }
       const savedKling = sessionStorage.getItem('weblockshot.kling_key')
       if (savedKling) setKlingKey(savedKling)
       const savedJimeng = sessionStorage.getItem('weblockshot.jimeng_key')
       if (savedJimeng) setJimengKey(savedJimeng)
+      const savedRunway = sessionStorage.getItem(RUNWAY_KEY_STORAGE)
+      if (savedRunway) setRunwayKey(savedRunway)
+      const savedLuma = sessionStorage.getItem(LUMA_KEY_STORAGE)
+      if (savedLuma) setLumaKey(savedLuma)
       const savedComfyUrl = sessionStorage.getItem(COMFY_URL_STORAGE_KEY)
       if (savedComfyUrl) setComfyUrl(savedComfyUrl)
       const savedComfyPreset = sessionStorage.getItem(COMFY_PRESET_STORAGE_KEY)
@@ -159,6 +176,12 @@ export const TokenSettingsModal: React.FC<Props> = ({
     if (jimengKey) {
       sessionStorage.setItem('weblockshot.jimeng_key', jimengKey)
     }
+    if (runwayKey) {
+      sessionStorage.setItem(RUNWAY_KEY_STORAGE, runwayKey)
+    }
+    if (lumaKey) {
+      sessionStorage.setItem(LUMA_KEY_STORAGE, lumaKey)
+    }
     sessionStorage.setItem(COMFY_URL_STORAGE_KEY, comfyUrl)
     sessionStorage.setItem(COMFY_PRESET_STORAGE_KEY, comfyPreset)
     setSaveSuccess(true)
@@ -174,6 +197,8 @@ export const TokenSettingsModal: React.FC<Props> = ({
     sessionStorage.removeItem('weblockshot.video_provider')
     sessionStorage.removeItem('weblockshot.kling_key')
     sessionStorage.removeItem('weblockshot.jimeng_key')
+    sessionStorage.removeItem(RUNWAY_KEY_STORAGE)
+    sessionStorage.removeItem(LUMA_KEY_STORAGE)
     sessionStorage.removeItem(COMFY_URL_STORAGE_KEY)
     sessionStorage.removeItem(COMFY_PRESET_STORAGE_KEY)
     setTokenConfig({
@@ -183,6 +208,8 @@ export const TokenSettingsModal: React.FC<Props> = ({
     })
     setKlingKey('')
     setJimengKey('')
+    setRunwayKey('')
+    setLumaKey('')
     setComfyUrl('http://127.0.0.1:8188')
     setComfyPreset('wan2.1-i2v')
     setVideoProvider('mock')
@@ -384,6 +411,41 @@ export const TokenSettingsModal: React.FC<Props> = ({
                   <p>0 接口费直调本地/云端 GPU，支持阿里 Wan 2.1 / CogVideoX</p>
                 </div>
               </label>
+
+              {/* M1 海外引擎：契约先行（官方 API 形状已实现并锁定），待真实环境验证 */}
+              <label
+                className={`provider-card-option ${videoProvider === 'runway' ? 'selected' : ''}`}
+                title="契约已实现（官方 v1 形状），尚未在真实账号下跑通出片"
+              >
+                <input
+                  type="radio"
+                  name="video_provider"
+                  value="runway"
+                  checked={videoProvider === 'runway'}
+                  onChange={() => setVideoProvider('runway')}
+                />
+                <div>
+                  <strong>Runway (Gen-4) · 海外引擎</strong>
+                  <p>按官方 API 契约实现（待真实环境验证，无 Key 时不会发起任何请求）</p>
+                </div>
+              </label>
+
+              <label
+                className={`provider-card-option ${videoProvider === 'luma' ? 'selected' : ''}`}
+                title="契约已实现（官方 dream-machine v1 形状），尚未在真实账号下跑通出片"
+              >
+                <input
+                  type="radio"
+                  name="video_provider"
+                  value="luma"
+                  checked={videoProvider === 'luma'}
+                  onChange={() => setVideoProvider('luma')}
+                />
+                <div>
+                  <strong>Luma (Dream Machine) · 海外引擎</strong>
+                  <p>按官方 API 契约实现（待真实环境验证，无 Key 时不会发起任何请求）</p>
+                </div>
+              </label>
             </div>
 
             {videoProvider === 'kling' && (
@@ -414,6 +476,46 @@ export const TokenSettingsModal: React.FC<Props> = ({
                 />
                 <small className="hint-text">
                   请前往字节跳动即梦/火山方舟获取 API 密钥。
+                </small>
+              </div>
+            )}
+
+            {videoProvider === 'runway' && (
+              <div className="form-item mt-3">
+                <label>Runway API Key：</label>
+                <input
+                  type="password"
+                  className="text-input"
+                  data-testid="runway-key"
+                  placeholder="Runway API Key（Bearer）"
+                  value={runwayKey}
+                  onChange={(e) => setRunwayKey(e.target.value)}
+                />
+                <small className="hint-text">
+                  请前往 Runway 开发者后台获取 API Key。请求头会带 <code>X-Runway-Version</code>。
+                  ⚠️ 契约已按官方文档实现，**尚未在真实 Runway 账号下跑通出片**（待真实环境验证）；
+                  未填 Key 时不会发起任何请求。如需自建网关，可另设 sessionStorage
+                  <code>weblockshot.runway_base</code> 覆盖 Base URL。
+                </small>
+              </div>
+            )}
+
+            {videoProvider === 'luma' && (
+              <div className="form-item mt-3">
+                <label>Luma API Key：</label>
+                <input
+                  type="password"
+                  className="text-input"
+                  data-testid="luma-key"
+                  placeholder="Luma API Key（Bearer）"
+                  value={lumaKey}
+                  onChange={(e) => setLumaKey(e.target.value)}
+                />
+                <small className="hint-text">
+                  请前往 Luma（Dream Machine）开发者后台获取 API Key。
+                  ⚠️ 契约已按官方文档实现，**尚未在真实 Luma 账号下跑通出片**（待真实环境验证）；
+                  未填 Key 时不会发起任何请求。如需自建网关，可另设 sessionStorage
+                  <code>weblockshot.luma_base</code> 覆盖 Base URL。
                 </small>
               </div>
             )}

@@ -1,0 +1,7 @@
+{
+  "_comment": "Runway 轮询契约：status=FAILED + failure 原因（前端映射为中文可读信息）",
+  "id": "runway-task-1",
+  "status": "FAILED",
+  "progress": 0.3,
+  "failure": "content moderated"
+}

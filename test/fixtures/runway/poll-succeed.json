@@ -1,0 +1,7 @@
+{
+  "_comment": "Runway 轮询契约：status=SUCCEEDED，视频位于顶层 output[0]",
+  "id": "runway-task-1",
+  "status": "SUCCEEDED",
+  "progress": 1,
+  "output": ["https://cdn.runwayml.com/output/runway-task-1.mp4"]
+}

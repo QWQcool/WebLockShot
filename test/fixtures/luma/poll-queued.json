@@ -1,0 +1,5 @@
+{
+  "_comment": "Luma 轮询契约：state=queued → 前端映射 queued",
+  "id": "luma-gen-1",
+  "state": "queued"
+}

@@ -1,0 +1,6 @@
+{
+  "_comment": "Runway 轮询契约：status=RUNNING + progress 为 0~1 小数（前端换算 0~100）",
+  "id": "runway-task-1",
+  "status": "RUNNING",
+  "progress": 0.42
+}

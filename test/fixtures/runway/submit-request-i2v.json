@@ -1,0 +1,12 @@
+{
+  "_comment": "Runway image_to_video 提交请求契约：裸 base64 需补 data URI 前缀（normalizeRunwayImage），端点切换为 /v1/image_to_video",
+  "endpoint": "/v1/image_to_video",
+  "method": "POST",
+  "body": {
+    "model": "gen4_turbo",
+    "promptText": "让产品缓慢旋转 360 度",
+    "promptImage": "data:image/jpeg;base64,AAAA",
+    "ratio": "720:1280",
+    "duration": 5
+  }
+}

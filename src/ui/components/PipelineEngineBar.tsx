@@ -25,11 +25,23 @@ function readInitialCollapsed(): boolean {
   return false
 }
 
-export const ENGINE_OPTIONS: Array<{ id: VideoProviderId; label: string }> = [
+export const ENGINE_OPTIONS: Array<{ id: VideoProviderId; label: string; title?: string }> = [
   { id: 'mock', label: 'Mock 实验画布 (免费)' },
   { id: 'kling', label: '快手可灵 (Kling)' },
   { id: 'jimeng', label: '字节即梦 (Jimeng)' },
   { id: 'comfyui', label: '🔥 ComfyUI 私有算力' },
+  // M1 海外引擎：契约先行（请求/响应形状已按官方文档实现并锁定 fixtures），
+  // 但尚未在真实账号下跑通出片 —— 悬停提示如实标注，不假装已验证
+  {
+    id: 'runway',
+    label: 'Runway (Gen-4)',
+    title: '海外引擎 · 契约已实现（官方 v1 形状），尚未在真实 Runway 账号下跑通出片（待真实环境验证）',
+  },
+  {
+    id: 'luma',
+    label: 'Luma (Dream Machine)',
+    title: '海外引擎 · 契约已实现（官方 dream-machine v1 形状），尚未在真实 Luma 账号下跑通出片（待真实环境验证）',
+  },
 ]
 
 type Props = {
@@ -66,10 +78,11 @@ export const PipelineEngineBar: React.FC<Props> = ({ providerId, onSelectProvide
 
       <div className="control-pill-group" id="engine-bar-options" hidden={collapsed}>
         <span className="pill-label">模型引擎:</span>
-        {ENGINE_OPTIONS.map(({ id, label }) => (
+        {ENGINE_OPTIONS.map(({ id, label, title }) => (
           <button
             key={id}
             type="button"
+            title={title}
             className={`pill-btn ${id === 'comfyui' ? 'comfyui-btn' : ''} ${providerId === id ? 'active' : ''}`}
             onClick={() => onSelectProvider(id)}
           >

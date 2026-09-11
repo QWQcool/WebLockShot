@@ -22,6 +22,8 @@ import {
 import { WorkbenchHeader, type WorkbenchStep, type StudioMode } from './components/WorkbenchHeader.tsx'
 import { PipelineEngineBar } from './components/PipelineEngineBar.tsx'
 import { TokenSettingsModal } from './components/TokenSettingsModal.tsx'
+import { RUNWAY_KEY_STORAGE } from '../media/providers/runway.ts'
+import { LUMA_KEY_STORAGE } from '../media/providers/luma.ts'
 import { MemoryGraphView } from './canvas/MemoryGraphView.tsx'
 import { WalletModal } from './components/WalletModal.tsx'
 import { ProductStep } from './steps/ProductStep.tsx'
@@ -227,6 +229,9 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama, onSwitchToCanv
       if (p === 'kling') return 'kling'
       if (p === 'jimeng') return 'jimeng'
       if (p === 'comfyui') return 'comfyui'
+      // M1 海外引擎（契约先行，待真实环境验证）
+      if (p === 'runway') return 'runway'
+      if (p === 'luma') return 'luma'
       return 'mock'
     } catch {
       return 'mock'
@@ -293,6 +298,27 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama, onSwitchToCanv
       void runComfyPing()
       return
     }
+    // M1 海外引擎：无 Key 时如实提示（灰态语义，不发起任何请求）
+    if (id === 'runway') {
+      try {
+        const key = sessionStorage.getItem(RUNWAY_KEY_STORAGE)
+        if (!key?.trim()) {
+          setPipelineErrorMsg('未检测到 Runway API Key！请点击右侧「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式（海外引擎 · 待真实环境验证）。')
+          setComfyPing({ status: 'idle' })
+          return
+        }
+      } catch {}
+    }
+    if (id === 'luma') {
+      try {
+        const key = sessionStorage.getItem(LUMA_KEY_STORAGE)
+        if (!key?.trim()) {
+          setPipelineErrorMsg('未检测到 Luma API Key！请点击右侧「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock 免费模式（海外引擎 · 待真实环境验证）。')
+          setComfyPing({ status: 'idle' })
+          return
+        }
+      } catch {}
+    }
     setComfyPing({ status: 'idle' })
   }
 
@@ -324,6 +350,18 @@ export const SellWorkbench: React.FC<Props> = ({ onSwitchToDrama, onSwitchToCanv
         const ok = await runComfyPing()
         if (!ok) return
       }
+    }
+    // M1 海外引擎：出片前二次校验凭据（无 Key 一律不派发任务）
+    if (provider === 'runway' || provider === 'luma') {
+      const storageKey = provider === 'runway' ? RUNWAY_KEY_STORAGE : LUMA_KEY_STORAGE
+      const label = provider === 'runway' ? 'Runway' : 'Luma'
+      try {
+        const k = sessionStorage.getItem(storageKey)
+        if (!k?.trim()) {
+          setPipelineErrorMsg(`当前工作流选用了 ${label} 官方 API，但尚未配置 API Key！请点击上方「⚙️ 前往配置 API Key」填入密钥，或切换为 Mock / ComfyUI 模式。`)
+          return
+        }
+      } catch {}
     }
     advanceToStep(5)
     await executorEngine.enqueueShots(visualPlans, provider)

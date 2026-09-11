@@ -1,0 +1,6 @@
+{
+  "_comment": "Luma 轮询契约：state=failed + failure_reason（前端映射为中文可读信息）",
+  "id": "luma-gen-1",
+  "state": "failed",
+  "failure_reason": "content moderation flagged the prompt"
+}

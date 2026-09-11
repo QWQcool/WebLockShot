@@ -1,0 +1,18 @@
+{
+  "_comment": "Luma 图生视频提交请求契约：首帧参考图走 keyframes.frame0（type=image + url），裸 base64 补 data URI 前缀",
+  "endpoint": "/generations",
+  "method": "POST",
+  "body": {
+    "model": "ray-2",
+    "prompt": "让产品缓慢旋转 360 度",
+    "aspect_ratio": "9:16",
+    "duration": "5s",
+    "loop": false,
+    "keyframes": {
+      "frame0": {
+        "type": "image",
+        "url": "data:image/jpeg;base64,AAAA"
+      }
+    }
+  }
+}

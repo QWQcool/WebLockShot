@@ -5,6 +5,8 @@ import { mockVideoProvider } from '../../media/providers/mock.ts'
 import { klingVideoProvider } from '../../media/providers/kling.ts'
 import { jimengVideoProvider } from '../../media/providers/jimeng.ts'
 import { comfyUIVideoProvider } from '../../media/providers/comfyui.ts'
+import { runwayVideoProvider } from '../../media/providers/runway.ts'
+import { lumaVideoProvider } from '../../media/providers/luma.ts'
 import { walletManager } from '../../domain/wallet.ts'
 import { circuitBreaker, assertJobStatusTransition, assertJobRequeue } from '../../domain/fsm.ts'
 import { getPollingWindow, pollSleep } from '../../domain/pollingConfig.ts'
@@ -21,6 +23,13 @@ export function resolveVideoProvider(providerId: VideoProviderId): VideoProvider
   }
   if (providerId === 'comfyui') {
     return comfyUIVideoProvider
+  }
+  // M1 海外引擎（契约先行，待真实环境验证）
+  if (providerId === 'runway') {
+    return runwayVideoProvider
+  }
+  if (providerId === 'luma') {
+    return lumaVideoProvider
   }
   return mockVideoProvider
 }
