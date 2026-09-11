@@ -2,6 +2,97 @@
 
 > 🌐 **English**: [README.en.md](./README.en.md) · 使用指南英文版：[docs/HOW_TO_USE.en.md](./docs/HOW_TO_USE.en.md)
 
+**在浏览器里跑完的创意生产工作台**：在无限画布上用一句话布置 Agent 节点，从脚本一路做到**可导入剪映的成片工程**。
+
+**▶ 在线直接体验（免安装 · 免 Key · 自带演示引擎）**：<https://qwqcool.github.io/WebLockShot/>
+
+[![30 秒演示：一句话编排 → 脚本 → 9:16 分镜预演 → 逐镜出片 → 3D 运镜台 → 剪映草稿 zip](./docs/screenshots/demo.gif)](https://qwqcool.github.io/WebLockShot/)
+
+> 上方为 **约 30 秒真实操作录屏**（`npm run demo:frames -- --prod` 采集 + `python docs/build_demo_gif.py` 组装，
+> 非设计稿/手绘 mock）：开场层 → 对话栏一句话 → 演示编排落位 → 生成脚本 → 生成分镜 → 逐镜出片 →
+> 3D 运镜台摆台 → 剪映草稿 zip 打包。
+> 录制走的是**与线上一致的形态**（https + 非回环域名 + 构建期注入 license key），
+> 因此画面里**没有** tldraw 的「Get a license for production」开发水印——访客看到的与 GIF 一致。
+
+## 为什么不一样（相对同赛道开源项目）
+
+|  | 差异点 | 具体是什么 |
+|---|---|---|
+| 🎥 | **3D 运镜台 · 本地预演 0 灵感币** | three.js 内置 Quaternius **CC0 素体**（45 个真实动画片段）+ 六套程序化场景预设 + 多机位 + 关键帧轨迹 + 首/尾帧导出，可接「视频生成」单镜直出或「分镜预演」自由镜数分镜。**我们对比过的同赛道开源项目（infinite-canvas / ComfyUI 系）未见对等的本地 3D 预演层** |
+| 📥 | **剪映 / CapCut 草稿 zip 一键交付** | 视频轨 + 旁白音轨 + 花字字幕轨**微秒级对齐**的 `draft_content.json` 与完整素材 zip，解压放入剪映草稿目录即可继续剪辑。同类多停在「导出 mp4」，**能直接产出可继续编辑的剪辑工程**的很少 |
+| 🧾 | **诚实标注 + 可验证工程** | 无 Key 标注「演示编排 · 非真实 LLM」、未实现节点标「未实现」、空态不摆样例数据、许可限制如实告知；**15 步实机 E2E + 子路径部署回归 + 生产模式回归 + 411 项单测 + a11y 双引擎扫描**，全部可本地复现并进 CI |
+
+## 🏗 架构一览
+
+```mermaid
+flowchart TD
+  subgraph ENTRY["入口层 · 浏览器 · 纯静态可部署"]
+    ON["开场层<br/>五类创作场景 tab"]
+    CHAT["对话栏<br/>一句话 / 场景模板 chips"]
+  end
+
+  subgraph ORCH["编排层"]
+    LLM["LLM 编排<br/>自带 API Key"]
+    DEMO["演示编排<br/>如实标注「非真实 LLM」"]
+    ROUTE["场景路由<br/>六类创作场景画廊"]
+  end
+
+  subgraph CANVAS["画布层 · tldraw 5.4 无限画布"]
+    NODES["9 类 Agent 节点<br/>brief / product / script / storyboard / generate / asset / edit / stage3d / deliver"]
+    EDGE["连线类型契约校验"]
+    DOC["CanvasDoc 契约<br/>localStorage 持久化 + 多标签同步"]
+    EXTRA["小地图 / 多画布项目 / Skill 市场 / 连接器 / 记忆图谱"]
+  end
+
+  subgraph EXEC["执行层"]
+    ENGINE["ExecutorEngine<br/>串行队列 + 重试"]
+    WALLET["灵感币钱包<br/>冻结 → 核销 / 全额退款"]
+  end
+
+  subgraph CAP["能力层"]
+    SCRIPT["ScriptWriter + Critic"]
+    BOARD["9:16 GSAP 分镜预演"]
+    GEN["生成引擎契约<br/>可灵 / 即梦 / ComfyUI / Runway / Luma / Mock"]
+    EDIT["局部重绘 inpaint"]
+    S3D["3D 运镜台<br/>three.js 素体 + 机位 + 关键帧"]
+  end
+
+  subgraph OUT["交付层"]
+    CARD["产物卡<br/>大资产入 IndexedDB"]
+    JY["剪映草稿 zip<br/>draft_content.json + 素材"]
+  end
+
+  subgraph SUP["支撑"]
+    LOCAL["本地优先<br/>API Key 只存浏览器"]
+    SRV["伴生服务（可选）<br/>TTS / ffmpeg / sqlite / MCP"]
+    I18N["中英双语 / PWA"]
+  end
+
+  ON --> CHAT
+  CHAT --> LLM
+  CHAT --> DEMO
+  LLM --> ROUTE
+  DEMO --> ROUTE
+  ROUTE --> NODES
+  NODES --> EDGE
+  NODES --> DOC
+  NODES --> EXTRA
+  NODES --> ENGINE
+  ENGINE --> WALLET
+  ENGINE --> SCRIPT
+  ENGINE --> BOARD
+  ENGINE --> GEN
+  ENGINE --> EDIT
+  ENGINE --> S3D
+  SCRIPT --> CARD
+  BOARD --> CARD
+  GEN --> CARD
+  EDIT --> CARD
+  S3D --> CARD
+  CARD --> JY
+  SRV -.可选.-> ENGINE
+```
+
 **一个浏览器里跑完的创意生产工作台。** 主线是 **🎨 Agent 创意画布**（自由创作空间，v2.4 默认入口）；
 次线是 **🛒 电商带货全链路**（成熟稳定，六步工业化流程）；**🎭 剧情短剧粗剪台**为 legacy 模式
 （保留兼容与零回归，新创作建议走画布）。
@@ -346,16 +437,21 @@ WebLockShot/
 │   ├── HOW_TO_USE.commerce.md        # 带货线分册（含短剧 legacy）
 │   ├── coverage.md / perf.md / a11y.md / degrade-matrix.md   # T 线实测基线
 │   ├── i18n.md / connectors.md / mcp.md                     # i18n 范围 / 连接器 / MCP 契约
-│   ├── screenshots/                  # 实机截图（npm run shots 生成）
-│   └── build_how_to_use_pdf.py       # 主手册 → HTML → A4 PDF
+│   ├── screenshots/                  # 实机截图（npm run shots）+ README 演示 GIF（demo.gif）
+│   ├── build_how_to_use_pdf.py       # 主手册 → HTML → A4 PDF
+│   └── build_demo_gif.py             # 演示帧序列 → GIF（真实时间戳 + 相同帧合并 + 自动降级）
 ├── scripts/
-│   ├── e2e-canvas.mjs                # T1 画布 E2E 套件
+│   ├── e2e-canvas.mjs                # T1 画布 E2E 套件（15 步）
+│   ├── basepath-check.mjs            # 子路径部署回归（复现 GitHub Pages base）
+│   ├── prodmode-check.mjs            # 生产模式回归（tldraw 许可闸门 + 到期日告警）
 │   ├── coverage-canvas.mjs           # T2 覆盖率基线
 │   ├── perf-canvas.mjs               # T3 性能基准
 │   ├── a11y-canvas.mjs               # T4 跨浏览器 + axe 扫描
 │   ├── degrade-matrix.mjs            # T5 降级 / 迁移矩阵
 │   ├── capture-screenshots.mjs       # 收官实机截图
+│   ├── capture-demo-gif.mjs          # README 演示录屏（--prod 走线上形态，无水印）
 │   ├── lib/browser-env.mjs           # 上述脚本共用环境（Playwright 解析 / 伴生服务）
+│   ├── lib/tls-static-server.mjs     # HTTPS/HTTP 极简静态服务 + 自签证书（生产形态共用）
 │   ├── chaos-smoke.mjs               # 边缘情况冒烟
 │   └── optimize-preset-images.mjs    # 预设图片瘦身工具 (sharp)
 ├── server/                           # 零依赖伴生服务 (静态托管 + API 反代 + 剪映草稿落盘 + 记忆记录 API + MCP 桥接)
@@ -513,6 +609,29 @@ chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）�
 `scripts/capture-screenshots.mjs` 驱动**生产构建 + 伴生服务**真实操作后截图，落盘
 `docs/screenshots/`（画布 11 张 + 带货 1 张 + 短剧 1 张 + 既有 14 张），README / 使用指南 / PDF 全部引用实机图，
 不使用设计稿或手绘 mock。记忆图谱「有数据」截图的图注已如实写明「演示数据由截图脚本写入本地 IndexedDB」。
+
+### README 演示 GIF（`npm run demo:frames`）
+
+README 顶部那段约 30 秒演示同样是**真实操作录屏**，两段式生成：
+
+```bash
+# ① 采集帧 + 真实时间戳 → .tmp-gif/（需先构建；--prod 走线上形态）
+npm run demo:frames -- --prod
+# ② 组装 GIF → docs/screenshots/demo.gif（需 Python + Pillow）
+python docs/build_demo_gif.py --max-mb 4
+```
+
+三个要点：
+
+- **`--prod` 不是可选装饰**：tldraw 在**开发形态**（http 协议，或 https + 回环地址）会显示
+  「Get a license for production」开发水印，而线上（https + 公网域名 + 已配置 key）没有。
+  用默认的 `127.0.0.1` 录制会让 README 出现**访客看不到的水印**，因此 `--prod` 用自签证书 +
+  域名解析到 127.0.0.1 复现线上形态（与 `npm run e2e:prod` 同一套 `scripts/lib/tls-static-server.mjs`），
+  且**不启动伴生服务**（与真实线上一致）。
+- **按真实时间戳写延时**：截图本身每帧耗时约 80–150ms，若按固定帧率写延时会把动作加速、
+  与真人操作时长脱节；采集时记录每帧时间戳，组装时按真实间隔还原节奏。
+- **体积控制**：相邻像素完全一致的帧合并延时（静态等待期几乎零成本）+ 全局调色板 +
+  超限自动降级（尺寸/色数）。当前产物约 900px / 96 色 / 3.2 MB。
 
 ### T 线结论（测试工程化 · 一句话汇总）
 

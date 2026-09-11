@@ -30,7 +30,8 @@
     "test:chaos": "node scripts/chaos-smoke.mjs",
     "verify:providers": "node --experimental-strip-types scripts/verify-providers.mjs",
     "e2e:basepath": "node scripts/basepath-check.mjs",
-    "e2e:prod": "node scripts/prodmode-check.mjs"
+    "e2e:prod": "node scripts/prodmode-check.mjs",
+    "demo:frames": "node scripts/capture-demo-gif.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

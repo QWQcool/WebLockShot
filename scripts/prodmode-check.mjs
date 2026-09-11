@@ -18,12 +18,10 @@
  * 诚实边界：本套件**不绕过、不去水印**，只验证「如实告知」这条防线；
  * 需要 openssl 生成自签证书，缺失时如实跳过（exit 0）。
  */
-import { execFileSync } from 'node:child_process'
-import { createServer } from 'node:https'
-import { createServer as createHttpServer } from 'node:http'
-import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
-import { extname, join, normalize } from 'node:path'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { ROOT, ensureDist, loadPlaywright, randomPort, skipEnv } from './lib/browser-env.mjs'
+import { findOpenssl, makeCert, startStaticServer } from './lib/tls-static-server.mjs'
 
 const argv = process.argv.slice(2)
 const FLAG = (name) => argv.includes(`--${name}`)
@@ -33,92 +31,6 @@ const HEADED = FLAG('headed')
 /** 生产形态主机名（非回环、非 *.localhost，从而命中 tldraw 的生产判定） */
 const PROD_HOST = 'wls.prod.test'
 const TMP_DIR = join(ROOT, '.tmp-prodmode')
-
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.webmanifest': 'application/manifest+json',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.glb': 'model/gltf-binary',
-  '.woff2': 'font/woff2',
-  '.md': 'text/markdown; charset=utf-8',
-  '.map': 'application/json; charset=utf-8',
-}
-
-/** 定位 openssl（Windows 上 Git for Windows 自带） */
-function findOpenssl() {
-  const candidates = [
-    'C:/Program Files/Git/usr/bin/openssl.exe',
-    'C:/Program Files/Git/mingw64/bin/openssl.exe',
-    'C:/Program Files (x86)/Git/usr/bin/openssl.exe',
-    '/usr/bin/openssl',
-    '/usr/local/bin/openssl',
-  ]
-  for (const p of candidates) if (existsSync(p)) return p
-  try {
-    execFileSync('openssl', ['version'], { stdio: 'ignore' })
-    return 'openssl'
-  } catch {
-    return null
-  }
-}
-
-/** 生成自签证书（仅本机测试用，落在 .tmp-prodmode/，已 gitignore） */
-function makeCert(openssl) {
-  mkdirSync(TMP_DIR, { recursive: true })
-  const key = join(TMP_DIR, 'key.pem')
-  const cert = join(TMP_DIR, 'cert.pem')
-  if (!existsSync(key) || !existsSync(cert)) {
-    execFileSync(
-      openssl,
-      [
-        'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
-        '-keyout', key, '-out', cert, '-days', '2',
-        '-subj', `/CN=${PROD_HOST}`,
-        '-addext', `subjectAltName=DNS:${PROD_HOST}`,
-      ],
-      { stdio: ['ignore', 'ignore', 'ignore'] }
-    )
-  }
-  return { key: readFileSync(key), cert: readFileSync(cert) }
-}
-
-/** 极简静态服务（http / https 共用），SPA 回落 index.html */
-function startStaticServer({ tls, port, distDir }) {
-  const handler = async (req, res) => {
-    const pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname)
-    let rel = pathname === '/' || pathname.endsWith('/') ? `${pathname}index.html` : pathname
-    const safe = normalize(rel).replace(/^([/\\])+/, '')
-    const abs = join(distDir, safe)
-    if (!abs.startsWith(distDir)) {
-      res.writeHead(403).end('forbidden')
-      return
-    }
-    try {
-      const buf = readFileSync(abs)
-      res.writeHead(200, { 'content-type': MIME[extname(abs).toLowerCase()] ?? 'application/octet-stream' })
-      res.end(buf)
-    } catch {
-      // SPA 回落
-      try {
-        const html = readFileSync(join(distDir, 'index.html'))
-        res.writeHead(200, { 'content-type': MIME['.html'] })
-        res.end(html)
-      } catch {
-        res.writeHead(404).end('not found')
-      }
-    }
-  }
-  const server = tls ? createServer({ key: tls.key, cert: tls.cert }, handler) : createHttpServer(handler)
-  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(server)))
-}
 
 /**
  * 构建产物里已烘焙的 tldraw license key 的**到期日**（形如 `tldraw-YYYY-MM-DD/<载荷>.<签名>`）。
@@ -208,7 +120,7 @@ async function main() {
       warn(`tldraw license key 将在 ${daysLeft} 天后过期（试用许可无宽限期）—— 请提前续期，否则线上画布会对所有访客消失`)
     }
   }
-  const tls = makeCert(openssl)
+  const tls = makeCert(openssl, { host: PROD_HOST, tmpDir: TMP_DIR })
 
   const prodPort = randomPort(27_000)
   const devPort = randomPort(29_000)
