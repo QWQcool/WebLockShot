@@ -11,6 +11,7 @@ import {
   readAssetMetaPayload,
   switchAssetVersion,
 } from './contract.ts'
+import { useT } from '../i18n/useLanguage.ts'
 import type { WlsNodeShape } from './WlsNodeUtil.tsx'
 
 /**
@@ -26,6 +27,7 @@ import type { WlsNodeShape } from './WlsNodeUtil.tsx'
  */
 export function AssetNodeBody({ shape }: { shape: WlsNodeShape }) {
   const editor = useEditor()
+  const t = useT()
   // hooks 必须在所有 early return 之前（P1：条件调用会触发 rules-of-hooks 白屏崩溃）
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [src, setSrc] = useState<string | null>(null)
@@ -80,7 +82,14 @@ export function AssetNodeBody({ shape }: { shape: WlsNodeShape }) {
   }, [missingUrl, payload?.url])
 
   if (!payload) {
-    return <div className="wls-asset-empty">产物数据不合法（契约校验未通过）</div>
+    // 空态（2026-09-11 校正）：编排/手动摆放的产物卡在出片前 meta 为空，
+    // 此前直接显示「产物数据不合法（契约校验未通过）」——把正常的「还没出片」
+    // 说成契约错误，用户会以为画布坏了。改为如实空态（真·非法载荷仍由此提示兜底）。
+    return (
+      <div className="wls-asset-empty" data-testid="asset-empty">
+        {t('node.asset.empty')}
+      </div>
+    )
   }
   if (missingUrl) {
     return <div className="wls-asset-error">⚠️ 产物引用缺失</div>

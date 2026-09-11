@@ -6,6 +6,8 @@ import {
   CANVAS_DOC_KEY,
   CANVAS_EDGE_COMPAT,
   CANVAS_NODE_KINDS,
+  CANVAS_NODE_META,
+  READY_NODE_KINDS,
   SCRIPT_SCENE_LABEL,
   SCRIPT_SCENE_TEMPLATE_ID,
   WLS_ARROW_SHAPE_PREFIX,
@@ -58,6 +60,10 @@ import {
 } from '../contract.ts'
 import { scriptToStory } from '../../director/nodes/storyboardNode.ts'
 import { STRUCTURE_TEMPLATES } from '../../prompts/library/structures.ts'
+import { nodeHint, t } from '../../i18n/strings.ts'
+
+const zhHint = (kind: (typeof CANVAS_NODE_KINDS)[number]): string => nodeHint('zh', kind)
+const enHint = (kind: (typeof CANVAS_NODE_KINDS)[number]): string => nodeHint('en', kind)
 import {
   loadCanvasDocFrom,
   saveCanvasDocTo,
@@ -878,6 +884,25 @@ test('A1 edit 节点蜕壳：nodeAvailability 转 ready，hint 去掉「二期�
   assert.equal(nodeAvailability('edit'), 'ready')
 })
 
+test('D1~D7 stage3d 节点蜕壳：nodeAvailability 转 ready（此前被 phase=3 误判为 locked）', () => {
+  assert.equal(nodeAvailability('stage3d'), 'ready')
+  assert.ok(READY_NODE_KINDS.includes('stage3d'))
+  // 尚未实现的 image 仍为 locked（不装可用）
+  assert.equal(nodeAvailability('image'), 'locked')
+  assert.ok(!READY_NODE_KINDS.includes('image'))
+})
+
+test('节点文案不得残留已过去的期数口径（一期 A / 二期开放 / 三期开放 / N 期开放）', () => {
+  const stale = /一期 A|二期开放|三期开放|\d 期开放/
+  for (const kind of CANVAS_NODE_KINDS) {
+    const meta = CANVAS_NODE_META[kind]
+    assert.ok(!stale.test(meta.hint), `${kind} 的 meta.hint 残留过期期数：${meta.hint}`)
+    assert.ok(!stale.test(zhHint(kind)), `${kind} 的中文 hint 残留过期期数：${zhHint(kind)}`)
+    assert.ok(!stale.test(enHint(kind)), `${kind} 的英文 hint 残留过期期数：${enHint(kind)}`)
+  }
+  assert.ok(!stale.test(t('zh', 'node.lockedNote')), 'locked 说明残留过期期数')
+})
+
 test('A1 edit meta：合法载荷往返（idbref maskRef + image/video-frame）', () => {
   const payload = {
     maskRef: 'idbref://canvas-mask-n1-abc',
@@ -1260,13 +1285,13 @@ test('S1 extractSkillManifest：少于 2 节点 / 灰态 kind 被过滤后不足
   const doc = makeSkillDoc()
   assert.equal(extractSkillManifest(doc, ['n1'], '单节点'), null)
   assert.equal(extractSkillManifest(doc, [], '空选集'), null)
-  // 灰态节点（image / stage3d 非 ready）不计入
+  // 灰态节点（image 尚未实现，非 ready）不计入
   const withLocked: CanvasDoc = {
     ...doc,
     nodes: [
       ...doc.nodes,
       { id: 'n7', kind: 'image', x: 2000, y: 0, w: 260, h: 160, meta: {} },
-      { id: 'n8', kind: 'stage3d', x: 2300, y: 0, w: 260, h: 160, meta: {} },
+      { id: 'n8', kind: 'image', x: 2300, y: 0, w: 260, h: 160, meta: {} },
     ],
     edges: [...doc.edges, { id: 'e6', from: 'n1', to: 'n7' }],
   }

@@ -89,7 +89,9 @@ export const CANVAS_NODE_META: Record<
     icon: '🖼️',
     phase: '2',
     accent: '#ff7eb6',
-    hint: '二期开放：ComfyUI 文生图 / 图生图，多风格视觉资产',
+    // 措辞校正（2026-09-11）：二期已收官但 image 节点未落地，原「二期开放」措辞会让用户以为
+    // 该能力已随二期上线——如实改为「尚未实现」，不再引用已过去的期数。
+    hint: '尚未实现：规划中的 ComfyUI 文生图 / 图生图（当前为占位节点，不装可用）',
   },
   script: {
     label: '脚本创编',
@@ -131,7 +133,9 @@ export const CANVAS_NODE_META: Record<
     icon: '🎥',
     phase: '3',
     accent: '#2aa8a0',
-    hint: '三期开放：摆角色 / 调机位 / 录关键帧，本地预演不耗积分',
+    // 措辞校正（2026-09-11）：D1~D7 已落地，节点**已可用**，原「三期开放」措辞
+    // 会让用户以为尚未开放（与节点内可用的「进入 3D 运镜台」按钮自相矛盾）。
+    hint: '已开放：摆角色 / 调机位 / 录关键帧，全程本地渲染不耗积分',
   },
   deliver: {
     label: '成片交付',
@@ -142,9 +146,11 @@ export const CANVAS_NODE_META: Record<
   },
 }
 
-/** 一期 A 可用的节点（1B 节点可摆放但内容为「待接通」占位；2/3 期节点为灰态） */
+/** 节点可用性：'ready' 已实现 / 'pending' 待接通 / 'locked' 尚未实现（占位） */
 export function nodeAvailability(kind: CanvasNodeKind): 'ready' | 'pending' | 'locked' {
   // B2 script / B3 storyboard / B4 generate+asset / B5 product+deliver / A1 edit 蜕壳接通
+  // D1~D7 stage3d 蜕壳接通（2026-09-11 校正：节点早已可用，此前仍按 phase='3' 判为 locked，
+  // 导致「已能进入 3D 运镜台」的节点被打上「3 期开放 / 仅摆放占位」的自相矛盾标注）
   if (
     kind === 'script' ||
     kind === 'storyboard' ||
@@ -152,7 +158,8 @@ export function nodeAvailability(kind: CanvasNodeKind): 'ready' | 'pending' | 'l
     kind === 'asset' ||
     kind === 'product' ||
     kind === 'deliver' ||
-    kind === 'edit'
+    kind === 'edit' ||
+    kind === 'stage3d'
   ) {
     return 'ready'
   }

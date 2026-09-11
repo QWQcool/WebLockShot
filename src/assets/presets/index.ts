@@ -2,15 +2,12 @@
  * 跨环境安全的预设商品素材解析器
  * 1. 解决 Node.js 单测中不能 import .jpg 的问题 (ERR_UNKNOWN_FILE_EXTENSION)
  * 2. 解决 GitHub Pages 子目录部署 (/WebLockShot/) 下的静态资源 404 路径拼接问题
+ *    （BASE_URL 拼接统一收口到 `../publicUrl.ts`，此处只负责拼 presets/ 前缀）
  */
+import { publicUrl } from '../publicUrl.ts'
 
 export function resolveAsset(filename: string): string {
-  if (typeof window === 'undefined') {
-    return `/presets/${filename}`
-  }
-  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'
-  const cleanBase = base.endsWith('/') ? base : `${base}/`
-  return `${cleanBase}presets/${filename}`
+  return publicUrl(`presets/${filename}`)
 }
 
 export const hairDryerImg = resolveAsset('hair_dryer.jpg')

@@ -17,7 +17,7 @@ import {
 } from './contract.ts'
 import { STAGE3D_OPEN_EVENT } from './stage3dMeta.ts'
 import { useT } from '../i18n/useLanguage.ts'
-import { nodeHintKey, nodeLabelKey } from '../i18n/strings.ts'
+import { nodeAvailabilityKey, nodeHintKey, nodeLabelKey } from '../i18n/strings.ts'
 import { AssetNodeBody } from './AssetNodeBody.tsx'
 import { GenerateNodeBody } from './GenerateNodeBody.tsx'
 import { ScriptNodeBody } from './ScriptNodeBody.tsx'
@@ -108,12 +108,7 @@ function WlsNodeBody({ shape }: { shape: WlsNodeShape }) {
     const t = useT()
     const meta = CANVAS_NODE_META[shape.props.kind]
     const availability = nodeAvailability(shape.props.kind)
-    const availabilityLabel =
-      availability === 'ready'
-        ? t('node.badge.ready')
-        : availability === 'pending'
-          ? t('node.badge.pending')
-          : t('node.badge.phase', { phase: meta.phase })
+    const availabilityLabel = t(nodeAvailabilityKey(availability))
     // 对话栏生成的 Brief 文本存在 meta.text（script 节点沿边读取上游 Brief，见 ScriptNodeBody）
     const briefText =
       typeof shape.props.meta.text === 'string' && shape.props.meta.text.trim().length > 0
@@ -178,11 +173,10 @@ function WlsNodeBody({ shape }: { shape: WlsNodeShape }) {
               {briefText ? (
                 <p className="wls-node-text">{briefText}</p>
               ) : (
-                <p className="wls-node-hint">{meta.hint}</p>
+                // 提示统一走 i18n 字典（此前读 CANVAS_NODE_META[kind].hint，与字典重复且不随语言切换）
+                <p className="wls-node-hint">{t(nodeHintKey(shape.props.kind))}</p>
               )}
-              {availability === 'locked' && (
-                <p className="wls-node-locked-note">当前为 {meta.phase} 期开放能力，一期 A 仅摆放占位。</p>
-              )}
+              {availability === 'locked' && <p className="wls-node-locked-note">{t('node.lockedNote')}</p>}
             </>
           )}
         </div>

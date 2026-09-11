@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# 子路径部署回归（npm run e2e:basepath）的独立构建产物
+dist-pages
 *.local
 .env
 .env.*
@@ -25,6 +27,8 @@ dist-ssr
 # 测试 Agent 冒烟临时快照与临时输出
 canvas.yaml
 .tmp-*
+# 生产模式回归（npm run e2e:prod）的自签证书目录（已被 .tmp-* 覆盖，此处显式标注用途）
+.tmp-prodmode/
 
 # 伴生服务运行产物（剪映草稿 zip 落盘目录 / TTS 音频 / ffmpeg 成片）
 jianying-drafts/

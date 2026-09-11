@@ -52,6 +52,11 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: 'true'
+          # tldraw 官方许可路径（**不是绕过**）：tldraw 在「生产环境 + 无 license key」时
+          # 会在约 5 秒后停止渲染整个编辑器（https 非回环地址，本地 http/localhost 豁免）。
+          # 在仓库 Settings → Secrets 配置 TLDRAW_LICENSE_KEY 后即可生效；
+          # 未配置时为空字符串，行为与现在完全一致（画布由页面内的诚实提示条说明原因）。
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

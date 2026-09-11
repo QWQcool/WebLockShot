@@ -2099,3 +2099,68 @@
   font-size: 0.6rem;
   color: var(--cv-mute, #5b7a86);
 }
+
+/* ---------------- tldraw 生产许可闸门 · 诚实提示条（V1） ---------------- */
+
+.wls-tldraw-license {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(760px, calc(100% - 40px));
+  pointer-events: none;
+}
+
+.wls-tldraw-license-card {
+  pointer-events: auto;
+  padding: 14px 18px 12px;
+  border: 1px solid #e7b26a;
+  border-left: 4px solid #d98a1f;
+  border-radius: 12px;
+  background: #fffaf1;
+  box-shadow: 0 10px 30px rgba(22, 50, 63, 0.16);
+}
+
+.wls-tldraw-license-title {
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+  /* T4 a11y 口径：浅底正文 ≥4.5:1 */
+  color: #7a4a06;
+}
+
+.wls-tldraw-license-body,
+.wls-tldraw-license-note,
+.wls-tldraw-license-fix {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--cv-ink, #16323f);
+}
+
+.wls-tldraw-license-note {
+  color: #4a6873;
+}
+
+.wls-tldraw-license-fix {
+  margin-bottom: 10px;
+  color: #4a6873;
+}
+
+.wls-tldraw-license-dismiss {
+  min-height: 32px;
+  padding: 0 16px;
+  border: 1px solid var(--cv-line, #dbe9ee);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--cv-ink, #16323f);
+  font-family: var(--body);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wls-tldraw-license-dismiss:active {
+  filter: brightness(0.96);
+}

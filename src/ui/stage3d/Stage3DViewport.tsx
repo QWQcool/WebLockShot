@@ -4,9 +4,11 @@ import { Grid, OrbitControls, TransformControls, useGLTF } from '@react-three/dr
 import * as THREE from 'three'
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { Stage3DObject } from '../../canvas/stage3dMeta.ts'
+import { BUILTIN_CHARACTER_MODEL_URL } from '../../canvas/stage3dAssets.ts'
 import { STAGE3D_POSE_PRESETS, sanitizeBoneName } from '../../canvas/stage3dPose.ts'
 import { animClipFor } from '../../canvas/stage3dAnim.ts'
 import { sampleCameraPose, type Stage3DKeyframe } from '../../canvas/stage3dKeyframes.ts'
+import { ErrorBoundary } from '../components/ErrorBoundary.tsx'
 
 /**
  * D1 3D 运镜台 · R3F 渲染层（本组件是唯一 import three/R3F 的文件，
@@ -44,9 +46,15 @@ export type Stage3DViewportProps = {
   } | null>
   /** D2：关键帧播放（kfs 来自选中机位；playing=true 时 useFrame 驱动导演相机） */
   playback: { kfs: Stage3DKeyframe[]; playing: boolean; onPlayhead(t: number): void } | null
+  /**
+   * 资源加载失败如实上报（模型 404 / 解析失败 → 上层 notice 条）。
+   * 视口内已用 ErrorBoundary 降级为占位体，绝不让异常冒泡到根级（曾整页白屏）。
+   */
+  onAssetError?(message: string): void
 }
 
-export const DEFAULT_CHARACTER_MODEL_URL = '/models/quaternius-universal-character.glb'
+/** 内置素体模型 URL：经 publicUrl 拼 vite base（子路径部署写死根路径会 404 → 白屏） */
+export const DEFAULT_CHARACTER_MODEL_URL = BUILTIN_CHARACTER_MODEL_URL
 
 const round4 = (v: number): number => Math.round(v * 10000) / 10000
 
@@ -194,6 +202,7 @@ function SceneContent(props: Stage3DViewportProps) {
           selected={props.selectedId === o.id}
           refs={objectRefs}
           onSelect={props.onSelect}
+          onAssetError={props.onAssetError}
         />
       ))}
       {props.selectedId && props.tool === 'move' && (
@@ -278,6 +287,7 @@ function SceneObject({
   selected,
   refs,
   onSelect,
+  onAssetError,
 }: {
   object: Stage3DObject
   builtinModelUrl: string
@@ -285,6 +295,7 @@ function SceneObject({
   selected: boolean
   refs: React.MutableRefObject<Map<string, THREE.Object3D>>
   onSelect(id: string | null): void
+  onAssetError?: (message: string) => void
 }) {
   const groupRef = useRef<THREE.Group>(null)
 
@@ -313,7 +324,11 @@ function SceneObject({
       }}
     >
       {object.type === 'character' ? (
-        <CharacterModel object={object} url={object.modelRef ? modelUrlByRef[object.modelRef] ?? null : builtinModelUrl} />
+        <CharacterModel
+          object={object}
+          url={object.modelRef ? modelUrlByRef[object.modelRef] ?? null : builtinModelUrl}
+          onAssetError={onAssetError}
+        />
       ) : (
         <mesh castShadow>
           {object.type === 'box' && <boxGeometry args={[0.8, 0.8, 0.8]} />}
@@ -328,25 +343,46 @@ function SceneObject({
   )
 }
 
+/** 占位体（模型未水合 / 加载失败时的诚实降级：灰色胶囊，不伪造角色外观） */
+function CharacterPlaceholder() {
+  return (
+    <mesh>
+      <capsuleGeometry args={[0.28, 0.9, 4, 12]} />
+      <meshStandardMaterial color="#cccccc" roughness={0.8} />
+    </mesh>
+  )
+}
+
 /** 素体模型：GLB 懒加载 + 包围盒归一（~1.8 单位高）+ 色板覆色 + D2 预置姿势 */
-function CharacterModel({ object, url }: { object: Stage3DObject; url: string | null }) {
+function CharacterModel({
+  object,
+  url,
+  onAssetError,
+}: {
+  object: Stage3DObject
+  url: string | null
+  onAssetError?: (message: string) => void
+}) {
   if (!url) {
     // 自定义模型 blob url 尚未水合：占位体如实显示
-    return (
-      <mesh>
-        <capsuleGeometry args={[0.28, 0.9, 4, 12]} />
-        <meshStandardMaterial color="#cccccc" roughness={0.8} />
-      </mesh>
-    )
+    return <CharacterPlaceholder />
   }
   return (
-    <GLBModel
-      key={url}
-      url={url}
-      color={object.color}
-      pose={object.pose ?? 'tpose'}
-      anim={object.anim ?? null}
-    />
+    // 局部兜底：模型 404 / 解析失败时只降级这一只角色，绝不冒泡到根级（曾整页白屏）
+    <ErrorBoundary
+      label={`素体模型 ${url}`}
+      resetKey={url}
+      onError={(err) => onAssetError?.(`模型加载失败，已降级为占位体：${err.message}`)}
+      fallback={() => <CharacterPlaceholder />}
+    >
+      <GLBModel
+        key={url}
+        url={url}
+        color={object.color}
+        pose={object.pose ?? 'tpose'}
+        anim={object.anim ?? null}
+      />
+    </ErrorBoundary>
   )
 }
 

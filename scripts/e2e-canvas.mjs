@@ -187,6 +187,26 @@ async function main() {
       await page.click('[data-testid=s3-scene-studio]')
       const active = await page.getAttribute('[data-testid=s3-scene-studio]', 'class')
       assert(/active/.test(active || ''), `场景预设未激活：${active}`)
+
+      // 回归（2026-09-11 线上白屏）：点「加人物」才会真正拉取 GLB。
+      // 此前 E2E 只进出 3D 台、从不加人物，于是「模型 URL 根绝对路径 → 子路径 404 →
+      // useGLTF 抛错 → 整页白屏」这一整类缺陷在四门槛下全绿溜到了线上。
+      const errBefore = pageErrors.length
+      await page.click('[data-testid=s3-add-character]')
+      await page.waitForTimeout(2500)
+      assert(
+        (await page.locator('[data-testid=stage3d-studio]').count()) === 1,
+        '「加人物」后 3D 台消失（疑似整页白屏）'
+      )
+      assert(
+        await page.evaluate(() => typeof window.__s3poseMatched === 'number'),
+        '素体模型未解析（加人物后仍是占位体，模型资源可能加载失败）'
+      )
+      assert(
+        pageErrors.length === errBefore,
+        `「加人物」触发 JS 异常：${pageErrors.slice(errBefore).join(' | ')}`
+      )
+
       await page.click('[data-testid=s3-back]')
       await page.waitForSelector('[data-testid=stage3d-studio]', { state: 'detached', timeout: 5000 })
       assert(await page.isVisible('[data-testid=canvas-workbench]'), '返回画布失败')

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { SCENE_GALLERY_CARDS, SCENE_GALLERY_TOPOLOGY } from '../../canvas/sceneGallery.ts'
+import { publicUrl } from '../../assets/publicUrl.ts'
 import './sceneGallery.css'
 
 /**
@@ -15,10 +16,7 @@ import './sceneGallery.css'
 
 /** 配图地址：BASE_URL 感知（GitHub Pages 子路径 /WebLockShot/ 下同样正确） */
 function sceneImageUrl(filename: string): string {
-  if (typeof window === 'undefined') return `/scenes/${filename}`
-  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'
-  const cleanBase = base.endsWith('/') ? base : `${base}/`
-  return `${cleanBase}scenes/${filename}`
+  return publicUrl(`scenes/${filename}`)
 }
 
 type Props = {

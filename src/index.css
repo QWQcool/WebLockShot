@@ -4687,3 +4687,96 @@ textarea:focus-visible {
   .preset-chip-card:active,
   .pill-btn:active { filter: brightness(1.25); }
 }
+
+/* ---------------- 渲染异常兜底（ErrorBoundary，永不整页白屏） ---------------- */
+
+.wls-error-boundary {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+  background: linear-gradient(180deg, var(--sky-2), var(--sky));
+}
+
+.wls-eb-card {
+  width: min(560px, 100%);
+  padding: 28px 26px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--foam);
+  box-shadow: 0 18px 48px rgba(22, 50, 63, 0.14);
+  text-align: center;
+}
+
+.wls-eb-icon {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.wls-eb-card h1 {
+  margin: 10px 0 8px;
+  font-family: var(--display);
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.wls-eb-card p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+/* T4 a11y 口径：浅底上的次要文案统一 ≥4.5:1 */
+.wls-eb-where {
+  font-size: 12px;
+  color: #4a6873;
+}
+
+.wls-eb-detail {
+  margin: 12px 0 16px;
+  padding: 10px 12px;
+  max-height: 160px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f2f8fa;
+  color: #33505c;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wls-eb-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.wls-eb-btn {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wls-eb-btn.primary {
+  background: var(--miku);
+  border-color: var(--miku);
+  /* T4：白字在初音青上仅 ~2.1:1，用深墨色 */
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.wls-eb-btn:active {
+  filter: brightness(0.96);
+}

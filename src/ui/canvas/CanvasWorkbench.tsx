@@ -15,6 +15,7 @@ import {
   extractSkillManifest,
   filterOrchestrationParams,
   initialNodeY,
+  nodeAvailability,
   nodeIdToShapeId,
   parseOrchestrationPlan,
   routeOrchestrationScene,
@@ -81,7 +82,8 @@ import {
 } from '../../canvas/stage3dFrames.ts'
 import { useLanguage, useT } from '../../i18n/useLanguage.ts'
 import { setLanguage } from '../../i18n/language.ts'
-import { nodeHint, nodeLabel, templateLabel } from '../../i18n/strings.ts'
+import { nodeAvailabilityKey, nodeHint, nodeLabel, templateLabel } from '../../i18n/strings.ts'
+import { TldrawLicenseNotice } from './TldrawLicenseNotice.tsx'
 
 /**
  * Agent 创意画布 · 一期 A（CANVAS_PLAN.md §4.1-1/2/6/7 + v1.1 变更）。
@@ -1165,7 +1167,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
         kind,
         icon: CANVAS_NODE_META[kind].icon,
         accent: CANVAS_NODE_META[kind].accent,
-        phase: CANVAS_NODE_META[kind].phase,
+        // 阶段标签改为「可用性」口径（2026-09-11 校正）：期数（1A/1B/2/3）对用户已无意义，
+        // 且与节点卡片徽标口径不一致（3D 运镜台明明可用却标「3」）。
+        availability: nodeAvailability(kind),
         // I1：标签/提示走 i18n（切语言后随 lang 变化重建）
         label: nodeLabel(lang, kind),
         hint: nodeHint(lang, kind),
@@ -1213,7 +1217,7 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
               <span className="wls-palette-accent" style={{ background: item.accent }} />
               <span className="wls-palette-icon">{item.icon}</span>
               <span className="wls-palette-label">{item.label}</span>
-              <span className="wls-palette-phase">{item.phase}</span>
+              <span className="wls-palette-phase">{t(nodeAvailabilityKey(item.availability))}</span>
             </button>
           ))}
           <div className="wls-palette-tip">{t('palette.tip')}</div>
@@ -1384,6 +1388,9 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
 
             {/* D9 小地图（右下角；Canvas2D 自绘，点击/拖动导航） */}
             <MiniMap shapes={mini.shapes} viewport={mini.viewport} onNavigate={handleMiniNavigate} />
+
+            {/* V1：tldraw 生产许可闸门如实提示（无 license key 的生产环境 5s 后编辑器停渲染） */}
+            <TldrawLicenseNotice />
 
             {/* D9 项目操作提示条 */}
             {projectNotice && (

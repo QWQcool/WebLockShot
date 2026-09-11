@@ -403,15 +403,16 @@ WebLockShot/
 # 画布契约 / Skill manifest / 3D 摆台 meta·动作·场景 / 记忆源 / 多画布存储 / 小地图 / MCP 操作批
 # i18n 字典（中英键对齐 / 无漏译 / 插值与持久化）
 # UI 冒烟（vitest + testing-library）：钱包交互 / 熔断徽章三态 / 共享管线
-# tests 400 (node) + 18 (vitest), fail 0
+# tests 407 (node) + 18 (vitest), fail 0
 ```
 
 ### 画布 E2E 套件（`npm run e2e`）
 
 把画布切片「用完即弃」的 Playwright 实机冒烟固化为可重复套件（`scripts/e2e-canvas.mjs`）：
 
-- **覆盖**：开场层 → 对话栏演示编排 → 节点落位 → 刷新恢复；3D 运镜台（进入 / 场景预设 / 返回）；
-  Skill 市场（安装 / 启停 / 卸载）；记忆图谱（真实空态或真实数据）；多画布项目 + 小地图 + 连接器 + 创作场景画廊
+- **覆盖**：开场层 → 对话栏演示编排 → 节点落位 → 刷新恢复；3D 运镜台（进入 / 场景预设 / **加人物** / 返回）；
+  Skill 市场（安装 / 启停 / 卸载）；记忆图谱（真实空态或真实数据）；多画布项目 + 小地图 + 连接器 + 创作场景画廊；
+  i18n 切换与持久化；海外引擎无 Key 灰态
 - **隔离**：独立浏览器上下文（localStorage / IndexedDB 不污染本机）+ 伴生服务 `WLS_STORAGE=memory` 起在随机端口
 - **诚实跳过**：未安装 Playwright 或浏览器未下载时打印启用指引并 `exit 0`（不伪装通过、不阻塞 CI）
 
@@ -420,6 +421,47 @@ npm run e2e                 # 构建（dist 缺失时）+ 起伴生服务 + 跑�
 npm run e2e -- --skip-build # 复用现有 dist（快速回归）
 npm run e2e -- --headed     # 有头模式（排障）
 ```
+
+### 子路径部署回归（`npm run e2e:basepath`）
+
+**为什么单独有这一套件**：上面所有实机套件（E2E / 性能 / a11y / 降级矩阵）都用一个「根路径」静态服务
+托管 `dist`，而线上 GitHub Pages 是**子路径**托管（vite `base = /WebLockShot/`）。凡是写死根绝对路径的
+资源在本地全绿、线上 404 —— 2026-09-11 的 3D 运镜台「加人物」**整页白屏**事故就是这么漏出去的。
+
+本套件用 `GITHUB_PAGES=1` 构建（base 与线上一致）+ 子路径静态服务，复现线上形态并断言：
+
+- 子路径入口可加载 → 开场层 → 进入画布；
+- 场景画廊配图（走 `publicUrl` 的同类资源）零 404；
+- 3D 台「加人物」：素体模型请求 **200** + 姿势生效（真渲染非占位体）+ 零 pageerror + **不白屏**；
+- 全程 `/WebLockShot/` 下资源零 4xx/5xx（`/healthz`、`/api/*` 属「无伴生服务」预期降级，仅如实记录）。
+
+```bash
+npm run e2e:basepath              # 构建 dist-pages（base=/WebLockShot/）+ 跑回归
+npm run e2e:basepath -- --skip-build
+```
+
+> 配套单测 `src/assets/__tests__/publicUrl.test.ts` 还有一条**源码级守卫**：
+> 扫描 `src/**` 禁止出现 `'/models/…'`、`'/scenes/…'` 等手写的 public 资源根绝对路径，
+> 从写法上杜绝同类回归（注释行豁免）。
+
+### 生产模式回归（`npm run e2e:prod`）
+
+**为什么需要它**：tldraw 的许可闸门判定是「`http:` 一律豁免；`https:` 仅 localhost / 127.x / ::1 豁免」，
+所以**全部本地套件（http://127.0.0.1）都看不到它，线上 https 必现**：无 license key 时
+`<Tldraw>` 会在约 5 秒后被替换成空 div —— 用户看到的是「画布内容忽然全部消失」（2026-09-11 实机反馈）。
+
+本套件用 **HTTPS + 非回环主机名**（自签证书 + `--host-resolver-rules`）复现线上形态，双向断言：
+
+- **生产形态**：闸门确实触发 → 本项目**如实提示条**出现（含原因与官方解决路径）→ 外层 UI 不崩 → 画布数据不丢；
+- **对照形态**（http://127.0.0.1）：闸门不触发、提示条不出现（证明提示不是误报）。
+
+```bash
+npm run e2e:prod              # 需要 openssl（Git for Windows 自带）生成自签证书；缺失时如实跳过
+npm run e2e:prod -- --skip-build
+```
+
+> 本项目**不绕过、不去水印**（用户已拍板接受该限制，见 [NOTICE](./NOTICE)）；
+> 官方解决路径是在构建期注入 `VITE_TLDRAW_LICENSE_KEY`（Pages 工作流已预留 `TLDRAW_LICENSE_KEY` secret 透传）。
 
 ### 覆盖率基线（`npm run test:coverage`）
 
@@ -457,6 +499,9 @@ chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）�
 | T3 性能基准 | 200 节点 54.5fps / 500 节点 25.7fps；记忆图谱 500 记录 79ms；3D chunk 957kB / 视口就绪 352ms；Skill 市场 100 项 86ms。**发现文档契约上限 200 节点、超限静默不落盘**（已记入优化建议，本期只测不改） |
 | T4 跨浏览器 + a11y | chromium / webkit 核心链路各 **5/5**；axe 严重项从 6 处**清零**（修 tablist 语义 + 8 处对比度），四态扫描 0 违规 |
 | T5 降级 / 迁移矩阵 | 六类能力缺失路径 **6/6** 优雅降级、标注诚实、无崩溃无白屏；旧单画布迁移零丢失 |
+| T6 线上白屏事故修复 | 3D 运镜台「加人物」在 GitHub Pages 子路径下**整页白屏**（模型 URL 写死根绝对路径 → 404 → `useGLTF` 抛错且无 ErrorBoundary 兜底）。修复：`publicUrl` 统一收口 + 根级/局部双重 ErrorBoundary + 新增 `npm run e2e:basepath` 子路径回归（**已做负向验收**：还原错误写法后该套件 5 项失败并复现 404，确认能抓到） |
+| T7 画布消失事故修复 | 线上「画布内容忽然全部消失」= **tldraw 生产许可闸门**（无 license key + https 非回环 → 约 5s 后 `<Tldraw>` 被替换为空 div）。修复：如实提示条 + `npm run e2e:prod` 生产模式回归（HTTPS 复现闸门，双向断言）+ 官方 license 路径文档化。**不绕过、不去水印** |
+| T8 过期文案校正 | 节点文案与可用性口径校正：`stage3d` 由 locked 误判改为 ready（此前「已能进入 3D 运镜台」却标「3 期开放 / 仅摆放占位」）；`image` 由「二期开放」改为「尚未实现」；左侧面板阶段标签改为可用性口径；产物卡空态不再显示「契约校验未通过」；节点 body 提示统一走 i18n。新增源码级守卫单测禁止残留期数口径 |
 
 ---
 
@@ -473,6 +518,18 @@ chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）�
 5. **3D 台动作预设缺「挥手 / 转身」**：内置 CC0 素体动画库无对应片段，**如实替代、不伪造**。
 6. **边提取为 O(n²)**（`editorPageToCanvasDraft` 内 `shapes.find` 线性查找）：节点/边规模增大时落盘耗时放大，
    建议改为一次 Map 索引。
+7. **子路径部署此前不在测试面内**（2026-09-11 白屏事故根因之一）：E2E / 性能 / a11y / 降级四套实机套件
+   原先统一用「根路径」静态服务托管 `dist`，无法暴露写死根绝对路径的资源。现已补两层防线：
+   **源码级守卫单测**（`publicUrl.test.ts`，随 `npm test` 进 CI，零额外成本）+ **`npm run e2e:basepath`**
+   实机复现线上形态。**建议后续把后者也并入 CI**（Pages 工作流当前只跑 tsc / lint / test，
+   未安装 Playwright 浏览器，该套件会自动优雅跳过）。
+8. **PWA 更新为 `prompt` 模式**：`registerType: 'prompt'` 是刻意选择（自动更新会打断进行中的生成任务），
+   代价是老访客需点「🚀 发现新版本」或硬刷新才会拿到新 bundle——排查「线上没更新」类反馈时先排除此项。
+9. **线上画布会在约 5 秒后停止渲染（tldraw 许可限制，已接受）**：https 非回环地址 + 无 license key 时，
+   tldraw 按许可条款停渲染。现已加**如实提示条**说明原因与官方解决路径，并留 `TLDRAW_LICENSE_KEY`
+   secret 透传（配置后即恢复）；本项目**不提供绕过校验 / 去水印手段**（用户已拍板）。详见 [NOTICE](./NOTICE)。
+10. **`image`（图像生成）节点仍未实现**：文案已由「二期开放」校正为「尚未实现」，节点为占位（不装可用）；
+   若要补齐需新增 `ImageNodeBody` 并接入 ComfyUI 文生图 / 图生图链路。
 7. **Skill 市场全量渲染**：100 项渲染 1340 个 DOM 节点，未做虚拟列表（规模继续增长时建议窗口化）。
 8. **tldraw 免费版水印 + 生产 5 秒停渲染**：需购买 license 或替换画布引擎（用户已拍板接受，不做绕过）。
 9. **`npm run test:node` 曾偶发 ECONNRESET 抖动**：已用 `duplex:'half'` 从测试侧消除（连续 4 次全量跑 0 失败）。

@@ -11,12 +11,19 @@
 
 - 包：`tldraw@5.4.0`（`license` 字段为 `SEE LICENSE IN LICENSE.md`，实际指向
   <https://github.com/tldraw/tldraw/blob/main/LICENSE.md>）
-- 事实口径：
+- 事实口径（读自 `tldraw@5.4.0` 构建产物实测，非转述）：
   - 免费/未授权使用时，画布**带 tldraw 水印**；
-  - **生产环境未配置有效 license key 时，画布渲染会在约 5 秒后停止**（tldraw 的许可限制，非本项目缺陷）；
+  - **生产环境未配置有效 license key 时，画布渲染会在约 5 秒后停止**（tldraw 的许可限制，非本项目缺陷）。
+    其判定为：`protocol === 'http:'` **或** `https:` + 回环主机 → 视为开发环境（豁免）；
+    即**本地 dev / 本地预览永远看不到该现象，线上 https 必现**；
+    闸门触发时 `<Tldraw>` 子树被替换为空 div（画布与 tldraw 自带 UI 消失），
+    但**本项目的画布数据不受影响**（IndexedDB / localStorage 照常保留）；
   - 本项目**接受该限制**，不包含也不提供任何绕过许可校验或去水印的手段；
-  - 若要正式上线，需自行向 tldraw 购买 license 并配置 `licenseKey`，或替换为 MIT 许可的画布引擎。
+    页面内已加**如实提示条**（说明原因 + 官方解决路径，见 `src/ui/canvas/TldrawLicenseNotice.tsx`）；
+  - 若要正式上线，需自行向 tldraw 购买 license 并配置 `VITE_TLDRAW_LICENSE_KEY`
+    （构建期环境变量，Pages 工作流已预留 `TLDRAW_LICENSE_KEY` secret 透传），或替换为 MIT 许可的画布引擎。
 - 因此：**本项目 MIT 仅覆盖本仓库自有代码，不覆盖 tldraw**。
+- 回归测试：`npm run e2e:prod`（HTTPS + 非回环主机名复现线上形态，验证闸门行为与提示条）。
 
 ### 2. GSAP —— 标准「免费使用」许可（非 MIT）
 

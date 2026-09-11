@@ -13,6 +13,7 @@ import {
   STAGE3D_POSE_LABELS,
   type Stage3DPoseId,
 } from '../../canvas/stage3dPose.ts'
+import { BUILTIN_CHARACTER_MODEL_URL } from '../../canvas/stage3dAssets.ts'
 import { STAGE3D_ANIM_PRESETS } from '../../canvas/stage3dAnim.ts'
 import {
   STAGE3D_SCENE_PRESETS,
@@ -744,11 +745,12 @@ export const Stage3DStudio: React.FC<Props> = ({ payload, onChange, onExportFram
             >
               <LazyViewport
                 objects={objects}
-                builtinModelUrl="/models/quaternius-universal-character.glb"
+                builtinModelUrl={BUILTIN_CHARACTER_MODEL_URL}
                 modelUrlByRef={modelUrlByRef}
                 panoramaUrl={panoramaUrl}
                 selectedId={selectedId}
                 tool={tool}
+                onAssetError={(msg) => setNotice({ kind: 'err', text: msg })}
                 onSelect={(id) => {
                   setSelectedId(id)
                   if (id) setSelectedCameraId(null)

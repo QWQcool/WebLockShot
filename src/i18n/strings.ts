@@ -61,10 +61,12 @@ const ZH = {
   'palette.tip': '点击添加节点到画布中央；灰态节点为后续阶段占位（诚实标注，不装可用）。',
 
   'node.badge.ready': '就绪',
-  'node.badge.pending': '一期 B 接通',
-  'node.badge.phase': '{phase} 期开放',
+  'node.badge.pending': '待接通',
+  'node.badge.unimplemented': '未实现',
+  'node.lockedNote': '该节点尚未实现：当前仅作流程占位，点击不会产生内容。',
   'node.skillInputHint': 'Skill 导入：此节点的输入未填写，请补全后再运行',
   'node.fillNewInput': '📥 填新输入：',
+  'node.asset.empty': '尚无产物：连入「视频生成」节点出片后自动写入',
 
   'chat.aria': '对话栏：一句话生成 Brief 节点',
   'chat.placeholder': '描述你想要什么，Agent 帮你上画布…',
@@ -115,7 +117,7 @@ const ZH = {
   'node.product.label': '素材导入',
   'node.product.hint': '商品图 / 参考图 / 视频 / 链接统一入口（一期 B 接通素材理解）',
   'node.image.label': '图像生成',
-  'node.image.hint': '二期开放：ComfyUI 文生图 / 图生图，多风格视觉资产',
+  'node.image.hint': '尚未实现：规划中的 ComfyUI 文生图 / 图生图（当前为占位节点，不装可用）',
   'node.script.label': '脚本创编',
   'node.script.hint': 'ScriptWriter + Critic 双智体：带货口播 / 剧情台词 / 品牌叙事（连入 Brief 或手动输入需求）',
   'node.storyboard.label': '分镜预演',
@@ -127,7 +129,7 @@ const ZH = {
   'node.edit.label': '局部重绘',
   'node.edit.hint': '连入产物卡（图片/视频单帧）后笔刷 / 框选涂抹重绘区，导出 mask PNG（重绘指令 A2 接通）',
   'node.stage3d.label': '3D 运镜台',
-  'node.stage3d.hint': '三期开放：摆角色 / 调机位 / 录关键帧，本地预演不耗积分',
+  'node.stage3d.hint': '已开放：摆角色 / 调机位 / 录关键帧，全程本地渲染不耗积分',
   'node.deliver.label': '成片交付',
   'node.deliver.hint': '产物送入剪映草稿三轨对齐链路 / 直接导出（一期 B 接通）',
 
@@ -142,6 +144,21 @@ const ZH = {
   'onboardingTab.ecommerce-ad.label': '电商广告',
   'onboardingTab.interactive-game.label': '互动游戏',
   'onboardingTab.web-app.label': '网页应用',
+
+  'error.title': '界面渲染异常',
+  'error.body': '本次渲染已中止，避免整页白屏。你的画布内容与本地数据不会因此丢失。',
+  'error.where': '出问题的区域：{area}',
+  'error.detail': '技术细节：{msg}',
+  'error.retry': '↻ 重试',
+  'error.reload': '↻ 重新加载页面',
+
+  'tldraw.gate.title': '⚠️ tldraw 编辑器已停止渲染（第三方许可限制，非本项目缺陷）',
+  'tldraw.gate.body':
+    '当前是生产环境（https 且非本地地址）且未配置 tldraw license key。按 tldraw 许可条款，编辑器会在约 5 秒后停止渲染：画布与 tldraw 自带工具条会消失，但你的画布数据仍保存在本地（IndexedDB / localStorage 未受影响），刷新或配置授权后可继续编辑。',
+  'tldraw.gate.devNote': '本地开发与本地预览（http 协议，或 localhost / 127.0.0.1）不受影响。',
+  'tldraw.gate.fix':
+    '官方解决路径：构建时注入 VITE_TLDRAW_LICENSE_KEY（需自行向 tldraw 购买授权），或替换为 MIT 许可的画布引擎。本项目不提供任何绕过许可校验 / 去水印的手段，详见 NOTICE。',
+  'tldraw.gate.dismiss': '知道了',
 } as const
 
 export type MessageKey = keyof typeof ZH
@@ -193,10 +210,12 @@ const EN: Record<MessageKey, string> = {
     'Click to add a node at the center of the canvas; greyed-out nodes are placeholders for later phases (honestly labeled, not fake-available).',
 
   'node.badge.ready': 'Ready',
-  'node.badge.pending': 'Wired in Phase B',
-  'node.badge.phase': 'Opens in Phase {phase}',
+  'node.badge.pending': 'Pending wiring',
+  'node.badge.unimplemented': 'Not implemented',
+  'node.lockedNote': 'This node is not implemented yet: it is a placeholder in the flow and produces nothing.',
   'node.skillInputHint': 'Skill import: this node still needs input — fill it in before running',
   'node.fillNewInput': '📥 Fill new input: ',
+  'node.asset.empty': 'No artifact yet: it is written automatically once the upstream “Video generation” node renders',
 
   'chat.aria': 'Chat bar: one sentence becomes a Brief node',
   'chat.placeholder': 'Describe what you want and the Agent will lay it out on the canvas…',
@@ -249,7 +268,7 @@ const EN: Record<MessageKey, string> = {
   'node.product.label': 'Asset import',
   'node.product.hint': 'Single entry for product images / references / videos / links (asset understanding lands in Phase B)',
   'node.image.label': 'Image generation',
-  'node.image.hint': 'Opens in Phase 2: ComfyUI text-to-image / image-to-image, multi-style visual assets',
+  'node.image.hint': 'Not implemented yet: planned ComfyUI text-to-image / image-to-image (placeholder node, not usable)',
   'node.script.label': 'Script writing',
   'node.script.hint': 'ScriptWriter + Critic duo: commerce voice-over / drama lines / brand narrative (connect a Brief or type the requirement)',
   'node.storyboard.label': 'Storyboard preview',
@@ -261,7 +280,7 @@ const EN: Record<MessageKey, string> = {
   'node.edit.label': 'Local repaint',
   'node.edit.hint': 'Connect an artifact card (image / video frame), paint the region with brush or lasso, export a mask PNG (repaint commands land in A2)',
   'node.stage3d.label': '3D camera stage',
-  'node.stage3d.hint': 'Opens in Phase 3: place characters / set cameras / record keyframes; local preview costs no credits',
+  'node.stage3d.hint': 'Available: place characters / set cameras / record keyframes; fully local rendering, no credits',
   'node.deliver.label': 'Delivery',
   'node.deliver.hint': 'Send artifacts into the CapCut/Jianying three-track alignment pipeline or export directly (wired in Phase B)',
 
@@ -276,6 +295,21 @@ const EN: Record<MessageKey, string> = {
   'onboardingTab.ecommerce-ad.label': 'Commerce ads',
   'onboardingTab.interactive-game.label': 'Interactive games',
   'onboardingTab.web-app.label': 'Web apps',
+
+  'error.title': 'Interface render error',
+  'error.body': 'This render was aborted to avoid a blank page. Your canvas content and local data are not lost.',
+  'error.where': 'Failing area: {area}',
+  'error.detail': 'Technical detail: {msg}',
+  'error.retry': '↻ Retry',
+  'error.reload': '↻ Reload page',
+
+  'tldraw.gate.title': '⚠️ tldraw editor stopped rendering (third-party license limit, not a bug in this project)',
+  'tldraw.gate.body':
+    'This is a production environment (https, non-local address) without a tldraw license key. Under the tldraw license the editor stops rendering after about 5 seconds: the canvas and tldraw’s own toolbars disappear, but your canvas data stays in local storage (IndexedDB / localStorage are untouched) and can be edited again after a reload or once a license is configured.',
+  'tldraw.gate.devNote': 'Local development and local preview (http, or localhost / 127.0.0.1) are unaffected.',
+  'tldraw.gate.fix':
+    'Official paths forward: inject VITE_TLDRAW_LICENSE_KEY at build time (you must obtain a license from tldraw), or replace the canvas engine with an MIT-licensed one. This project does not ship any way to bypass license checks or remove the watermark — see NOTICE.',
+  'tldraw.gate.dismiss': 'Got it',
 }
 
 const DICTS: Record<Language, Record<MessageKey, string>> = { zh: ZH, en: EN }
@@ -309,6 +343,12 @@ export function nodeLabelKey(kind: CanvasNodeKind): MessageKey {
 /** 节点提示键（kind → 字典键） */
 export function nodeHintKey(kind: CanvasNodeKind): MessageKey {
   return `node.${kind}.hint` as MessageKey
+}
+
+/** 节点可用性徽标键（节点卡片徽标与左侧面板阶段标签共用同一口径） */
+export function nodeAvailabilityKey(availability: 'ready' | 'pending' | 'locked'): MessageKey {
+  if (availability === 'ready') return 'node.badge.ready'
+  return availability === 'pending' ? 'node.badge.pending' : 'node.badge.unimplemented'
 }
 
 export function nodeLabel(lang: Language, kind: CanvasNodeKind): string {
