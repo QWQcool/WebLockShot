@@ -32,9 +32,41 @@ export type IdempotentPayload = {
 /** 多标签页锁元数据 localStorage 前缀（尽力而为语义，非强互斥，见 acquireLock 注释） */
 const LOCK_META_PREFIX = 'weblockshot.idempotency.lock.'
 
-type CrossTabLockMeta = { token: string; at: number }
+/** 本页实例 id 的 sessionStorage 键：**同标签页跨刷新保持**、**跨标签页互不相同** */
+const PAGE_ID_KEY = 'weblockshot.page_instance_id'
 
-class IdempotencyManager {
+type CrossTabLockMeta = {
+  token: string
+  at: number
+  /**
+   * 写入该锁的页实例 id（见 PAGE_ID_KEY）。用于区分「其它标签页的锁」与
+   * 「本页刷新前留下的陈旧锁」——后者必须忽略，否则刷新后会在 TTL 内无法重试。
+   * 可能为 null（sessionStorage 不可用，如隐私模式）。
+   */
+  pageId?: string | null
+}
+
+/**
+ * 读取/生成当前页实例 id。
+ * 用 `sessionStorage` 是刻意的：它在**同一标签页跨刷新保持**（所以刷新后仍是「我自己」），
+ * 而不同标签页之间互不共享（所以另一页是「别人」）。
+ * 不可用（隐私模式 / 无 sessionStorage / 抛错）时返回 null —— 调用方按「未知」处理，见 acquireLock。
+ */
+function readOrCreatePageId(): string | null {
+  try {
+    const storage = (globalThis as { sessionStorage?: Storage }).sessionStorage
+    if (!storage) return null
+    const existing = storage.getItem(PAGE_ID_KEY)
+    if (existing && existing.trim()) return existing
+    const id = `pg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+    storage.setItem(PAGE_ID_KEY, id)
+    return id
+  } catch {
+    return null
+  }
+}
+
+export class IdempotencyManager {
   private inFlightLocks = new Map<
     string,
     { timestamp: number; timeoutTimer: ReturnType<typeof setTimeout>; crossTabToken?: string | null }
@@ -43,6 +75,8 @@ class IdempotencyManager {
   /** O1：锁 TTL 对齐轮询窗口后的缓冲（轮询收尾 + settle/refund 的时间余量） */
   private readonly lockBufferMs = 60_000
   private readonly cacheTtlMs = 600_000 // 已完成缓存保留 10 分钟
+  /** 本页实例 id（sessionStorage；不可用时为 null → 跨页判定退化为「不阻断」，见 acquireLock） */
+  private readonly pageId: string | null = readOrCreatePageId()
 
   /**
    * 生成规范化幂等键
@@ -82,17 +116,33 @@ class IdempotencyManager {
     }
   }
 
-  /** 写入本页持有的锁元数据（带 token + 时间戳，供其它标签页 CAS 检查与释放比对） */
+  /** 写入本页持有的锁元数据（带 token + 时间戳 + pageId，供其它标签页 CAS 检查与释放比对） */
   private crossTabWrite(key: string): string | null {
     try {
       const storage = (globalThis as { localStorage?: Storage }).localStorage
       if (!storage) return null
       const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-      storage.setItem(LOCK_META_PREFIX + key, JSON.stringify({ token, at: Date.now() }))
+      storage.setItem(
+        LOCK_META_PREFIX + key,
+        JSON.stringify({ token, at: Date.now(), pageId: this.pageId })
+      )
       return token
     } catch {
       return null
     }
+  }
+
+  /**
+   * 该跨页锁元数据是否应**阻断**本页获取锁（纯判定，便于单测）。
+   * 只有同时满足三条才算「他人持有」：
+   * 1. 未过期（超过 TTL 视为陈旧，不阻断）；
+   * 2. 元数据带 pageId **且**本页也有 pageId（否则无法判定归属 → 不阻断，见下）；
+   * 3. pageId 与本页不同（不同标签页）。
+   */
+  private isForeignCrossTabLock(meta: CrossTabLockMeta, lockTimeoutMs: number, now = Date.now()): boolean {
+    if (now - meta.at >= lockTimeoutMs) return false
+    if (!meta.pageId || !this.pageId) return false
+    return meta.pageId !== this.pageId
   }
 
   private crossTabRemove(key: string, token?: string | null): void {
@@ -113,9 +163,19 @@ class IdempotencyManager {
    * 尝试获取执行锁（防连击与防重复提交）
    * 如果该 key 正在执行中，返回 success: false
    *
-   * 多标签页语义（尽力而为，非强互斥）：localStorage 中若存在新鲜锁元数据
-   * （另一标签页写入），本页拒绝获取 —— 这是 CAS 风格的乐观检查，无法防止
-   * 两页同时通过检查的竞态窗口，仅作为第二道防线；强互斥依赖服务端幂等键。
+   * 多标签页语义（尽力而为，非强互斥）：localStorage 中若存在**属于其它页实例**的新鲜锁元数据，
+   * 本页拒绝获取 —— 这是 CAS 风格的乐观检查，无法防止两页同时通过检查的竞态窗口，
+   * 仅作为第二道防线。
+   *
+   * ⚠️ 诚实边界（**不要把本检查当成「有兜底的弱保护」**）：本仓库内**无法证实**存在更强的
+   * 跨标签页去重兜底 —— `clientTaskId` 虽会随提交传给 provider（`executorNode`），但本仓库
+   * 不包含 provider 的去重实现（是否按它去重取决于供应商），`server/` 侧无任何幂等键逻辑，
+   * mock / 演示路径更是完全没有去重。因此下文「pageId 不可用 → 不阻断」的降级**确有代价**：
+   * 该罕见场景（隐私模式等）下，跨标签页同任务防重会从「拦截」退化为「**不拦截**」。
+   *
+   * 页身份（pageId）：锁元数据写入时带上本页 `sessionStorage` 中的实例 id，
+   * 于是「本页刷新前留下的陈旧锁」可被识别并忽略（刷新后可立即重试），
+   * 而「另一标签页的锁」仍然互斥。取不到 pageId 时按「未知 = 不阻断」降级（见下方注释）。
    */
   public acquireLock(key: string, lockTimeoutMs = this.getLockTtlMs()): { success: boolean; reason?: string } {
     if (this.inFlightLocks.has(key)) {
@@ -127,9 +187,19 @@ class IdempotencyManager {
       }
     }
 
-    // 多标签页尽力而为检查：另一标签页的新鲜锁元数据存在 → 拒绝
+    // 多标签页尽力而为检查（第二道防线）：只有「带页身份 + 与本页不同 + 未过期」才视为他人持有。
+    // - 本页自己的陈旧锁（同 pageId，如刷新页面时上一批任务未释放）→ 忽略并覆盖：
+    //   否则刷新后会在 TTL（轮询窗口 + 60s ≈ 11 分钟）内无法重试，且「其它标签页执行中」的提示
+    //   具有误导性（用户并没有开第二个标签页）。
+    // - pageId 不可用（隐私模式 / 无 sessionStorage）→ **不阻断**（未知 = 不阻断）：
+    //   此时无法判定锁的归属，若按「不可判定即拒绝」处理，会把用户自己的陈旧锁误判成他人锁
+    //   （那正是本次修复要解决的误导性提示）。
+    //   ⚠️ 代价（如实标注）：该罕见场景下，跨标签页同任务防重由「会拦截」退化为「**不拦截**」。
+    //   这是为修 bug 付出的、可接受的代价；但**不要**用「反正有服务端幂等键兜底」来安慰自己 ——
+    //   该兜底在本仓库内无法证实（provider 是否按 clientTaskId 去重取决于供应商、server/ 无幂等键、
+    //   mock/演示路径无去重），属**未验证假设**。
     const crossTabMeta = this.crossTabRead(key)
-    if (crossTabMeta && Date.now() - crossTabMeta.at < lockTimeoutMs) {
+    if (crossTabMeta && this.isForeignCrossTabLock(crossTabMeta, lockTimeoutMs)) {
       return {
         success: false,
         reason: '相同任务似乎正在其它标签页执行中（检测到跨页任务锁），请勿重复提交。',

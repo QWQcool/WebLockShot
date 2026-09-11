@@ -9,7 +9,7 @@ import {
   assertJobRequeue,
   circuitBreaker,
 } from '../fsm.ts'
-import { idempotencyManager } from '../idempotency.ts'
+import { IdempotencyManager, idempotencyManager } from '../idempotency.ts'
 import { setPollingWindow } from '../pollingConfig.ts'
 
 test('FSM 有限状态机：允许合法状态迁移', () => {
@@ -161,39 +161,58 @@ test('O1 幂等锁：长轮询场景锁不提前释放；看门狗超 TTL 后仍
 
 test('O1 幂等锁：多标签页 storage CAS（尽力而为）与释放清理', () => {
   idempotencyManager.clear()
-  // 构造 localStorage 桩（Node 环境无 localStorage）
+  // 构造 localStorage / sessionStorage 桩（Node 环境两者皆无）
   const store = new Map<string, string>()
+  const session = new Map<string, string>()
   ;(globalThis as { localStorage?: unknown }).localStorage = {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, v),
     removeItem: (k: string) => void store.delete(k),
   }
+  ;(globalThis as { sessionStorage?: unknown }).sessionStorage = {
+    getItem: (k: string) => session.get(k) ?? null,
+    setItem: (k: string, v: string) => void session.set(k, v),
+    removeItem: (k: string) => void session.delete(k),
+  }
 
   try {
+    // 注意：模块单例在**导入时**（尚无 sessionStorage 桩）已确定 pageId=null，
+    // 无法用于跨页断言，故此处用新实例代表「本页」（pageId 取自刚安装的 sessionStorage 桩）。
+    const page = new IdempotencyManager()
+
     const key = 'o1-crosstab-key'
-    const first = idempotencyManager.acquireLock(key)
+    const first = page.acquireLock(key)
     assert.equal(first.success, true)
-    // 本页持锁后应写入锁元数据（带 token + 时间戳）
-    assert.ok(store.get(`weblockshot.idempotency.lock.${key}`), '应写入跨页锁元数据')
+    // 本页持锁后应写入锁元数据（带 token + 时间戳 + 页身份）
+    const metaRaw = store.get(`weblockshot.idempotency.lock.${key}`) ?? ''
+    assert.ok(metaRaw, '应写入跨页锁元数据')
+    assert.ok((JSON.parse(metaRaw) as { pageId?: string | null }).pageId, '锁元数据应带页身份（pageId）')
 
     // 释放后元数据应被清理
-    idempotencyManager.releaseLock(key)
+    page.releaseLock(key)
     assert.equal(store.get(`weblockshot.idempotency.lock.${key}`), undefined, '释放后应清理跨页锁元数据')
 
-    // 模拟另一标签页的新鲜锁元数据 → 本页拒绝获取（尽力而为第二道防线）
-    store.set(`weblockshot.idempotency.lock.${key}`, JSON.stringify({ token: 'other-tab', at: Date.now() }))
-    const blocked = idempotencyManager.acquireLock(key)
+    // 模拟另一标签页的新鲜锁元数据（pageId 不同）→ 本页拒绝获取（尽力而为第二道防线）
+    store.set(
+      `weblockshot.idempotency.lock.${key}`,
+      JSON.stringify({ token: 'other-tab', at: Date.now(), pageId: 'pg_other_tab' })
+    )
+    const blocked = page.acquireLock(key)
     assert.equal(blocked.success, false, '检测到其它标签页新鲜锁应拒绝')
     assert.match(blocked.reason || '', /其它标签页/)
     store.delete(`weblockshot.idempotency.lock.${key}`)
 
     // 陈旧锁元数据（超 TTL）不阻塞
-    store.set(`weblockshot.idempotency.lock.${key}`, JSON.stringify({ token: 'stale-tab', at: 0 }))
-    const stale = idempotencyManager.acquireLock(key)
+    store.set(
+      `weblockshot.idempotency.lock.${key}`,
+      JSON.stringify({ token: 'stale-tab', at: 0, pageId: 'pg_other_tab' })
+    )
+    const stale = page.acquireLock(key)
     assert.equal(stale.success, true, '陈旧锁元数据不应阻塞获取')
-    idempotencyManager.releaseLock(key)
+    page.releaseLock(key)
   } finally {
     delete (globalThis as { localStorage?: unknown }).localStorage
+    delete (globalThis as { sessionStorage?: unknown }).sessionStorage
     idempotencyManager.clear()
   }
 })

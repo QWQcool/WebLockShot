@@ -513,66 +513,59 @@ async function main() {
     })
 
     // ---- ⑪ P1 运行历史（S3 数据层 + S4 UI） ----
-    await step('⑪ 运行历史：刷新后仍在 + 面板可开合 + ≥3 条 + 字段完整 + 持久引用', async () => {
-      // 显式再刷新一次：记录存 IndexedDB，必须跨刷新存活（TODO P1 验收标准）
-      await page.reload({ waitUntil: 'domcontentloaded' })
-      await page.waitForSelector('[data-testid=chat-dock]', { timeout: 20_000 })
-
-      // 刷新后引擎内存态为空 → 重新点「出片」会真正新建任务。
-      // 注意：⑨ 只等「首个产物出现」就继续了，故这里必须等**6 镜全部到终态**再断言记录数。
-      await page.evaluate(() => {
-        const node = [...document.querySelectorAll('.wls-node[data-kind="generate"]')].pop()
-        const btn = [...(node?.querySelectorAll('button') ?? [])].find((b) => /出片|重新生成/.test(b.textContent || ''))
-        btn?.click()
-      })
-      await page.waitForSelector('[data-testid=wls-generate-confirm-ok]', { timeout: 10_000 })
-      await page.click('[data-testid=wls-generate-confirm-ok]')
-      await page.waitForFunction(
-        () => {
-          const els = [...document.querySelectorAll('.wls-generate-artifact')]
-          return els.length >= 6 && els.every((e) => !/排队中|生成中/.test(e.textContent || ''))
-        },
-        null,
-        { timeout: 90_000 }
-      )
-
+    await step('⑪ 运行历史：刷新后仍在（先断言上一批）+ 面板可开合 + 字段完整', async () => {
+      // 刷新**前**先读一次记录数（上一批，来自 ⑨ 的逐镜出片）
       await page.click('[data-testid=open-run-history]')
       await page.waitForSelector('[data-testid=run-history]', { timeout: 10_000 })
       await page.waitForSelector('[data-testid=rh-row]', { timeout: 10_000 })
+      const beforeReload = await page.locator('[data-testid=rh-row]').count()
+      assert(beforeReload >= 1, `刷新前应已有记录（⑨ 逐镜出片至少 1 条），实测 ${beforeReload}`)
+      // 面板可开合
+      await page.click('[data-testid=rh-close]')
+      await page.waitForSelector('[data-testid=run-history]', { state: 'detached', timeout: 5000 })
 
-      const rows = page.locator('[data-testid=rh-row]')
-      const count = await rows.count()
-      assert(count >= 3, `运行历史记录不足（${count}，期望 ≥3：逐镜出片 6 镜应有 6 条）`)
+      // 刷新：记录存 IndexedDB，必须跨刷新存活（TODO P1 验收标准）
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('[data-testid=chat-dock]', { timeout: 20_000 })
 
-      // 取一条**成功**记录做字段断言（不假设首条一定成功：⑨ 只等首个产物，中途导航可能留下
-      // 未释放的跨页锁元数据，使个别镜次在下一轮以「跨页任务锁」失败——那是既有幂等实现的
-      // 已知粗糙点，与本步要验证的「记录字段完整性」无关，故按状态定位而非按位置定位）。
+      // ★ 关键：**在重新出片之前**断言历史仍持有上一批记录。
+      // 若放到重新出片之后再断言 count，数字可能全部来自新一轮——即便 IndexedDB 完全不持久化
+      // 也能成立（半恒真）。这里先只做「刷新前后条数不减」的断言，与新一轮无关。
+      await page.click('[data-testid=open-run-history]')
+      await page.waitForSelector('[data-testid=run-history]', { timeout: 10_000 })
+      await page.waitForSelector('[data-testid=rh-row]', { timeout: 10_000 })
+      const afterReload = await page.locator('[data-testid=rh-row]').count()
+      assert(
+        afterReload >= beforeReload,
+        `刷新后历史未保留上一批记录（刷新前 ${beforeReload} → 刷新后 ${afterReload}）`
+      )
+
+      // 字段完整性 + 持久引用（此时面板里就是上一批记录，取一条成功记录断言）
       const okRows = page.locator('[data-testid=rh-row]', { hasText: '成功' })
-      assert((await okRows.count()) > 0, '运行历史中没有成功记录')
+      assert((await okRows.count()) > 0, '刷新后历史中没有成功记录')
       const okRow = okRows.first()
       const okText = (await okRow.innerText()) || ''
       assert(/耗时/.test(okText), `记录未显示耗时：${okText.slice(0, 80)}`)
       assert(/灵感币/.test(okText), `记录未显示费用：${okText.slice(0, 80)}`)
       assert(/演示 · 非真实生成/.test(okText), `演示引擎记录未标注「演示 · 非真实生成」：${okText.slice(0, 80)}`)
 
-      // 展开详情：演示产物的 record.outputRef 是 blob:，必须回查到节点 meta 的 idbref:// 持久引用
-      await okRow.locator('button').first().click()
-      const detail = (await page.textContent('[data-testid=rh-detail]')) || ''
-      assert(/idbref:\/\//.test(detail), `详情未显示持久 idbref 引用（blob: 回查节点 meta 失败）：${detail.slice(0, 200)}`)
-      assert(!/产物引用已失效/.test(detail), `持久引用回查失败，退化成「已失效」：${detail.slice(0, 200)}`)
-
+      // 注：**持久引用回查**（blob: → 节点 meta 的 idbref://）不放在本步断言 ——
+      // 画布文档是防抖落盘的，刷新后 `meta.artifacts` 可能尚未落盘，此时回查失败是**如实**结果
+      // （引用确实不可得），不应在本步当作缺陷。该断言放在 ⑫（本页刚完整出片、meta 必已写入）。
+      assert(!/耗时 —/.test(okText), '成功记录应显示真实耗时（不是占位「—」）')
       await page.click('[data-testid=rh-close]')
       await page.waitForSelector('[data-testid=run-history]', { state: 'detached', timeout: 5000 })
     })
 
-    await step('⑫ 运行历史：注入上游失败 → 记录数递增 + 失败原因可见 + 0 币不显示已退款 + 清空', async () => {
+    await step('⑫ 运行历史：完整逐镜出片 → ≥3 条且递增 + 持久引用；注入失败 → 失败原因可见 + 0 币不显示已退款；清空', async () => {
       // 刷新 → 引擎内存态清空（否则同 taskKey 会被幂等防重跳过，不会产生新记录）
       await page.reload({ waitUntil: 'domcontentloaded' })
       await page.waitForSelector('[data-testid=chat-dock]', { timeout: 20_000 })
 
-      // 基线记录数（从 UI 读，顺带验证「面板可开合」）
+      // 基线记录数（从 UI 读；**容忍 0 条**——本步只关心「新一轮让条数递增」，不依赖历史已有数据）
       await page.click('[data-testid=open-run-history]')
-      await page.waitForSelector('[data-testid=rh-row]', { timeout: 10_000 })
+      await page.waitForSelector('[data-testid=run-history]', { timeout: 10_000 })
+      await page.waitForTimeout(400) // 等 listRunRecords 校准（可能为 0 条）
       const before = await page.locator('[data-testid=rh-row]').count()
       await page.click('[data-testid=rh-close]')
       await page.waitForSelector('[data-testid=run-history]', { state: 'detached', timeout: 5000 })
@@ -602,6 +595,18 @@ async function main() {
       await page.waitForSelector('[data-testid=rh-row]', { timeout: 10_000 })
       const after = await page.locator('[data-testid=rh-row]').count()
       assert(after > before, `记录数未递增（${before} → ${after}）`)
+      // 一次完整的「逐镜出片」（6 镜）后，历史条数必须 ≥3（TODO P1 验收标准）
+      assert(after >= 3, `一次完整逐镜出片后记录数应 ≥3，实测 ${after}`)
+
+      // 持久输出引用：演示产物的 record.outputRef 是 blob:，UI 必须回查到**节点 meta** 的
+      // idbref://（出片成功后由 markArtifact 写入），而不是把失效的 blob: 当持久引用用。
+      // 放在本步是因为 meta 是本页刚写入的（⑪ 跨刷新后文档防抖落盘可能未完成）。
+      const okRows = page.locator('[data-testid=rh-row]', { hasText: '成功' })
+      assert((await okRows.count()) > 0, '完整出片后应有成功记录')
+      await okRows.first().locator('button').first().click()
+      const okDetail = (await page.textContent('[data-testid=rh-detail]')) || ''
+      assert(/idbref:\/\//.test(okDetail), `详情未显示持久 idbref 引用（blob: 回查节点 meta 失败）：${okDetail.slice(0, 200)}`)
+      assert(!/产物引用已失效/.test(okDetail), `持久引用回查失败，退化成「已失效」：${okDetail.slice(0, 200)}`)
 
       // 在失败记录里定位「注入的那条」（不假设它一定是最新一条），并采集全部失败原因便于诊断
       const failRows = page.locator('[data-testid=rh-row]', { hasText: '失败' })
