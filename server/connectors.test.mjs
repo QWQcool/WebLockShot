@@ -36,8 +36,17 @@ function mockRes() {
   }
 }
 
-async function callHandler(handler, method, urlPath) {
-  const req = { method, headers: {} }
+async function callHandler(handler, method, urlPath, body) {
+  const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))]
+  const req = {
+    method,
+    headers: {},
+    on(ev, cb) {
+      if (ev === 'data') chunks.forEach((c) => cb(c))
+      if (ev === 'end') cb()
+      if (ev === 'error') return
+    },
+  }
   const res = mockRes()
   await handler(req, res, urlPath)
   return res
@@ -158,6 +167,67 @@ test('startServer：GET /api/connectors 挂载 + healthz connectors:interface', 
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+/* ---------------- D8 正向标杆连接器：GitHub ---------------- */
+
+test('GitHub run：未配置 PAT → 401 诚实说明（凭据只存服务端）', async () => {
+  const handler = createConnectorsHandler({ mode: 'ready' })
+  const res = await callHandler(handler, 'POST', '/api/connectors/github/run', { op: 'list-issues', repo: 'a/b' })
+  assert.equal(res.status, 401)
+  assert.ok(res.payload.error.includes('WLS_GITHUB_TOKEN'))
+})
+
+test('GitHub run：配置 PAT + 注入 fetch → 200 返回 Issue 列表（正向取需求闭环）', async () => {
+  let calledUrl = ''
+  const fakeFetch = async (url) => {
+    calledUrl = String(url)
+    return {
+      ok: true,
+      status: 200,
+      json: async () => [
+        { number: 7, title: '补齐画布导出', html_url: 'https://github.com/a/b/issues/7' },
+        { number: 8, title: '优化 3D 台', html_url: 'https://github.com/a/b/issues/8' },
+      ],
+    }
+  }
+  const handler = createConnectorsHandler({ mode: 'ready', githubToken: 'ghp_test', fetchImpl: fakeFetch })
+  const res = await callHandler(handler, 'POST', '/api/connectors/github/run', { op: 'list-issues', repo: 'a/b' })
+  assert.equal(res.status, 200)
+  assert.equal(res.payload.items.length, 2)
+  assert.equal(res.payload.items[0].number, 7)
+  assert.match(calledUrl, /api\.github\.com\/repos\/a\/b\/issues/)
+
+  // 非法 repo
+  const badRepo = await callHandler(handler, 'POST', '/api/connectors/github/run', { repo: 'not-a-repo' })
+  assert.equal(badRepo.status, 400)
+
+  // 不支持的操作
+  const badOp = await callHandler(handler, 'POST', '/api/connectors/github/run', { op: 'delete-repo', repo: 'a/b' })
+  assert.equal(badOp.status, 400)
+})
+
+test('GitHub run：上游非 2xx → 502 如实说明（不伪造结果）', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 403, json: async () => ({}) })
+  const handler = createConnectorsHandler({ mode: 'ready', githubToken: 'ghp_x', fetchImpl: fakeFetch })
+  const res = await callHandler(handler, 'POST', '/api/connectors/github/run', { repo: 'a/b' })
+  assert.equal(res.status, 502)
+  assert.match(res.payload.error, /403/)
+})
+
+test('GitHub run：interface 态（未装 SDK）→ 仍为占位 501（能力位门控）', async () => {
+  const handler = createConnectorsHandler({ mode: 'interface', githubToken: 'ghp_test' })
+  const res = await callHandler(handler, 'POST', '/api/connectors/github/run', { repo: 'a/b' })
+  assert.equal(res.status, 501)
+})
+
+test('GET /api/connectors：ready 态下 GitHub 卡如实标注已配置凭据', async () => {
+  const handler = createConnectorsHandler({ mode: 'ready', githubToken: 'ghp_test' })
+  const res = await callHandler(handler, 'GET', '/api/connectors')
+  const github = res.payload.connectors.find((c) => c.id === 'github')
+  const notion = res.payload.connectors.find((c) => c.id === 'notion')
+  assert.equal(github.configured, true)
+  assert.equal(notion.configured, false)
 })
 
 test('startServer：connectorsMode=ready 注入（D8 能力位切换）', async () => {

@@ -47,6 +47,8 @@ export const ConnectorPanelView: React.FC<Props> = ({ onClose }) => {
   const [remote, setRemote] = useState<ConnectorEntry[] | null>(null)
   const [companion, setCompanion] = useState<CompanionState>({ phase: 'probing' })
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err' | 'info'; text: string } | null>(null)
+  // D8：MCP 反向驱动能力（可选依赖探测结果）
+  const [mcp, setMcp] = useState<{ ready: boolean; guidance?: string } | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [form, setForm] = useState<{ name: string; category: ConnectorCategory; description: string }>({
     name: '',
@@ -76,6 +78,21 @@ export const ConnectorPanelView: React.FC<Props> = ({ onClose }) => {
           }
         } else {
           setCompanion({ phase: 'off' })
+        }
+        // D8：MCP 状态（未装 SDK 时服务端返回 guidance 原文，UI 如实展示）
+        try {
+          const s = await fetch('/api/mcp/status', { method: 'GET' })
+          if (s.ok) {
+            const b = (await s.json()) as Record<string, unknown>
+            if (!cancelled) {
+              setMcp({
+                ready: b.ready === true,
+                guidance: typeof b.guidance === 'string' ? b.guidance : undefined,
+              })
+            }
+          }
+        } catch {
+          // 探测失败按未就绪处理（诚实降级）
         }
       } catch {
         if (!cancelled) setCompanion({ phase: 'off' })
@@ -144,6 +161,32 @@ export const ConnectorPanelView: React.FC<Props> = ({ onClose }) => {
   const handleRemove = useCallback((id: string, name: string) => {
     setCustom(removeCustomConnector(undefined, id))
     setNotice({ kind: 'ok', text: `已移除自定义连接器「${name}」` })
+  }, [])
+
+  /** D8 正向标杆连接器：GitHub 拉取 Issue（PAT 只存伴生服务侧；未配置则如实 401 提示） */
+  const handleGithubRun = useCallback(async () => {
+    const repo = window.prompt('GitHub 仓库（owner/name）：', '')
+    if (!repo) return
+    try {
+      const res = await fetch('/api/connectors/github/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'list-issues', repo: repo.trim() }),
+      })
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      if (!res.ok) {
+        setNotice({ kind: 'err', text: typeof body.error === 'string' ? body.error : `HTTP ${res.status}` })
+        return
+      }
+      const items = Array.isArray(body.items) ? (body.items as Record<string, unknown>[]) : []
+      const first = items[0] && typeof items[0].title === 'string' ? items[0].title : '—'
+      setNotice({
+        kind: 'ok',
+        text: `✓ 已拉取 ${repo} 的 ${items.length} 条 open Issue（首条：${first}）`,
+      })
+    } catch {
+      setNotice({ kind: 'err', text: 'GitHub 请求失败：伴生服务不可达' })
+    }
   }, [])
 
   return (
@@ -246,6 +289,17 @@ export const ConnectorPanelView: React.FC<Props> = ({ onClose }) => {
                   <span className={`cp-card-status cp-card-status--${entry.status}`}>
                     {describeConnectorStatus(entry.status)}
                   </span>
+                  {entry.id === 'github' && mcp?.ready && (
+                    <button
+                      type="button"
+                      className="cp-card-run"
+                      data-testid="cp-github-run"
+                      title="拉取指定仓库的 open Issue（PAT 存伴生服务侧 WLS_GITHUB_TOKEN）"
+                      onClick={() => void handleGithubRun()}
+                    >
+                      📥 拉取 Issue
+                    </button>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -300,6 +354,41 @@ export const ConnectorPanelView: React.FC<Props> = ({ onClose }) => {
           </div>
         </section>
       )}
+
+      {/* D8 MCP 反向驱动（可选依赖）：未装 = 安装指引；装了 = 本地 Agent 可驱动画布 */}
+      <section className="cp-section">
+        <div className="cp-section-head">
+          <h3>MCP 反向驱动（可选依赖）</h3>
+          <span className="cp-section-note" data-testid="cp-mcp-state">
+            {mcp === null ? '探测中…' : mcp.ready ? '已就绪' : '未启用'}
+          </span>
+        </div>
+        <div className="cp-mcp" data-testid="cp-mcp">
+          {mcp?.ready ? (
+            <>
+              <p className="cp-mcp-ok">
+                ✅ 已检测到 <code>@modelcontextprotocol/sdk</code>：本地 Agent（Codex / Claude Code 等）可
+                <strong>读取画布拓扑</strong>并<strong>建节点 / 连线</strong>，画布每 2 秒同步一次。
+              </p>
+              <p className="cp-mcp-line">
+                工具：<code>canvas_read_topology</code> · <code>canvas_apply_ops</code> · 端点{' '}
+                <code>/api/mcp/*</code>（详见 <code>docs/mcp.md</code>）
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="cp-mcp-warn">
+                {mcp?.guidance ??
+                  '未检测到可选依赖 @modelcontextprotocol/sdk：反向驱动画布不可用（默认零依赖行为不变）。'}
+              </p>
+              <p className="cp-mcp-line">
+                启用：<code>npm i @modelcontextprotocol/sdk</code> 后重启伴生服务（正向标杆连接器 GitHub
+                另需 <code>WLS_GITHUB_TOKEN</code>）
+              </p>
+            </>
+          )}
+        </div>
+      </section>
 
       <footer className="cp-footer">
         连接器协议层 mock 单测见 <code>server/connectors.test.mjs</code>；三类目标形态文档见{' '}

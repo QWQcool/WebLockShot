@@ -48,6 +48,15 @@ import { SkillMarketView } from './SkillMarketView.tsx'
 import { ConnectorPanelView } from './ConnectorPanelView.tsx'
 import { CanvasOnboardingView } from './CanvasOnboardingView.tsx'
 import { SceneGalleryView } from './SceneGalleryView.tsx'
+import {
+  mcpEdgeArrowId,
+  mcpNodeShapeId,
+  validateMcpOps,
+  type McpCreateEdgeOp,
+  type McpCreateNodeOp,
+  type McpOp,
+} from '../../canvas/mcpOps.ts'
+import { probeMcpCapability, pullMcpOps, pushTopology } from '../../services/companion/mcpClient.ts'
 import { ORCHESTRATION_SYSTEM_PROMPT } from '../../canvas/orchestrationPrompt.ts'
 import { markOnboardingSeen, readOnboardingSeen } from '../../canvas/canvasOnboarding.ts'
 import { findInstalledByName, readSkillLibrary, type InstalledSkill } from '../../canvas/skillLibrary.ts'
@@ -395,6 +404,15 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   // D6 创作场景画廊（Miora 图8 回炉）：工具条/开场层入口；卡片点击 → 预填对话栏 或 一键编排（复用 B6）
   const [isSceneGalleryOpen, setIsSceneGalleryOpen] = useState(false)
 
+  // D8 MCP 反向驱动：能力位就绪（伴生服务 + 可选 SDK）时启用拓扑镜像推送与 Agent 操作批轮询
+  const [mcpReady, setMcpReady] = useState(false)
+  const [mcpNotice, setMcpNotice] = useState<string | null>(null)
+  const mcpSeqRef = useRef(0)
+  // 导入盐：隔离 Agent 侧 id 与本地 id 空间（同一 Agent 反复下发不冲突）。
+  // 初值留空，在桥接 effect 内惰性生成——render 期不调用 Math.random（react/purity）
+  const mcpSaltRef = useRef('')
+  const mcpPushedSigRef = useRef('')
+
   // D1 3D 运镜台：stage3d 节点按钮派发 window 事件 → 打开全屏 Stage3DStudio；
   // 摆台数据经 writeStage3DMetaPayload 写回节点 meta.stage3d（走既有 shape 变更 → 持久化链路）
   const [stage3dTarget, setStage3dTarget] = useState<{ shapeId: TLShapeId; payload: Stage3DMetaPayload } | null>(null)
@@ -638,6 +656,111 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     },
     []
   )
+
+  /**
+   * D8：应用本地 Agent 经 MCP 提交的操作批（反向驱动画布）。
+   * 单一 editor.run batch（Ctrl+Z 一次回滚）；id 带导入盐隔离；已存在的 shape 幂等跳过。
+   */
+  const applyMcpOps = useCallback((ops: McpOp[]) => {
+    const editor = editorRef.current
+    if (!editor || ops.length === 0) return 0
+    const salt = mcpSaltRef.current || 's0'
+    const existing = new Set<string>(editor.getCurrentPageShapes().map((s) => s.id as string))
+    const nodes = ops.filter((o): o is McpCreateNodeOp => o.type === 'create-node')
+    const edges = ops.filter((o): o is McpCreateEdgeOp => o.type === 'create-edge')
+    let applied = 0
+    editor.markHistoryStoppingPoint()
+    editor.run(() => {
+      for (const n of nodes) {
+        const shapeId = mcpNodeShapeId(n.id, salt)
+        if (existing.has(shapeId)) continue
+        editor.createShape({
+          id: shapeId as TLShapeId,
+          type: CANVAS_NODE_SHAPE_TYPE,
+          x: n.x,
+          y: n.y,
+          props: { w: n.w, h: n.h, kind: n.kind, meta: n.meta as JsonObject },
+        })
+        existing.add(shapeId)
+        applied++
+      }
+      for (const e of edges) {
+        const arrowId = mcpEdgeArrowId(e.id, salt)
+        const fromId = mcpNodeShapeId(e.from, salt)
+        const toId = mcpNodeShapeId(e.to, salt)
+        if (existing.has(arrowId)) continue
+        if (!editor.getShape(fromId as TLShapeId) || !editor.getShape(toId as TLShapeId)) continue
+        editor.createShape({
+          id: arrowId as TLShapeId,
+          type: 'arrow',
+          x: 0,
+          y: 0,
+          props: { start: { x: 0, y: 0 }, end: { x: 120, y: 0 } },
+        })
+        editor.createBindings([
+          { fromId: arrowId as TLShapeId, toId: fromId as TLShapeId, type: 'arrow', props: { terminal: 'start' as const } },
+          { fromId: arrowId as TLShapeId, toId: toId as TLShapeId, type: 'arrow', props: { terminal: 'end' as const } },
+        ])
+        existing.add(arrowId)
+        applied++
+      }
+    })
+    if (applied > 0) editor.zoomToFit()
+    return applied
+  }, [])
+
+  /**
+   * D8 MCP 桥接循环：能力位就绪时启用。
+   * ① 轮询 Agent 操作批 → 校验 → 应用（画布实时反映）；
+   * ② 把本地画布拓扑镜像推送到伴生服务（供本地 Agent 读取）。
+   * 能力位未就绪（未装 SDK / 无伴生服务）= 完全不启动，行为与现状零差异。
+   */
+  useEffect(() => {
+    let cancelled = false
+    let timer: number | null = null
+    if (!mcpSaltRef.current) mcpSaltRef.current = `s${Math.random().toString(36).slice(2, 6)}`
+
+    const tick = async () => {
+      if (cancelled) return
+      const editor = editorRef.current
+      if (!editor) return
+      const pulled = await pullMcpOps(mcpSeqRef.current)
+      if (cancelled) return
+      if (pulled.ok) {
+        for (const batch of pulled.batches) {
+          const check = validateMcpOps(batch.ops)
+          if (!check.ok) {
+            setMcpNotice(`⚠️ 本地 Agent 操作批被拒：${check.reason}`)
+            continue
+          }
+          const applied = applyMcpOps(check.ops)
+          if (applied > 0) {
+            setMcpNotice(`🤖 已应用本地 Agent 的 ${applied} 项画布操作（MCP 反向驱动 · 可 Ctrl+Z 撤销）`)
+          }
+        }
+        mcpSeqRef.current = pulled.seq
+      }
+      const draft = editorPageToCanvasDraft(editor, { id: 'mirror', name: docName, updatedAt: Date.now() })
+      const sig = `${draft.nodes.length}:${draft.edges.length}:${draft.nodes.map((n) => n.id).join(',')}|${draft.edges.map((e) => e.id).join(',')}`
+      if (sig !== mcpPushedSigRef.current) {
+        const pushed = await pushTopology({ nodes: draft.nodes, edges: draft.edges })
+        if (!cancelled && pushed.ok) mcpPushedSigRef.current = sig
+      }
+    }
+
+    void probeMcpCapability().then((cap) => {
+      if (cancelled) return
+      setMcpReady(cap.ready)
+      if (!cap.ready) return
+      void tick()
+      timer = window.setInterval(() => void tick(), 2000)
+    })
+
+    return () => {
+      cancelled = true
+      if (timer !== null) window.clearInterval(timer)
+    }
+  }, [applyMcpOps, docName])
 
   /** B6 编排核心（D5：抽取为入参函数，供底部对话栏与开场层共用，避免两套编排逻辑） */
   const runOrchestration = useCallback(async (rawText: string) => {
@@ -1064,6 +1187,15 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             >
               🎬 创作场景
             </button>
+            {mcpReady && (
+              <span
+                className="wls-canvas-mcp-chip"
+                data-testid="mcp-chip"
+                title="MCP 反向驱动已就绪：本地 Agent 可读取画布拓扑并建节点/连线"
+              >
+                🤖 MCP 已就绪
+              </span>
+            )}
             <span className="wls-canvas-save-state">已保存 {savedAt}</span>
           </div>
           <div className="wls-canvas-root">
@@ -1075,6 +1207,22 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             {edgeNotice && (
               <div className="wls-edge-toast" role="alert" data-testid="edge-notice">
                 ⛔ {edgeNotice}
+              </div>
+            )}
+
+            {/* D8：MCP 反向驱动提示条（Agent 操作已应用 / 被拒原因） */}
+            {mcpNotice && (
+              <div className="wls-edge-toast" role="status" data-testid="mcp-notice">
+                <span>{mcpNotice}</span>
+                <button
+                  type="button"
+                  className="wls-orch-close"
+                  aria-label="关闭提示"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => setMcpNotice(null)}
+                >
+                  ✕
+                </button>
               </div>
             )}
 

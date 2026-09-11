@@ -924,6 +924,19 @@
   line-height: 1.4;
 }
 
+/* D8：MCP 反向驱动就绪徽章（画布工具条） */
+.wls-canvas-mcp-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: #e6f7f4;
+  border: 1px solid #a8ddd4;
+  color: #1c7d76;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
 /* D5-②：出片前费用确认弹层（节点内嵌，不弹全局模态） */
 .wls-generate-confirm {
   display: flex;

@@ -10,8 +10,10 @@
  * 5. （预留）PUT/GET/DELETE /api/sessions/:id：会话快照存取（BackendAdapter rest 模式后端）
  * 6. （预留）/api/llm 反代：设置 WLS_LLM_TARGET 后启用，未设置返回 501
  * 7. （预留）WLS_KEYS：设置后反代注入真实密钥 Authorization 头；未设置 = 透传模式（现状）
- * 8. /api/connectors（D4）：连接器目录 + auth/run 占位（协议层 mock，不引 SDK，不接真实第三方）
- *    /healthz 能力位 connectors: 'interface' | 'ready'（D8 检测到 @modelcontextprotocol/sdk 后切 ready）
+ * 8. /api/connectors（D4/D8）：连接器目录 + auth 占位 + run（GitHub 标杆连接器，需 WLS_GITHUB_TOKEN）
+ *    /healthz 能力位 connectors: 'interface' | 'ready'（D8：检测到 @modelcontextprotocol/sdk 后切 ready）
+ * 9. /api/mcp/*（D8，可选依赖）：反向驱动画布桥接（画布拓扑镜像 + Agent 操作队列）
+ *    /healthz 能力位 mcp: 'ready' | 'off'；未装 SDK = 全部 501 + 安装指引，服务器零报错
  *
  * 用法：
  *   npx weblockshot                 # 默认端口 5174
@@ -40,6 +42,7 @@ import { createTtsHandler, createTtsFileHandler } from './tts.mjs'
 import { createRenderHandler, createRenderFileHandler, detectFfmpeg, RENDER_DEFAULT_TIMEOUT_SEC } from './render.mjs'
 import { createMemoryHandler } from './memory.mjs'
 import { createConnectorsHandler } from './connectors.mjs'
+import { createMcpHandler, detectMcpSdk } from './mcp.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const STARTED_AT = Date.now()
@@ -65,6 +68,8 @@ function parseArgs(argv, env = process.env) {
     // 未设置 = 不鉴权（本地模式现状不变）。默认监听 127.0.0.1，公网部署须显式 WLS_HOST=0.0.0.0
     // 且强制配置 WLS_AUTH_TOKEN。
     authToken: env.WLS_AUTH_TOKEN?.trim() || undefined,
+    // D8 正向标杆连接器：GitHub PAT（只存服务端，不落前端）
+    githubToken: env.WLS_GITHUB_TOKEN?.trim() || undefined,
     host: env.WLS_HOST || '127.0.0.1',
     maxUnzipMb: Number(env.WLS_MAX_UNZIP_MB) || 1024,
     // Edge-TTS 语音合成开关（P1-1）：'off' 关闭（/api/tts 返回 501），默认 on
@@ -513,10 +518,21 @@ export async function startServer(opts = {}) {
   const memoryEnabled = opts.memory !== undefined ? opts.memory : storage.mode === 'sqlite'
   const memoryHandler = createMemoryHandler({ enabled: memoryEnabled, storage, logger })
 
-  // D4 连接器面板：协议层 mock（不引 SDK，不接真实第三方）；healthz 能力位 connectors: interface|ready
-  // D8 将在检测到 @modelcontextprotocol/sdk 后传 'ready'（本期恒 'interface'）
-  const connectorsMode = opts.connectorsMode !== undefined ? opts.connectorsMode : 'interface'
-  const connectorsHandler = createConnectorsHandler({ mode: connectorsMode, logger })
+  // D8：可选依赖 @modelcontextprotocol/sdk 动态探测（未装 = 零依赖现状；绝不静态 import）
+  const mcpSdkInstalled =
+    opts.mcpSdkInstalled !== undefined
+      ? opts.mcpSdkInstalled
+      : await detectMcpSdk(opts.mcpSdkImport)
+  // D4/D8 连接器：SDK 已装 = 'ready'（正向标杆连接器 + 反向 MCP 桥接开放），否则 'interface'（现状）
+  const connectorsMode =
+    opts.connectorsMode !== undefined ? opts.connectorsMode : mcpSdkInstalled ? 'ready' : 'interface'
+  const connectorsHandler = createConnectorsHandler({
+    mode: connectorsMode,
+    logger,
+    githubToken: args.githubToken,
+    fetchImpl: opts.connectorFetchImpl,
+  })
+  const mcpHandler = createMcpHandler({ ready: mcpSdkInstalled, store: storage, logger })
 
   const healthPayload = () => ({
     ok: true,
@@ -533,6 +549,7 @@ export async function startServer(opts = {}) {
     ffmpeg: ffmpegEnabled && ffmpegPath ? 'on' : 'off',
     memory: memoryEnabled ? 'sqlite' : 'off',
     connectors: connectorsMode,
+    mcp: mcpSdkInstalled ? 'ready' : 'off',
   })
 
   /** 校验共享 token：x-wls-token 头或 Authorization: Bearer <token> */
@@ -588,6 +605,19 @@ export async function startServer(opts = {}) {
       // 预留接口：未配置 WLS_LLM_TARGET 时明确 501，而非静默 404
       sendJson(res, 501, {
         error: 'LLM 反代未启用（预留接口）。设置 WLS_LLM_TARGET 后本路由将反向代理至目标 LLM API。',
+      })
+      return
+    }
+
+    // MCP 桥接（D8）：/api/mcp/*（SDK 未装 = 501 + 安装指引；装了 = 反向驱动画布可用）
+    if (urlPath === '/api/mcp' || urlPath.startsWith('/api/mcp/')) {
+      mcpHandler(req, res, urlPath).catch((err) => {
+        logger?.warn?.({ err: err instanceof Error ? err.message : String(err) }, 'mcp 处理异常')
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: 'mcp 内部错误' })
+        } else {
+          res.end()
+        }
       })
       return
     }

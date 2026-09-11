@@ -36,16 +36,84 @@ export const CONNECTOR_INTERFACE_DETAIL =
  * @param {{ mode?: 'interface' | 'ready', logger?: object }} opts
  *   mode 默认 'interface'（D4 现状）；D8 检测到 SDK 后传 'ready'。
  */
-export function createConnectorsHandler({ mode = 'interface', logger } = {}) {
+export function createConnectorsHandler({
+  mode = 'interface',
+  logger,
+  githubToken,
+  fetchImpl,
+} = {}) {
+  const token = typeof githubToken === 'string' && githubToken.trim() ? githubToken.trim() : null
+  const doFetch = fetchImpl || ((...args) => fetch(...args))
+
   const listPayload = () => ({
     mode,
     connectors: CONNECTOR_CATALOG.map((c) => ({
       ...c,
-      configured: false,
+      // D8：GitHub 为标杆连接器，配置了 PAT 即如实标注「已配置凭据」（仍未接入前 configured=false）
+      configured: c.id === 'github' ? Boolean(token) : false,
       status: mode === 'ready' ? 'ready' : 'interface',
       ...(mode === 'ready' ? {} : { detail: CONNECTOR_INTERFACE_DETAIL }),
     })),
   })
+
+  /** 正向标杆连接器：GitHub 拉取 Issue（REST，PAT 由伴生服务侧持有，绝不进前端存储） */
+  const runGithub = async (req, res) => {
+    if (!token) {
+      sendJson(res, 401, {
+        ok: false,
+        mode,
+        connectorId: 'github',
+        error:
+          'GitHub 连接器未授权：请在伴生服务侧配置 WLS_GITHUB_TOKEN（Personal Access Token）后重启。凭据只存服务端，不落前端。',
+      })
+      return
+    }
+    let body = {}
+    try {
+      body = JSON.parse((await readBody(req)).toString('utf8'))
+    } catch {
+      body = {}
+    }
+    const op = typeof body.op === 'string' ? body.op : 'list-issues'
+    if (op !== 'list-issues') {
+      sendJson(res, 400, { ok: false, error: `不支持的 GitHub 操作：${op}（当前仅 list-issues）` })
+      return
+    }
+    const repo = typeof body.repo === 'string' ? body.repo.trim() : ''
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+      sendJson(res, 400, { ok: false, error: 'repo 必须形如 owner/name' })
+      return
+    }
+    try {
+      const r = await doFetch(
+        `https://api.github.com/repos/${repo}/issues?state=open&per_page=10`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/vnd.github+json',
+            'User-Agent': 'weblockshot-companion',
+          },
+        }
+      )
+      if (!r.ok) {
+        sendJson(res, 502, { ok: false, error: `GitHub API 返回 ${r.status}（凭据或仓库权限可能有误）` })
+        return
+      }
+      const data = await r.json()
+      const items = (Array.isArray(data) ? data : []).map((it) => ({
+        number: it?.number,
+        title: typeof it?.title === 'string' ? it.title.slice(0, 200) : '',
+        url: typeof it?.html_url === 'string' ? it.html_url : '',
+      }))
+      logger?.info?.({ repo, count: items.length }, '[connectors] GitHub Issue 拉取成功')
+      sendJson(res, 200, { ok: true, connectorId: 'github', op, repo, items })
+    } catch (err) {
+      sendJson(res, 502, {
+        ok: false,
+        error: `GitHub 请求失败：${err instanceof Error ? err.message : '未知错误'}`,
+      })
+    }
+  }
 
   return async function handleConnectors(req, res, urlPath) {
     if (urlPath === '/api/connectors') {
@@ -69,6 +137,11 @@ export function createConnectorsHandler({ mode = 'interface', logger } = {}) {
       }
       if (req.method !== 'POST') {
         sendJson(res, 405, { error: '仅支持 POST' })
+        return
+      }
+      // D8 正向标杆连接器：GitHub 拉取 Issue（仅在 MCP SDK 已装 = ready 态开放）
+      if (id === 'github' && action === 'run' && mode === 'ready') {
+        await runGithub(req, res)
         return
       }
       logger?.info?.({ id, action, mode }, '[connectors] 占位路由被调用（无真实功能）')
@@ -96,4 +169,30 @@ function sendJson(res, status, payload) {
   }
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
   res.end(JSON.stringify(payload))
+}
+
+/** 读取请求体（上限 64KB） */
+function readBody(req, maxBytes = 64 * 1024) {
+  return new Promise((resolveBody, rejectBody) => {
+    const chunks = []
+    let size = 0
+    let settled = false
+    const finish = (err, data) => {
+      if (settled) return
+      settled = true
+      if (err) rejectBody(err)
+      else resolveBody(data)
+    }
+    req.on('data', (chunk) => {
+      size += chunk.length
+      if (size > maxBytes) {
+        finish(Object.assign(new Error('body too large'), { status: 413 }))
+        req.resume()
+        return
+      }
+      chunks.push(chunk)
+    })
+    req.on('end', () => finish(null, Buffer.concat(chunks)))
+    req.on('error', (err) => finish(err instanceof Error ? err : new Error(String(err))))
+  })
 }
