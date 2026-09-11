@@ -329,7 +329,22 @@ WebLockShot/
 # TTS 引擎自适应语速算法
 # ComfyUI / 可灵 / 即梦 Provider（含网络失败显式抛错、未就绪资产不伪造）
 # UI 冒烟（vitest + testing-library）：钱包交互 / 熔断徽章三态 / 共享管线
-# tests 234 (node) + 18 (vitest), fail 0
+# tests 362 (node) + 18 (vitest), fail 0
+```
+
+### 画布 E2E 套件（`npm run e2e`）
+
+把画布切片「用完即弃」的 Playwright 实机冒烟固化为可重复套件（`scripts/e2e-canvas.mjs`）：
+
+- **覆盖**：开场层 → 对话栏演示编排 → 节点落位 → 刷新恢复；3D 运镜台（进入 / 场景预设 / 返回）；
+  Skill 市场（安装 / 启停 / 卸载）；记忆图谱（真实空态或真实数据）；多画布项目 + 小地图 + 连接器 + 创作场景画廊
+- **隔离**：独立浏览器上下文（localStorage / IndexedDB 不污染本机）+ 伴生服务 `WLS_STORAGE=memory` 起在随机端口
+- **诚实跳过**：未安装 Playwright 或浏览器未下载时打印启用指引并 `exit 0`（不伪装通过、不阻塞 CI）
+
+```bash
+npm run e2e                 # 构建（dist 缺失时）+ 起伴生服务 + 跑全部步骤
+npm run e2e -- --skip-build # 复用现有 dist（快速回归）
+npm run e2e -- --headed     # 有头模式（排障）
 ```
 
 ---
