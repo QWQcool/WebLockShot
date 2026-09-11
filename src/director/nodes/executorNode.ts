@@ -11,8 +11,30 @@ import { walletManager } from '../../domain/wallet.ts'
 import { circuitBreaker, assertJobStatusTransition, assertJobRequeue } from '../../domain/fsm.ts'
 import { getPollingWindow, pollSleep } from '../../domain/pollingConfig.ts'
 import { idempotencyManager } from '../../domain/idempotency.ts'
+import { appendRunRecord } from '../../persist/runStore.ts'
+import type { RunRecordInput } from '../../domain/runRecord.ts'
 
 export type JobUpdateListener = (jobs: ShotJob[]) => void
+
+/**
+ * S3：执行器运行上下文。由调用方（画布 generate 节点）注入，
+ * 用于把执行历史关联回具体节点。sell 6 镜管线可不注入（nodeId 缺省）。
+ */
+export type RunContext = {
+  /** 触发本次执行的画布节点 id（sell 管线 / 未接线时缺省） */
+  nodeId?: string
+  /** 动作类型（画布 CanvasNodeKind；缺省 'generate'） */
+  kind?: string
+}
+
+/** 单次动作的过程内累加器（动作结束时汇总成一条 RunRecord） */
+type RunAcc = {
+  startedAt: number
+  /** 实际发生冻结的灵感币消耗（未成功冻结保持 0，不虚报） */
+  cost: number
+  /** 是否发生退款（由 refundRun 在退款成功时置真） */
+  refunded: boolean
+}
 
 export function resolveVideoProvider(providerId: VideoProviderId): VideoProvider {
   if (providerId === 'kling') {
@@ -44,6 +66,8 @@ export class ExecutorEngine {
    */
   private pendingPlans: Map<string, VisualPlan> = new Map()
   private listeners: Set<JobUpdateListener> = new Set()
+  /** S3：执行历史上下文（由调用方注入；缺省 kind='generate'） */
+  private runContext: RunContext = {}
 
   constructor(customProvider?: VideoProvider) {
     this.customProvider = customProvider
@@ -51,6 +75,19 @@ export class ExecutorEngine {
 
   setProvider(provider: VideoProvider) {
     this.customProvider = provider
+  }
+
+  /**
+   * S3：注入执行历史上下文（画布 generate 节点用 `{ nodeId: shape.id, kind: 'generate' }`）。
+   * 增量合并，便于调用方只覆盖关心的字段。
+   */
+  setRunContext(ctx: RunContext) {
+    this.runContext = { ...this.runContext, ...ctx }
+  }
+
+  /** S3：读取当前执行历史上下文（副本） */
+  getRunContext(): RunContext {
+    return { ...this.runContext }
   }
 
   resolveProvider(providerId: VideoProviderId): VideoProvider {
@@ -263,8 +300,22 @@ export class ExecutorEngine {
     }
   }
 
-  /** 处理单个任务：熔断检查 -> 幂等锁 -> 资金冻结 -> 提交 -> 轮询 -> 结算/退款 */
+  /**
+   * S3 单一收口：包一层，保证**所有**终态分支（熔断 / 幂等冲突 / 余额不足 / 提交异常 /
+   * 轮询超时 / 成功）都恰好落一条 RunRecord —— 包括各处提前 return 的失败分支。
+   * 记录写在 finally，避免遗漏；落库 fire-and-forget，不阻塞串行队列。
+   */
   private async processJob(job: ShotJob, plan: VisualPlan) {
+    const run: RunAcc = { startedAt: Date.now(), cost: 0, refunded: false }
+    try {
+      await this.executeJob(job, plan, run)
+    } finally {
+      this.recordRun(job, run)
+    }
+  }
+
+  /** 处理单个任务：熔断检查 -> 幂等锁 -> 资金冻结 -> 提交 -> 轮询 -> 结算/退款 */
+  private async executeJob(job: ShotJob, plan: VisualPlan, run: RunAcc) {
     // 0. 熔断检查与防连击幂等锁
     const breakerCheck = circuitBreaker.isAvailable(job.provider)
     if (!breakerCheck.allowed) {
@@ -298,6 +349,9 @@ export class ExecutorEngine {
       this.notify()
       return
     }
+
+    // S3：仅记录**实际发生**的冻结消耗（余额不足等失败路径保持 0，不虚报）
+    run.cost = cost
 
     this.setJobStatus(job, 'running', 'submit to provider')
     // 恢复/重生成任务重新开跑：清除恢复提示与标记
@@ -354,7 +408,7 @@ export class ExecutorEngine {
           job.error = result.error || '生成失败'
 
           // 资金两阶段事务：阶段 2B (失败全额回滚退还)
-          walletManager.refund(job.shotId, cost, job.provider, `第 ${plan.order || job.shotId} 镜生成异常自动退还`)
+          this.refundRun(job, cost, `第 ${plan.order || job.shotId} 镜生成异常自动退还`, run)
           circuitBreaker.recordFailure(job.provider)
           idempotencyManager.releaseLock(job.taskKey)
           this.notify()
@@ -367,7 +421,7 @@ export class ExecutorEngine {
         // 轮询超时：绝不 settle，必须全额退款
         this.setJobStatus(job, 'failed', 'polling window timeout')
         job.error = '轮询超时'
-        walletManager.refund(job.shotId, cost, job.provider, `第 ${plan.order || job.shotId} 镜生成超时自动退款`)
+        this.refundRun(job, cost, `第 ${plan.order || job.shotId} 镜生成超时自动退款`, run)
         circuitBreaker.recordFailure(job.provider)
         idempotencyManager.releaseLock(job.taskKey)
         this.notify()
@@ -375,11 +429,47 @@ export class ExecutorEngine {
     } catch (err) {
       this.setJobStatus(job, 'failed', 'submit/poll exception')
       job.error = err instanceof Error ? err.message : String(err)
-      walletManager.refund(job.shotId, cost, job.provider, `第 ${plan.order || job.shotId} 镜提交异常自动退款`)
+      this.refundRun(job, cost, `第 ${plan.order || job.shotId} 镜提交异常自动退款`, run)
       circuitBreaker.recordFailure(job.provider)
       idempotencyManager.releaseLock(job.taskKey)
       this.notify()
     }
+  }
+
+  // ---------------- S3：执行历史（RunRecord）单一收口 ----------------
+
+  /**
+   * 退款并记录「本次是否发生退款」。
+   * 只有钱包真的完成退款（返回 true）才置真——无凭据被拒的退款不算，避免虚报。
+   */
+  private refundRun(job: ShotJob, amount: number, reason: string, run: RunAcc) {
+    const ok = walletManager.refund(job.shotId, amount, job.provider, reason)
+    if (ok) run.refunded = true
+  }
+
+  /**
+   * 落一条执行历史（S3 单一收口；UI 层不各自记录）。
+   * - demo：provider 为 mock（演示引擎）→ UI 需标注「演示 · 非真实生成」；
+   * - outputRef：可能为 idbref://（持久）或 blob:（刷新后失效），UI 需按失效语义处理；
+   * - fire-and-forget：不阻塞串行队列；存储不可用时 runStore 静默降级。
+   */
+  private recordRun(job: ShotJob, run: RunAcc) {
+    const input: RunRecordInput = {
+      kind: this.runContext.kind ?? 'generate',
+      status: job.status === 'succeeded' ? 'succeeded' : 'failed',
+      startedAt: run.startedAt,
+      endedAt: Date.now(),
+      cost: run.cost,
+      refunded: run.refunded,
+      demo: job.provider === 'mock',
+      provider: job.provider,
+      shotId: job.shotId,
+      attempt: job.attempt,
+      ...(this.runContext.nodeId ? { nodeId: this.runContext.nodeId } : {}),
+      ...(job.error ? { error: job.error } : {}),
+      ...(job.asset?.url ? { outputRef: job.asset.url } : {}),
+    }
+    void appendRunRecord(input)
   }
 }
 
