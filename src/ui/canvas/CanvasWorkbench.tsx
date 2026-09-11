@@ -30,12 +30,19 @@ import {
   type OrchestrationPlan,
   type SkillManifest,
 } from '../../canvas/contract.ts'
+import { subscribeExternalCanvasChanges } from '../../canvas/canvasStore.ts'
 import {
-  clearCanvasDoc,
-  loadCanvasDoc,
-  saveCanvasDoc,
-  subscribeExternalCanvasChanges,
-} from '../../canvas/canvasStore.ts'
+  createProject,
+  deleteProject,
+  loadProjectDoc,
+  readProjectsIndex,
+  renameProject,
+  saveProjectDoc,
+  setActiveProject,
+  type ProjectsIndex,
+} from '../../canvas/projectStore.ts'
+import { type MiniRect } from '../../canvas/minimap.ts'
+import { MiniMap } from './MiniMap.tsx'
 import {
   docEdgesToArrowCreations,
   docToShapePartials,
@@ -150,15 +157,24 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   const editorRef = useRef<Editor | null>(null)
   const saveTimerRef = useRef<number | null>(null)
   const suppressSaveRef = useRef(false)
-  // 惰性读取已保存文档（首次访问时执行一次）
-  const docRef = useRef<CanvasDoc | null>(null)
+  // 惰性读取已保存文档（首次访问时执行一次）。
+  // ⚠️ D9 关键：**项目 id 与文档必须绑定在同一条目里**——否则防抖落盘若用旧闭包的
+  // activeProjectId + 新 docRef，会把新项目文档写进旧项目键（实测数据串写）。
+  const docRef = useRef<{ projectId: string; doc: CanvasDoc } | null>(null)
   const [docName, setDocName] = useState<string>('')
   const [savedAt, setSavedAt] = useState<string>('—')
 
+  // D9 多画布项目：索引（含老单文档首次迁移）+ 当前项目；每项目独立存储键，切换不串数据
+  const [projectIndex, setProjectIndex] = useState<ProjectsIndex>(() => readProjectsIndex())
+  const activeProjectId = projectIndex.activeId
+  const [projectNotice, setProjectNotice] = useState<string | null>(null)
+
   const getDoc = useCallback((): CanvasDoc => {
-    if (docRef.current === null) docRef.current = loadCanvasDoc()
-    return docRef.current
-  }, [])
+    if (docRef.current === null) {
+      docRef.current = { projectId: activeProjectId, doc: loadProjectDoc(undefined, activeProjectId) }
+    }
+    return docRef.current.doc
+  }, [activeProjectId])
 
   useEffect(() => {
     setDocName(getDoc().name)
@@ -167,22 +183,24 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   const persistNow = useCallback(() => {
     const editor = editorRef.current
     if (!editor || suppressSaveRef.current) return
-    const current = getDoc()
+    const entry = docRef.current
+    if (!entry) return
     const draft = editorPageToCanvasDraft(editor, {
-      id: current.id,
-      name: current.name,
+      id: entry.doc.id,
+      name: entry.doc.name,
       updatedAt: Date.now(),
     })
     const validated = validateCanvasDoc({ ...draft, version: 1 as const })
     if (!validated) return
-    docRef.current = validated
-    const ok = saveCanvasDoc(validated)
+    // 落盘目标由 ref 条目自带（与文档同源），不受闭包中 activeProjectId 新旧影响
+    docRef.current = { projectId: entry.projectId, doc: validated }
+    const ok = saveProjectDoc(undefined, entry.projectId, validated)
     setSavedAt(
       ok
         ? new Date(validated.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })
         : '保存失败（localStorage 不可用）'
     )
-  }, [getDoc])
+  }, [])
 
   const schedulePersist = useCallback(() => {
     if (saveTimerRef.current !== null) {
@@ -283,6 +301,65 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
     [scheduleCompatCheck]
   )
 
+  /** D9：切换项目（保存当前 → 载入目标文档 → 整体替换画布内容） */
+  const switchProject = useCallback(
+    (id: string) => {
+      const editor = editorRef.current
+      if (id === activeProjectId) return
+      persistNow()
+      const next = setActiveProject(undefined, id)
+      setProjectIndex(next)
+      const doc = loadProjectDoc(undefined, id)
+      docRef.current = { projectId: id, doc }
+      setDocName(doc.name)
+      setProjectNotice(`已切换到项目「${doc.name}」`)
+      if (editor) replaceCanvasShapes(editor, doc)
+    },
+    [activeProjectId, persistNow, replaceCanvasShapes]
+  )
+
+  /** D9：新建项目并切过去 */
+  const handleCreateProject = useCallback(() => {
+    const name = window.prompt('新项目名称：', `项目 ${projectIndex.projects.length + 1}`)
+    if (name === null) return
+    // 切走前先把当前项目落盘（否则未落盘内容会随 docRef 重置丢失）
+    persistNow()
+    const r = createProject(undefined, name)
+    if (!r.ok) {
+      setProjectNotice(`⛔ ${r.reason}`)
+      return
+    }
+    setProjectIndex(r.index)
+    const doc = loadProjectDoc(undefined, r.id)
+    docRef.current = { projectId: r.id, doc }
+    setDocName(doc.name)
+    const editor = editorRef.current
+    if (editor) replaceCanvasShapes(editor, doc)
+    setProjectNotice(`✓ 已新建项目「${doc.name}」`)
+  }, [projectIndex.projects.length, persistNow, replaceCanvasShapes])
+
+  /** D9：删除当前项目（至少保留一个；删后自动切到剩余项目） */
+  const handleDeleteProject = useCallback(() => {
+    if (projectIndex.projects.length <= 1) {
+      setProjectNotice('⛔ 至少保留一个项目')
+      return
+    }
+    const current = projectIndex.projects.find((p) => p.id === activeProjectId)
+    if (!window.confirm(`删除项目「${current?.name ?? ''}」？该项目的画布内容将一并删除。`)) return
+    const r = deleteProject(undefined, activeProjectId)
+    if (!r.ok) {
+      setProjectNotice(`⛔ ${r.reason}`)
+      return
+    }
+    setProjectIndex(r.index)
+    const doc = loadProjectDoc(undefined, r.id)
+    docRef.current = { projectId: r.id, doc }
+    setDocName(doc.name)
+    const editor = editorRef.current
+    if (editor) replaceCanvasShapes(editor, doc)
+    setProjectNotice(`已删除项目并切换到「${doc.name}」`)
+  }, [projectIndex.projects, activeProjectId, replaceCanvasShapes])
+
   const handleMount = useCallback(
     (editor: Editor) => {
       editorRef.current = editor
@@ -331,11 +408,11 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       const editor = editorRef.current
       if (!editor) return
       if (external.updatedAt <= getDoc().updatedAt) return
-      docRef.current = external
+      docRef.current = { projectId: docRef.current?.projectId ?? activeProjectId, doc: external }
       setDocName(external.name)
       replaceCanvasShapes(editor, external)
     })
-  }, [getDoc, replaceCanvasShapes])
+  }, [getDoc, replaceCanvasShapes, activeProjectId])
 
   const addNode = useCallback((kind: CanvasNodeKind, meta: Record<string, unknown> = {}) => {
     const editor = editorRef.current
@@ -894,11 +971,19 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
   const onRename = useCallback(
     (name: string) => {
       const trimmed = name.trim() || '未命名画布'
-      docRef.current = { ...getDoc(), name: trimmed }
+      // D9：文档名与项目名保持同步（重名/超长由 projectStore 拒绝并如实提示）
+      const r = renameProject(undefined, activeProjectId, trimmed)
+      if (!r.ok) {
+        setProjectNotice(`⛔ ${r.reason}`)
+        return
+      }
+      setProjectIndex(r.index)
+      const entry = docRef.current
+      if (entry) docRef.current = { projectId: entry.projectId, doc: { ...entry.doc, name: trimmed } }
       setDocName(trimmed)
       persistNow()
     },
-    [getDoc, persistNow]
+    [persistNow, activeProjectId]
   )
 
   const onClear = useCallback(() => {
@@ -909,10 +994,45 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       .filter((s) => s.type === CANVAS_NODE_SHAPE_TYPE || s.type === 'arrow')
       .map((s) => s.id)
     if (ids.length > 0) editor.deleteShapes(ids)
-    docRef.current = { ...getDoc(), nodes: [], edges: [] }
-    clearCanvasDoc()
+    const entry = docRef.current
+    if (!entry) return
+    const cleared = { ...entry.doc, nodes: [], edges: [] }
+    docRef.current = { projectId: entry.projectId, doc: cleared }
+    saveProjectDoc(undefined, entry.projectId, { ...cleared, updatedAt: Date.now() })
     setSavedAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }))
-  }, [getDoc])
+  }, [])
+
+  // D9 小地图：内容矩形（wls-node 页坐标）+ 视口矩形，300ms 轮询（去重后才 setState，避免无谓重渲染）
+  const [mini, setMini] = useState<{ shapes: MiniRect[]; viewport: MiniRect }>({
+    shapes: [],
+    viewport: { x: 0, y: 0, w: 800, h: 600 },
+  })
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const editor = editorRef.current
+      if (!editor) return
+      const rects: MiniRect[] = []
+      for (const s of editor.getCurrentPageShapes()) {
+        if (s.type !== CANVAS_NODE_SHAPE_TYPE) continue
+        const b = editor.getShapePageBounds(s)
+        if (b) rects.push({ x: b.minX, y: b.minY, w: b.width, h: b.height })
+      }
+      const vp = editor.getViewportPageBounds()
+      const next = {
+        shapes: rects,
+        viewport: { x: vp.minX, y: vp.minY, w: vp.width, h: vp.height },
+      }
+      setMini((prev) => (miniEqual(prev, next) ? prev : next))
+    }, 300)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  /** D9 小地图导航：点击/拖动 → 世界坐标 → 平滑居中 */
+  const handleMiniNavigate = useCallback((world: { x: number; y: number }) => {
+    const editor = editorRef.current
+    if (!editor) return
+    editor.centerOnPoint(world, { animation: { duration: 120 } })
+  }, [])
 
   // S1：导出 Skill 包（CANVAS_PLAN.md §9 S1）：框选 ≥2 个 wls-node → 提取子拓扑 → manifest JSON 浏览器下载。
   // 参数走白名单过滤（brief.text / product.title / script.scriptScene），产物 url / maskRef / imports 等设备本地引用剥离。
@@ -1086,6 +1206,38 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
         {/* tldraw 画布 */}
         <main className="wls-canvas-stage">
           <div className="wls-canvas-toolbar">
+            {/* D9 多画布项目：切换 / 新建 / 删除（重命名用右侧名称输入框，与项目名同步） */}
+            <select
+              className="wls-project-select"
+              data-testid="project-select"
+              aria-label="画布项目"
+              value={activeProjectId}
+              onChange={(e) => switchProject(e.target.value)}
+            >
+              {projectIndex.projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="project-new"
+              title="新建画布项目（独立存储，切换不串数据）"
+              onClick={handleCreateProject}
+            >
+              ＋ 新项目
+            </button>
+            <button
+              type="button"
+              className="wls-canvas-btn"
+              data-testid="project-delete"
+              title="删除当前项目（至少保留一个）"
+              onClick={handleDeleteProject}
+            >
+              🗑 删除项目
+            </button>
             <input
               className="wls-canvas-name"
               value={docName}
@@ -1202,6 +1354,25 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
             <Tldraw shapeUtils={[WlsNodeUtil]} onMount={handleMount}>
               <CanvasEmptyHint />
             </Tldraw>
+
+            {/* D9 小地图（右下角；Canvas2D 自绘，点击/拖动导航） */}
+            <MiniMap shapes={mini.shapes} viewport={mini.viewport} onNavigate={handleMiniNavigate} />
+
+            {/* D9 项目操作提示条 */}
+            {projectNotice && (
+              <div className="wls-edge-toast" role="status" data-testid="project-notice">
+                <span>{projectNotice}</span>
+                <button
+                  type="button"
+                  className="wls-orch-close"
+                  aria-label="关闭提示"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => setProjectNotice(null)}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             {/* B1：非法连线拒绝提示条（画布内顶部居中，3 秒自动消失） */}
             {edgeNotice && (
@@ -1396,6 +1567,19 @@ export const CanvasWorkbench: React.FC<Props> = ({ onSwitchToSell, onSwitchToDra
       )}
     </div>
   )
+}
+
+/** D9 小地图状态比较（1px 容差去重，避免每 300ms 无谓重渲染） */
+function miniEqual(
+  a: { shapes: MiniRect[]; viewport: MiniRect },
+  b: { shapes: MiniRect[]; viewport: MiniRect }
+): boolean {
+  if (a.shapes.length !== b.shapes.length) return false
+  const eq = (p: MiniRect, q: MiniRect) =>
+    Math.abs(p.x - q.x) < 1 && Math.abs(p.y - q.y) < 1 && Math.abs(p.w - q.w) < 1 && Math.abs(p.h - q.h) < 1
+  if (!eq(a.viewport, b.viewport)) return false
+  for (let i = 0; i < a.shapes.length; i++) if (!eq(a.shapes[i], b.shapes[i])) return false
+  return true
 }
 
 /** 画布内诚实标注条（tldraw 左上菜单下方，单一信息位） */
