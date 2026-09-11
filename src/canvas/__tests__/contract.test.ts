@@ -60,10 +60,9 @@ import {
 } from '../contract.ts'
 import { scriptToStory } from '../../director/nodes/storyboardNode.ts'
 import { STRUCTURE_TEMPLATES } from '../../prompts/library/structures.ts'
-import { nodeHint, t } from '../../i18n/strings.ts'
+import { MESSAGE_KEYS, nodeHint, t } from '../../i18n/strings.ts'
 
 const zhHint = (kind: (typeof CANVAS_NODE_KINDS)[number]): string => nodeHint('zh', kind)
-const enHint = (kind: (typeof CANVAS_NODE_KINDS)[number]): string => nodeHint('en', kind)
 import {
   loadCanvasDocFrom,
   saveCanvasDocTo,
@@ -892,15 +891,40 @@ test('D1~D7 stage3d 节点蜕壳：nodeAvailability 转 ready（此前被 phase=
   assert.ok(!READY_NODE_KINDS.includes('image'))
 })
 
-test('节点文案不得残留已过去的期数口径（一期 A / 二期开放 / 三期开放 / N 期开放）', () => {
-  const stale = /一期 A|二期开放|三期开放|\d 期开放/
+/**
+ * 过期文案守卫（2026-09-11 用户实机截图指出「很多说明不匹配现在版本」后新增）。
+ * 一/二/三期已全部收官，任何用户可见文案都不得再引用已过去的期数口径——
+ * 这类残留会让用户以为能力尚未上线（与节点实际可用状态自相矛盾）。
+ */
+const STALE_PHASE = /一期 A|一期 B|二期开放|三期开放|\d 期开放|Phase A|Phase B|Phase 2\/3|A2 接通/
+
+test('节点 meta.hint 不得残留已过去的期数口径', () => {
   for (const kind of CANVAS_NODE_KINDS) {
     const meta = CANVAS_NODE_META[kind]
-    assert.ok(!stale.test(meta.hint), `${kind} 的 meta.hint 残留过期期数：${meta.hint}`)
-    assert.ok(!stale.test(zhHint(kind)), `${kind} 的中文 hint 残留过期期数：${zhHint(kind)}`)
-    assert.ok(!stale.test(enHint(kind)), `${kind} 的英文 hint 残留过期期数：${enHint(kind)}`)
+    assert.ok(!STALE_PHASE.test(meta.hint), `${kind} 的 meta.hint 残留过期期数：${meta.hint}`)
   }
-  assert.ok(!stale.test(t('zh', 'node.lockedNote')), 'locked 说明残留过期期数')
+})
+
+test('中英字典全量文案不得残留已过去的期数口径（含顶栏副标题 / 画布提示条 / 节点提示）', () => {
+  // 自检：守卫不能是空转的（确认正则确实能命中真实的历史文案）
+  assert.ok(STALE_PHASE.test('当前为 2 期开放能力，一期 A 仅摆放占位。'))
+  assert.ok(STALE_PHASE.test('greyed nodes are Phase 2/3 placeholders'))
+  assert.ok(MESSAGE_KEYS.length > 50, '字典键数量异常，守卫可能空转')
+
+  const offenders: string[] = []
+  for (const key of MESSAGE_KEYS) {
+    for (const lang of ['zh', 'en'] as const) {
+      const value = t(lang, key)
+      if (STALE_PHASE.test(value)) offenders.push(`${lang}:${key} = ${value}`)
+    }
+  }
+  assert.deepEqual(offenders, [], `发现过期期数文案（用户可见）：\n${offenders.join('\n')}`)
+})
+
+test('节点 hint 与 meta.hint 双向一致（避免两处文案各改一半）', () => {
+  for (const kind of CANVAS_NODE_KINDS) {
+    assert.equal(zhHint(kind), CANVAS_NODE_META[kind].hint, `${kind} 的中文 hint 与 meta.hint 不一致`)
+  }
 })
 
 test('A1 edit meta：合法载荷往返（idbref maskRef + image/video-frame）', () => {

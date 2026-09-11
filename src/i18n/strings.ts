@@ -19,7 +19,7 @@ export const DEFAULT_LANGUAGE: Language = 'zh'
 /** 中文源字典（键即契约） */
 const ZH = {
   'app.brand': 'WebLockShot · Agent 创意画布',
-  'app.subtitle': '一期 A · 初意工作室（自由创作空间）',
+  'app.subtitle': 'Agent 创意画布 · 自由创作空间',
 
   'mode.aria': '工作模式',
   'mode.sell': '🎯 带货工作台',
@@ -58,7 +58,7 @@ const ZH = {
 
   'palette.aria': 'Agent 节点面板',
   'palette.title': 'Agent 节点',
-  'palette.tip': '点击添加节点到画布中央；灰态节点为后续阶段占位（诚实标注，不装可用）。',
+  'palette.tip': '点击添加节点到画布中央；尚未实现的节点会如实标注（占位，不装可用）。',
 
   'node.badge.ready': '就绪',
   'node.badge.pending': '待接通',
@@ -78,7 +78,7 @@ const ZH = {
   'chat.expand': '💬 对话',
 
   'canvas.emptyHint':
-    '对话栏一期 A 只落 Brief 节点 · 连线与业务管线为一期 B · 灰态节点为二/三期占位 · License 水印为 tldraw 免费版',
+    '对话栏一句话 → 自动布置节点与连线 · 节点内可直接生成脚本 / 分镜 / 出片 · 3D 运镜台本地渲染不耗积分 · 水印与生产环境约 5 秒停渲染为 tldraw 免费版限制',
 
   'orch.busy': '🤖 Agent 正在布置画布，请稍候…',
   'orch.llm': '✓ LLM 编排',
@@ -115,7 +115,7 @@ const ZH = {
   'node.brief.label': '需求 Brief',
   'node.brief.hint': '一句话需求：想做什么、给谁看、突出什么（对话栏可直接生成）',
   'node.product.label': '素材导入',
-  'node.product.hint': '商品图 / 参考图 / 视频 / 链接统一入口（一期 B 接通素材理解）',
+  'node.product.hint': '商品图 / 参考图 / 视频 / 链接统一入口（本地读取，直接产出图片产物卡）',
   'node.image.label': '图像生成',
   'node.image.hint': '尚未实现：规划中的 ComfyUI 文生图 / 图生图（当前为占位节点，不装可用）',
   'node.script.label': '脚本创编',
@@ -127,11 +127,11 @@ const ZH = {
   'node.asset.label': '产物卡',
   'node.asset.hint': '单镜出片产物（视频卡，大资产入 IndexedDB），可连线送入成片交付',
   'node.edit.label': '局部重绘',
-  'node.edit.hint': '连入产物卡（图片/视频单帧）后笔刷 / 框选涂抹重绘区，导出 mask PNG（重绘指令 A2 接通）',
+  'node.edit.hint': '连入产物卡（图片/视频单帧）后笔刷 / 框选涂抹重绘区，导出 mask PNG 供重绘',
   'node.stage3d.label': '3D 运镜台',
   'node.stage3d.hint': '已开放：摆角色 / 调机位 / 录关键帧，全程本地渲染不耗积分',
   'node.deliver.label': '成片交付',
-  'node.deliver.hint': '产物送入剪映草稿三轨对齐链路 / 直接导出（一期 B 接通）',
+  'node.deliver.hint': '产物送入剪映草稿三轨对齐链路 / 直接导出',
 
   'template.ecommerce.label': '带货短视频',
   'template.brand.label': '品牌视觉',
@@ -166,7 +166,7 @@ export type MessageKey = keyof typeof ZH
 /** 英文译文字典：键必须与中文源字典完全一致（缺键即编译错误） */
 const EN: Record<MessageKey, string> = {
   'app.brand': 'WebLockShot · Agent Canvas',
-  'app.subtitle': 'Phase A · Ideation Studio (free-form space)',
+  'app.subtitle': 'Agent Canvas · free-form creative space',
 
   'mode.aria': 'Workspace mode',
   'mode.sell': '🎯 Commerce Studio',
@@ -207,7 +207,7 @@ const EN: Record<MessageKey, string> = {
   'palette.aria': 'Agent node palette',
   'palette.title': 'Agent nodes',
   'palette.tip':
-    'Click to add a node at the center of the canvas; greyed-out nodes are placeholders for later phases (honestly labeled, not fake-available).',
+    'Click to add a node at the center of the canvas; nodes that are not implemented yet are honestly labeled (placeholder, not usable).',
 
   'node.badge.ready': 'Ready',
   'node.badge.pending': 'Pending wiring',
@@ -227,7 +227,7 @@ const EN: Record<MessageKey, string> = {
   'chat.expand': '💬 Chat',
 
   'canvas.emptyHint':
-    'Phase A chat bar only drops Brief nodes · edges and business pipelines land in Phase B · greyed nodes are Phase 2/3 placeholders · License watermark comes from tldraw free tier',
+    'One sentence in the chat bar lays out nodes and edges · nodes generate scripts / storyboards / shots in place · the 3D camera stage renders locally at no cost · the watermark and the ~5s stop in production come from the tldraw free tier',
 
   'orch.busy': '🤖 The Agent is laying out the canvas, please wait…',
   'orch.llm': '✓ LLM orchestration',
@@ -266,7 +266,7 @@ const EN: Record<MessageKey, string> = {
   'node.brief.label': 'Requirement Brief',
   'node.brief.hint': 'One-sentence requirement: what to make, for whom, what to highlight (the chat bar can create it directly)',
   'node.product.label': 'Asset import',
-  'node.product.hint': 'Single entry for product images / references / videos / links (asset understanding lands in Phase B)',
+  'node.product.hint': 'Single entry for product images / references / videos / links (read locally, produces image artifact cards)',
   'node.image.label': 'Image generation',
   'node.image.hint': 'Not implemented yet: planned ComfyUI text-to-image / image-to-image (placeholder node, not usable)',
   'node.script.label': 'Script writing',
@@ -278,11 +278,11 @@ const EN: Record<MessageKey, string> = {
   'node.asset.label': 'Artifact card',
   'node.asset.hint': 'Single-shot output (video card; heavy assets go to IndexedDB) that can be wired into delivery',
   'node.edit.label': 'Local repaint',
-  'node.edit.hint': 'Connect an artifact card (image / video frame), paint the region with brush or lasso, export a mask PNG (repaint commands land in A2)',
+  'node.edit.hint': 'Connect an artifact card (image / video frame), paint the region with brush or lasso, export a mask PNG for repainting',
   'node.stage3d.label': '3D camera stage',
   'node.stage3d.hint': 'Available: place characters / set cameras / record keyframes; fully local rendering, no credits',
   'node.deliver.label': 'Delivery',
-  'node.deliver.hint': 'Send artifacts into the CapCut/Jianying three-track alignment pipeline or export directly (wired in Phase B)',
+  'node.deliver.hint': 'Send artifacts into the CapCut/Jianying three-track alignment pipeline, or export directly',
 
   'template.ecommerce.label': 'Commerce short video',
   'template.brand.label': 'Brand visuals',

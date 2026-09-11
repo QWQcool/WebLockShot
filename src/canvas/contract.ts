@@ -82,7 +82,7 @@ export const CANVAS_NODE_META: Record<
     icon: '📥',
     phase: '1B',
     accent: '#39c5bb',
-    hint: '商品图 / 参考图 / 视频 / 链接统一入口（一期 B 接通素材理解）',
+    hint: '商品图 / 参考图 / 视频 / 链接统一入口（本地读取，直接产出图片产物卡）',
   },
   image: {
     label: '图像生成',
@@ -126,7 +126,7 @@ export const CANVAS_NODE_META: Record<
     icon: '🖌️',
     phase: '2',
     accent: '#ff7eb6',
-    hint: '连入产物卡（图片/视频单帧）后笔刷 / 框选涂抹重绘区，导出 mask PNG（重绘指令 A2 接通）',
+    hint: '连入产物卡（图片/视频单帧）后笔刷 / 框选涂抹重绘区，导出 mask PNG 供重绘',
   },
   stage3d: {
     label: '3D 运镜台',
@@ -142,7 +142,7 @@ export const CANVAS_NODE_META: Record<
     icon: '✨',
     phase: '1B',
     accent: '#39c5bb',
-    hint: '产物送入剪映草稿三轨对齐链路 / 直接导出（一期 B 接通）',
+    hint: '产物送入剪映草稿三轨对齐链路 / 直接导出',
   },
 }
 
