@@ -20,14 +20,19 @@
  *   - 任一步骤失败 → 打印 ❌ 详情并 exit 1（可定位到具体步骤）
  *   - 伴生服务用 WLS_STORAGE=memory 起在随机端口，不触碰本机 sqlite / 草稿目录
  */
-import { spawn, execSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { rmSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  NODE_SHAPE_TYPE,
+  ROOT,
+  ensureDist,
+  loadPlaywright,
+  randomPort,
+  skipEnv,
+  startCompanionServer,
+  waitHealthy,
+} from './lib/browser-env.mjs'
 
-const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
-const require = createRequire(import.meta.url)
 const argv = process.argv.slice(2)
 const FLAG = (name) => argv.includes(`--${name}`)
 const SKIP_BUILD = FLAG('skip-build')
@@ -35,90 +40,7 @@ const HEADED = FLAG('headed')
 const VIEWPORT = { width: 1600, height: 900 }
 const STEP_TIMEOUT = 30_000
 
-/** 画布节点 shape type（contract.ts 的 CANVAS_NODE_SHAPE_TYPE，避免 import TS） */
-const NODE_SHAPE_TYPE = 'wls-node'
-
-// ---------------- Playwright 解析（多路径，缺失即优雅跳过） ----------------
-
-/**
- * 依次尝试：项目 node_modules → 全局 npm root → npx 缓存目录。
- * 返回 playwright 模块或 null（null = 环境未安装，走诚实跳过）。
- */
-function loadPlaywright() {
-  const candidates = [ROOT]
-  try {
-    const globalRoot = execSync('npm root -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-    if (globalRoot) candidates.push(globalRoot)
-  } catch {
-    /* npm 不可用时忽略 */
-  }
-  const npxCache = join(process.env.LOCALAPPDATA || '', 'npm-cache', '_npx')
-  try {
-    for (const dir of readdirSync(npxCache)) candidates.push(join(npxCache, dir, 'node_modules'))
-  } catch {
-    /* 无 npx 缓存时忽略 */
-  }
-  for (const base of candidates) {
-    try {
-      return require(require.resolve('playwright', { paths: [base] }))
-    } catch {
-      /* 继续下一个候选 */
-    }
-  }
-  return null
-}
-
-function skip(reason) {
-  console.log('\n=== 画布 E2E 已跳过（环境不满足）===')
-  console.log(`原因：${reason}`)
-  console.log('启用方式：')
-  console.log('  npm i -D playwright && npx playwright install chromium')
-  console.log('（套件在无 Playwright 的环境下如实跳过，不伪装通过）')
-  process.exit(0)
-}
-
-// ---------------- 伴生服务 ----------------
-
-async function waitHealthy(base, deadlineMs = 20_000) {
-  const deadline = Date.now() + deadlineMs
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(1000) })
-      if (res.ok) return true
-    } catch {
-      /* 未就绪，继续等 */
-    }
-    await new Promise((r) => setTimeout(r, 200))
-  }
-  return false
-}
-
-function startCompanionServer(port) {
-  const draftDir = join(ROOT, '.tmp-e2e', 'drafts')
-  mkdirSync(draftDir, { recursive: true })
-  const child = spawn(
-    process.execPath,
-    [
-      'server/weblockshot-server.mjs',
-      '--port',
-      String(port),
-      '--dist',
-      join(ROOT, 'dist'),
-      '--draft-dir',
-      draftDir,
-    ],
-    {
-      cwd: ROOT,
-      env: { ...process.env, WLS_STORAGE: 'memory', WLS_LOG_LEVEL: 'error' },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  )
-  // 必须同时消费 stdout 与 stderr：只消费一路会让另一路写满 64KB 管道缓冲后阻塞进程
-  let log = ''
-  child.stdout.on('data', (d) => (log += String(d)))
-  child.stderr.on('data', (d) => (log += String(d)))
-  return { child, getLog: () => log }
-}
+const skip = (reason) => skipEnv('画布 E2E', reason)
 
 // ---------------- 断言工具 ----------------
 
@@ -155,16 +77,10 @@ async function main() {
   const { chromium } = playwright
 
   // 1. 构建产物
-  if (!SKIP_BUILD) {
-    console.log('· 构建 dist（--skip-build 可复用现有产物）…')
-    execSync('npm run build', { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] })
-  } else if (!existsSync(join(ROOT, 'dist', 'index.html'))) {
-    console.log('· dist 缺失，回退为完整构建…')
-    execSync('npm run build', { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] })
-  }
+  ensureDist({ skipBuild: SKIP_BUILD })
 
   // 2. 伴生服务
-  const port = 23000 + Math.floor(Math.random() * 2000)
+  const port = randomPort()
   const base = `http://127.0.0.1:${port}`
   const server = startCompanionServer(port)
   let browser = null

@@ -17,6 +17,7 @@
     "preview": "vite preview",
     "start:server": "node server/weblockshot-server.mjs",
     "e2e": "node scripts/e2e-canvas.mjs",
+    "perf": "node scripts/perf-canvas.mjs",
     "test:chaos": "node scripts/chaos-smoke.mjs",
     "verify:providers": "node --experimental-strip-types scripts/verify-providers.mjs"
   },
