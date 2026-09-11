@@ -53,14 +53,17 @@ export function writeLanguage(lang: Language, storage?: MinimalStorage | null): 
 }
 
 /**
- * 首次进入的初始语言：优先显式存储值；无存储时按浏览器语言推断
- * （`en*` → 英文，其余 → 中文默认）。**不写入存储**——避免把「推断」固化成「用户选择」。
+ * 首次进入的初始语言：**只有显式存储值才生效，否则一律默认中文**。
+ *
+ * 刻意**不做浏览器语言推断**：
+ * 1. I1 的验收口径是「默认中文、零回归」，推断会让英文系统下的首访体验与口径不符；
+ * 2. 推断会让同一份代码在不同系统语言下表现不一致（CI 的 Node 会暴露 `navigator.language`，
+ *    本机 zh-CN 与 CI en-US 会得到不同结果——已实测踩坑）。
+ * 语言是用户显式选择，切换后写入存储并持久化。
  */
-export function resolveInitialLanguage(navLang?: string, storage?: MinimalStorage | null): Language {
+export function resolveInitialLanguage(storage?: MinimalStorage | null): Language {
   const stored = resolveStorage(storage)?.getItem(LANGUAGE_STORAGE_KEY)
-  if (isLanguage(stored)) return stored
-  const nav = navLang ?? (typeof navigator !== 'undefined' ? navigator.language : undefined)
-  return typeof nav === 'string' && /^en\b/i.test(nav) ? 'en' : DEFAULT_LANGUAGE
+  return isLanguage(stored) ? stored : DEFAULT_LANGUAGE
 }
 
 /* ---------------- 模块级订阅 store ---------------- */

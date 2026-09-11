@@ -149,13 +149,14 @@ describe('语言持久化（脏值自愈 → 中文零回归）', () => {
     assert.equal(isLanguage(undefined), false)
   })
 
-  it('resolveInitialLanguage：显式存储优先；无存储时按浏览器语言推断（不写存储）', () => {
-    assert.equal(resolveInitialLanguage('en-US', memStorage()), 'en')
-    assert.equal(resolveInitialLanguage('zh-CN', memStorage()), 'zh')
-    assert.equal(resolveInitialLanguage(undefined, memStorage()), 'zh')
-    const store = memStorage({ [LANGUAGE_STORAGE_KEY]: 'zh' })
-    assert.equal(resolveInitialLanguage('en-US', store), 'zh', '显式存储必须压过浏览器推断')
-    assert.equal(store._map.size, 1, '推断结果不得写回存储')
+  it('resolveInitialLanguage：只有显式存储值生效，其余一律默认中文（不做浏览器语言推断）', () => {
+    // 不依赖运行环境（CI 的 Node 会暴露 navigator.language，本机与 CI 系统语言不同）
+    assert.equal(resolveInitialLanguage(memStorage()), 'zh', '无存储 → 默认中文')
+    assert.equal(resolveInitialLanguage(null), 'zh')
+    assert.equal(resolveInitialLanguage(memStorage({ [LANGUAGE_STORAGE_KEY]: 'en' })), 'en', '显式存储优先')
+    const store = memStorage({ [LANGUAGE_STORAGE_KEY]: 'en' })
+    assert.equal(resolveInitialLanguage(store), 'en')
+    assert.equal(store._map.size, 1, '读取不得写回存储')
   })
 })
 
@@ -167,15 +168,17 @@ describe('语言 store 订阅', () => {
       calls++
     })
     const before = getLanguageSnapshot()
-    setLanguage('en')
+    // 目标值取「与当前快照不同」的语言，断言不依赖环境默认值
+    const target: 'zh' | 'en' = before === 'zh' ? 'en' : 'zh'
+    setLanguage(target)
     assert.equal(calls, 1)
-    assert.equal(getLanguageSnapshot(), 'en')
-    setLanguage('en')
+    assert.equal(getLanguageSnapshot(), target)
+    setLanguage(target)
     assert.equal(calls, 1, '同值不应再次通知')
     setLanguage(before)
     assert.equal(calls, 2)
     off()
-    setLanguage('en')
+    setLanguage(target)
     assert.equal(calls, 2, '退订后不再通知')
     __resetLanguageSnapshotForTest()
   })
