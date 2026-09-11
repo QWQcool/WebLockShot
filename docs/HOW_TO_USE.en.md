@@ -276,6 +276,11 @@ curl -X POST http://localhost:5174/api/render \
   (prompt mode never interrupts an in-flight render)
 - **Keys and data**: identical to desktop — API keys live in `sessionStorage`, sessions in IndexedDB
 - **Responsive**: below 768 px the layout stacks into one column; at 768 px and above it matches desktop
+- **Canvas on narrow screens (P0)**: the top bar folds into **two rows** (brand, then the mode switch — text is
+  never stacked vertically), the left node palette becomes a **horizontally scrolling strip at the bottom**, the
+  canvas toolbar and chat template chips scroll in a single line, and the **minimap and shortcuts hint hide
+  themselves**; measured at 390×844 the canvas keeps about **75 % of the viewport height** (34 % before the fix),
+  and at ≥769 px the desktop layout is **exactly as before**
 - **Touch**: every tappable area is ≥44 px, and the product page opens the rear camera directly
 - **Background correctness**: returning to the foreground refreshes polling immediately
 
@@ -376,8 +381,9 @@ This release adds a complete test-engineering layer (the T line); everything can
 
 | Command | Purpose | Current result |
 | :--- | :--- | :--- |
-| `npm test` | node unit tests + vitest UI smoke tests | 400 + 18, **0 failures** |
-| `npm run e2e` | Canvas E2E suite (real mouse paths, isolated storage) | **13/13 steps pass**; skips gracefully without Playwright |
+| `npm test` | node unit tests + vitest UI smoke tests | 449 + 26, **0 failures** |
+| `npm run e2e` | Canvas E2E suite (real mouse paths, isolated storage) | **17/17 steps pass**; skips gracefully without Playwright |
+| `npm run e2e:mobile` | Mobile / touch narrow-screen layout assertions (390×844 + 360×640) | **15/15 assertions pass**; wired into CI (with a CJK font step) |
 | `npm run test:coverage` | Coverage baseline for key pure-function layers (80% gate) | **10/10 passing** ([coverage.md](./coverage.md)) |
 | `npm run perf` | Canvas / memory graph / 3D chunk / Skill Market benchmarks | see [perf.md](./perf.md) (includes optimization notes) |
 | `npm run a11y` | chromium + webkit core flow + axe (WCAG 2.0 A/AA) | **5/5** on both engines, **0** serious axe findings ([a11y.md](./a11y.md)) |

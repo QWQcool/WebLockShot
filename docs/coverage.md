@@ -32,7 +32,7 @@ npm run test:coverage -- --json   # 机器可读输出
 
 ## 口径与诚实边界
 
-- **只统计 Node 侧单测覆盖**。React 组件层（`*.ui.test.tsx`）由 vitest 跑（18 项），
+- **只统计 Node 侧单测覆盖**。React 组件层（`*.ui.test.tsx`）由 vitest 跑（26 项），
   不进本门槛——Node 测试运行器无法渲染组件，混入会得到失真的分母。
 - **未覆盖即未覆盖，不做数字美化**。`--strict` 未开启时脚本对未达标项打印
   「未覆盖行」明细而非静默通过。

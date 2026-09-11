@@ -238,4 +238,10 @@ Then:
   `npm run verify:providers -- --kling-key=AK:SK --jimeng-key=AK:SK`;
 - **Runway / Luma await a real environment** (contracts implemented and locked, no live render yet);
 - **The mock engine costs 0 credits**; other engines bill through the two-phase virtual wallet;
-- Without a key the relevant engines are **honestly disabled with a message**, never pretending to work.
+- Without a key the relevant engines are **honestly disabled with a message**, never pretending to work;
+- **The run-history entry point lives on the canvas side** (canvas toolbar “🕘 Run history”, see branch 1 §5):
+  shot-by-shot rendering in the commerce workbench goes through the **same executor**, so it is written into the
+  run history as well (with cost and refund state), but there is currently **no dedicated entry point inside the
+  commerce workbench**;
+- **Narrow screens (<768 px)**: the mode switch no longer stacks vertically, the canvas node palette becomes a
+  bottom strip and the minimap / shortcuts hint hide themselves (see the main handbook “(6) Mobile”).

@@ -157,8 +157,8 @@ Agent 节点链路；点几下就能拿到脚本、9:16 分镜预演、逐镜出
   <div class="stat"><b>9</b><span>类 Agent 节点</span></div>
   <div class="stat"><b>6</b><span>个生成引擎契约</span></div>
   <div class="stat"><b>45</b><span>个 3D 动画片段</span></div>
-  <div class="stat"><b>15</b><span>步实机 E2E</span></div>
-  <div class="stat"><b>429</b><span>项自动化测试</span></div>
+  <div class="stat"><b>17</b><span>步实机 E2E</span></div>
+  <div class="stat"><b>475</b><span>项自动化测试</span></div>
   <div class="stat"><b>50k+</b><span>行自有代码</span></div>
 </div>
 
@@ -310,6 +310,12 @@ Agent 节点链路；点几下就能拿到脚本、9:16 分镜预演、逐镜出
 <li><strong>灵感币两阶段结算</strong>：出片前预冻结 → 成功核销 / 异常全额退款（含幂等与 30 分钟 TTL 孤儿冻结回收）；
   画布与工作台共用同一条钱包管线，费用在界面上透明可见。</li>
 </ul>
+<h3>6.7 运行历史（可审计）</h3>
+<p>每次节点执行落一条记录（由执行器<strong>单一收口</strong>写入，滚动保留最近 200 条）：<strong>状态 / 耗时 /
+费用（灵感币）/ 是否退款 / 失败原因</strong>，可展开看关联节点、分镜、供应商、尝试次数与输出引用
+（优先展示节点内持久化的 <code>idbref://</code>）。与虚拟钱包打通是本项目的差异化信息——<strong>这一次花了多少、
+退了没有，一目了然</strong>。</p>
+<figure><img alt="运行历史：状态 / 耗时 / 费用（灵感币）/ 是否退款 / 失败原因；6 条为真实出片记录（0 灵感币 · 演示引擎 · 标注「演示 · 非真实生成」），展开的失败条为截图脚本写入的演示记录（非产品内置样例）" src="screenshots/19c_canvas_run_history.png" /><figcaption>运行历史：状态 / 耗时 / 费用（灵感币）/ 是否退款 / 失败原因；6 条为真实出片记录（0 灵感币 · 演示引擎 · 标注「演示 · 非真实生成」），展开的失败条为截图脚本写入的演示记录（非产品内置样例）</figcaption></figure>
 <h2>七、技术实现与质量门禁</h2>
 <h3>7.1 分层结构</h3>
 <table>
@@ -403,16 +409,21 @@ Agent 节点链路；点几下就能拿到脚本、9:16 分镜预演、逐镜出
 <tr>
 <td>单元测试（node）</td>
 <td><code>npm test</code></td>
-<td><strong>411 项，0 失败</strong></td>
+<td><strong>449 项，0 失败</strong></td>
 </tr>
 <tr>
 <td>组件测试（vitest）</td>
 <td><code>npm run test:ui</code></td>
-<td><strong>18 项，0 失败</strong></td>
+<td><strong>26 项，0 失败</strong></td>
 </tr>
 <tr>
 <td>画布 E2E（真实鼠标路径）</td>
 <td><code>npm run e2e</code></td>
+<td><strong>17/17</strong></td>
+</tr>
+<tr>
+<td>移动端窄屏断言（双视口）</td>
+<td><code>npm run e2e:mobile</code></td>
 <td><strong>15/15</strong></td>
 </tr>
 <tr>
@@ -453,7 +464,7 @@ npm run dev            # 打开 http://localhost:5173
 
 # 质量门禁（可自行复现第七章的全部数字）
 npm test               # 单元测试
-npm run e2e            # 15 步实机 E2E
+npm run e2e            # 17 步实机 E2E
 </code></pre>
 <div class="endnote">
 <b>一句话总结</b>：一句话进、成片工程出——中间是 9 类可编排节点、一套本地 3D 预演台、

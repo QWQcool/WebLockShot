@@ -149,7 +149,7 @@ node scripts/e2e-mobile.mjs        # 待创建（可先复用本次探针逻辑�
 
 工作约定（本仓库既有惯例，必须遵守）：
 1. 每条任务都要先复现/取证，再改代码；不接受「我觉得」。
-2. 收口门槛：npm run lint（0 errors）、npm run build、npm run test:node、npm run e2e（15 步）
+2. 收口门槛：npm run lint（0 errors）、npm run build、npm run test:node、npm run e2e（17 步）
    —— 涉及部署形态时还要跑 npm run e2e:basepath / e2e:prod。
 3. 每个修复都要做**负向验收**：把 bug 还原回去，确认新增的测试真的会红。
 4. 保持「诚实标注」口径：未实现的能力界面里要如实写「未实现」，不摆样例数据、不伪造评分。

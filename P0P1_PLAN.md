@@ -76,9 +76,9 @@
 ```bash
 npm run lint        # 0 errors（基线 20 warnings）
 npm run build       # 0 错
-npm run test:node   # 基线 411（410 pass + 1 skip）
-npm test            # 含 vitest 18
-npm run e2e         # 15 步（S1/S2 后必须仍全过）
+npm run test:node   # 基线 449（448 pass + 1 skip）
+npm test            # 含 vitest 26
+npm run e2e         # 17 步（S1/S2 后必须仍全过）
 npm run e2e:mobile  # S2 之后（S1 期间可手动跑探针取证）
 ```
 
@@ -102,7 +102,7 @@ npm run e2e:mobile  # S2 之后（S1 期间可手动跑探针取证）
 | S2 e2e:mobile 断言化 | ✅ 完成 | S2 提交 | 探针 → 断言套件 **15 条**（双视口×7 + 触摸1）：A 页面级 scrollWidth / B 有效溢出=0（实现比口径更严：`overflow-x∈{auto,scroll}` **且** `scrollWidth>clientWidth`）/ C 顶栏≤120 / D 无竖排（`TreeWalker SHOW_TEXT` 取行盒，规避装饰条假阳性）/ E 画布≥45% / F 小地图与快捷键隐藏 / G 触摸主流程；失败非 0 退出。CI：`e2e` job 新增 `Install CJK fonts` + 移动端断言两步（runner 无 CJK 字体，本套件断言文本度量布局）。独立验收 `wls-tester`：绿态 15/15、负向 12 条红、**定向变异 M1 只红 C / M3b·M4 只红 B**（断言独立且不过度排除真溢出） |
 | S3 P1 数据层 | 待开始 | — | — |
 | S4 P1 UI | 待开始 | — | — |
-| S5 收尾（截图/PDF/HOW_TO_USE） | 待开始 | — | — |
+| S5 收尾（截图/PDF/HOW_TO_USE） | ✅ 完成 | S5 提交 | 新增 `19c_canvas_run_history.png`（混合方案：真跑 6 镜出片产 6 条真实记录 + 1 条演示失败记录，图注如实标注来源；Mock 引擎 0 币且从不失败，真实路径拍不出「费用/退款/失败原因」三列）；文档 13 个文件更新（含中英同步、7 处 stale 数字修正、README 已知限制补 400ms 缺口、HOW_TO_USE 一主两分加运行历史与移动端）；PDF 重建（SHOWCASE **11 页/11 图**、HOW_TO_USE **48 页**）。终验 `wls-tester`：5 项核心 PASS + 发现 3 处 stale（dev 补到 7 处） |
 
 ### 验收口径决策（S1 定稿，S2 起沿用）
 

@@ -17,8 +17,8 @@ Agent 节点链路；点几下就能拿到脚本、9:16 分镜预演、逐镜出
   <div class="stat"><b>9</b><span>类 Agent 节点</span></div>
   <div class="stat"><b>6</b><span>个生成引擎契约</span></div>
   <div class="stat"><b>45</b><span>个 3D 动画片段</span></div>
-  <div class="stat"><b>15</b><span>步实机 E2E</span></div>
-  <div class="stat"><b>429</b><span>项自动化测试</span></div>
+  <div class="stat"><b>17</b><span>步实机 E2E</span></div>
+  <div class="stat"><b>475</b><span>项自动化测试</span></div>
   <div class="stat"><b>50k+</b><span>行自有代码</span></div>
 </div>
 
@@ -149,6 +149,15 @@ Agent 节点链路；点几下就能拿到脚本、9:16 分镜预演、逐镜出
 - **灵感币两阶段结算**：出片前预冻结 → 成功核销 / 异常全额退款（含幂等与 30 分钟 TTL 孤儿冻结回收）；
   画布与工作台共用同一条钱包管线，费用在界面上透明可见。
 
+### 6.7 运行历史（可审计）
+
+每次节点执行落一条记录（由执行器**单一收口**写入，滚动保留最近 200 条）：**状态 / 耗时 /
+费用（灵感币）/ 是否退款 / 失败原因**，可展开看关联节点、分镜、供应商、尝试次数与输出引用
+（优先展示节点内持久化的 `idbref://`）。与虚拟钱包打通是本项目的差异化信息——**这一次花了多少、
+退了没有，一目了然**。
+
+![运行历史：状态 / 耗时 / 费用（灵感币）/ 是否退款 / 失败原因；6 条为真实出片记录（0 灵感币 · 演示引擎 · 标注「演示 · 非真实生成」），展开的失败条为截图脚本写入的演示记录（非产品内置样例）](screenshots/19c_canvas_run_history.png)
+
 ## 七、技术实现与质量门禁
 
 ### 7.1 分层结构
@@ -176,9 +185,10 @@ Agent 节点链路；点几下就能拿到脚本、9:16 分镜预演、逐镜出
 
 | 套件 | 命令 | 当前结果 |
 |---|---|---|
-| 单元测试（node） | `npm test` | **411 项，0 失败** |
-| 组件测试（vitest） | `npm run test:ui` | **18 项，0 失败** |
-| 画布 E2E（真实鼠标路径） | `npm run e2e` | **15/15** |
+| 单元测试（node） | `npm test` | **449 项，0 失败** |
+| 组件测试（vitest） | `npm run test:ui` | **26 项，0 失败** |
+| 画布 E2E（真实鼠标路径） | `npm run e2e` | **17/17** |
+| 移动端窄屏断言（双视口） | `npm run e2e:mobile` | **15/15** |
 | 子路径部署回归 | `npm run e2e:basepath` | **全过** |
 | 生产模式回归 | `npm run e2e:prod` | **全过** |
 | 降级 / 迁移矩阵 | `npm run degrade` | **6/6** |
@@ -198,7 +208,7 @@ npm run dev            # 打开 http://localhost:5173
 
 # 质量门禁（可自行复现第七章的全部数字）
 npm test               # 单元测试
-npm run e2e            # 15 步实机 E2E
+npm run e2e            # 17 步实机 E2E
 ```
 
 <div class="endnote">

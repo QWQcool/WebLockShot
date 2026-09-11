@@ -7,12 +7,15 @@
  *
  * 覆盖三条线：
  *   - 画布线：开场层 / 主界面 / 对话栏编排 / Skill 市场 / 记忆图谱（空态 + 有数据）/ 3D 运镜台 /
- *     创作场景画廊 / 连接器面板 / 英文界面
+ *     创作场景画廊 / 连接器面板 / 英文界面 / **运行历史（真实出片后拍摄）**
  *   - 带货线：全链路工作台（含引擎条与海外引擎）
  *   - 短剧线：legacy 粗剪台
  *
- * 诚实说明：记忆图谱「有数据」截图由本脚本向**本地 IndexedDB** 写入 60 条结构化回流记录后拍摄，
- * 图注必须写明「演示数据由截图脚本写入」，不得当作产品内置样例。
+ * 诚实说明：两处「有数据」截图含**脚本写入的演示数据**，图注必须写明来源，不得当作产品内置样例：
+ *   ① 记忆图谱：向本地 IndexedDB 写入 60 条结构化回流记录后拍摄；
+ *   ② 运行历史：画布出片走 Mock 引擎（0 灵感币且从不失败），真实路径拍不出「费用 / 已退款 /
+ *      失败原因」三列，故在**真实跑完 6 镜出片**（6 条真实记录）之外，额外写入 1 条符合
+ *      RunRecordSchema 的失败+已退款演示记录。
  *
  * 用法：
  *   npm run shots                 # 构建（dist 缺失时）+ 采集
@@ -100,6 +103,21 @@ async function main() {
       await page.screenshot({ path, fullPage: false })
       shots.push({ file, caption })
       console.log(`  ✔ ${file} — ${caption}`)
+    }
+
+    /** 点画布节点内的动作按钮（与 capture-demo-gif.mjs 同一实现，供真实跑一遍管线用） */
+    const clickNodeBtn = async (kind, label) => {
+      const ok = await page.evaluate(
+        ({ k, lp }) => {
+          const node = [...document.querySelectorAll(`.wls-node[data-kind="${k}"]`)].pop()
+          const b = node && [...node.querySelectorAll('button')].find((x) => (x.textContent || '').includes(lp))
+          if (!b || b.disabled) return false
+          b.click()
+          return true
+        },
+        { k: kind, lp: label }
+      )
+      if (!ok) throw new Error(`${kind} 节点的「${label}」按钮不可用`)
     }
 
     // ---------------- 画布线 ----------------
@@ -223,6 +241,91 @@ async function main() {
     await shot('23_canvas_en.png', '英文界面（顶栏「🌐 中文 / EN」或设置面板「界面语言」切换，持久化）')
     await page.click('[data-testid=toggle-language]')
     await page.waitForTimeout(300)
+
+    // ---------------- P1：运行历史（🕘） ----------------
+    // 走**真实路径**：在本页真跑一次「生成脚本 → 生成分镜 → 逐镜出片（含确认扣费）」，
+    // 再打开工具条「🕘 运行历史」抽屉截图。
+    // 为什么放在画布线**末尾**才拍：本步会在画布上新增 6 张产物卡，若插在中间会改变 18~23 号
+    // 既有截图的内容；放在末尾则既有截图零改动（此后的 24/25 是另两条线的整页截图，不受影响）。
+    await clickNodeBtn('script', '生成脚本')
+    await page.waitForFunction(
+      () => {
+        const el = [...document.querySelectorAll('.wls-node[data-kind="script"]')].pop()
+        return /演示 · 评分非真实/.test(el?.innerText || '')
+      },
+      null,
+      { timeout: 30_000 }
+    )
+    await clickNodeBtn('storyboard', '生成分镜')
+    await page.waitForFunction(
+      () => /镜 \d+\/\d+/.test([...document.querySelectorAll('.wls-node[data-kind="storyboard"]')].pop()?.innerText || ''),
+      null,
+      { timeout: 30_000 }
+    )
+    await clickNodeBtn('generate', '开始逐镜出片')
+    await page.waitForSelector('[data-testid=wls-generate-confirm-ok]', { timeout: 10_000 })
+    await page.click('[data-testid=wls-generate-confirm-ok]')
+    // 等 6 镜全部到终态（不是「首个产物出现」就收工，否则记录条数不确定）
+    await page.waitForFunction(
+      () => {
+        const els = [...document.querySelectorAll('.wls-generate-artifact')]
+        return els.length >= 6 && els.every((e) => !/排队中|生成中/.test(e.textContent || ''))
+      },
+      null,
+      { timeout: 90_000 }
+    )
+    await page.waitForTimeout(600)
+
+    // 补 1 条**演示记录**：画布出片走 Mock 引擎（0 灵感币且从不失败），真实路径拍不出
+    // 「费用（非 0） / 已退款 / 失败原因」这三列——而那正是本面板的差异化信息。
+    // 故向本地 IndexedDB 写入 1 条符合 RunRecordSchema 的失败+已退款记录，**图注如实标注来源**
+    // （与 19b 记忆图谱「演示数据由截图脚本写入」同一口径）。
+    await page.evaluate(async () => {
+      await new Promise((resolve, reject) => {
+        const req = indexedDB.open('weblockshot-runs', 1)
+        req.onupgradeneeded = () => {
+          const db = req.result
+          if (!db.objectStoreNames.contains('runs')) db.createObjectStore('runs', { keyPath: 'id' })
+        }
+        req.onsuccess = () => {
+          const db = req.result
+          const tx = db.transaction('runs', 'readwrite')
+          const now = Date.now()
+          tx.objectStore('runs').put({
+            id: `run_shot_demo_${now}`,
+            kind: 'generate',
+            status: 'failed',
+            startedAt: now - 4_200,
+            endedAt: now,
+            durationMs: 4_200,
+            cost: 8,
+            refunded: true,
+            demo: false,
+            provider: 'kling',
+            shotId: 'story-s2',
+            attempt: 1,
+            error: '上游 4xx：额度不足（演示记录）',
+          })
+          tx.oncomplete = () => resolve()
+          tx.onerror = () => reject(tx.error)
+        }
+        req.onerror = () => reject(req.error)
+      })
+    })
+
+    await page.click('[data-testid=open-run-history]')
+    await page.waitForSelector('[data-testid=run-history]', { timeout: 10_000 })
+    await page.waitForSelector('[data-testid=rh-row]', { timeout: 10_000 })
+    // 展开**失败那条**（而非最新一条）：失败原因只在展开详情里，必须让它入镜
+    await page.locator('[data-testid=rh-row]', { hasText: '失败' }).first().locator('button').first().click()
+    await page.waitForSelector('[data-testid=rh-detail]', { timeout: 8_000 })
+    await page.waitForTimeout(500)
+    await shot(
+      '19c_canvas_run_history.png',
+      '运行历史（工具条「🕘 运行历史」）：状态 / 耗时 / 费用（灵感币）/ 是否退款 / 失败原因；6 条为**真实出片**记录（0 灵感币 · 演示引擎 · 标注「演示 · 非真实生成」），展开的失败条为**截图脚本写入的演示记录**（体现「8 灵感币 · 已退款 · 失败原因」，非产品内置样例）'
+    )
+    await page.click('[data-testid=rh-close]')
+    await page.waitForSelector('[data-testid=run-history]', { state: 'detached', timeout: 8_000 })
 
     // ---------------- 带货线（含海外引擎） ----------------
     await page.goto(`${base}/?view=sell&mode=pipeline`, { waitUntil: 'domcontentloaded' })

@@ -12,7 +12,7 @@
 - [2. Onboarding and the Scene Gallery](#2-onboarding-and-the-scene-gallery)
 - [3. Chat-bar orchestration](#3-chat-bar-orchestration)
 - [4. Nodes and the data-flow contract](#4-nodes-and-the-data-flow-contract)
-- [5. From script to artifact card](#5-from-script-to-artifact-card)
+- [5. From script to artifact card (incl. 🕘 run history)](#5-from-script-to-artifact-card)
 - [6. Local repaint and version stacking](#6-local-repaint-and-version-stacking)
 - [7. The 3D camera stage](#7-the-3d-camera-stage)
 - [8. Skill distillation / reuse / market](#8-skill-distillation--reuse--market)
@@ -106,6 +106,26 @@ video generation, artifact card, local repaint, 3D camera stage, delivery.
   **`blob:` is never persisted** (it dies across reloads) — only lightweight references go into the document.
 - **Delivery**: connect an artifact card to package a CapCut draft zip in the browser; the node shows the
   wallet balance.
+
+### Run history (toolbar “🕘 Run history”)
+
+![Run history: status / duration / cost (credits) / refunded / failure reason](./screenshots/19c_canvas_run_history.png)
+
+Every node run (shot-by-shot render / retry / regenerate) writes one **auditable record**, written by the
+executor in **one place** and rolling over the latest 200. The panel shows:
+
+- **Status** (succeeded / failed / running) and **duration**;
+- **Cost**: the credits actually spent by that run (0 credits reads “0 credits (nothing charged)”), plus
+  **whether a refund happened** — an automatic failure refund shows “↩ refunded”; when there was nothing to
+  refund (0 credits) the badge is **not** shown, so a free failure is never misread as refunded;
+- **Failure reason**: expand a row to see it (e.g. “upstream 4xx”), with “nothing to refund” vs
+  “not refunded (settled normally)” kept distinct;
+- The expanded row also shows the linked node, shot, provider, attempt count and **output reference** — demo
+  artifacts are `blob:` (dead after a reload), so the panel **prefers the durable `idbref://` stored in the
+  node** and honestly says “output reference expired” when there is none;
+- Records produced by the **demo engine (Mock)** are labelled “demo · not a real generation”;
+- “🧹 Clear” empties the list; records live in IndexedDB so they **survive a reload** (the header summarises
+  total / succeeded / failed / net spend / refunded).
 
 ## 6. Local repaint and version stacking
 
@@ -252,3 +272,7 @@ See [mcp.md](./mcp.md) for the endpoint details.
 7. **i18n covers “key copy”**; node internals and some overlays are still Chinese.
 8. **MCP / connectors are mostly API-level** (plus the MCP badge and connector panel); deeper two-way
    orchestration means calling the documented endpoints.
+9. **Refreshing within ~400 ms after a render finishes**: the canvas document's debounced save has not landed
+   yet → the node's `meta.artifacts` pointer is lost → the run history cannot resolve the `idbref://` reference
+   (**the asset itself is still in IndexedDB**, so re-running the shot restores it). The window is very narrow;
+   recorded honestly here, with no compensation this round.

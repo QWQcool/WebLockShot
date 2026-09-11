@@ -148,6 +148,13 @@ so the commerce/drama bundles are unaffected). Canvas planning lives in [CANVAS_
   link archive); the delivery node packages a CapCut draft zip in the browser and shows the wallet balance.
 - **Data-flow contract**: edges are type-checked (e.g. `storyboard → video generation` is legal, the reverse
   is rejected with a reason); edge ids are stable across reloads and arrows are re-materialised on refresh.
+- **🕘 Run history (P1)**: every node run writes one auditable record (written by the executor in **one place**,
+  the latest 200 are kept). The panel shows **status / duration / cost (credits) / whether it was refunded /
+  failure reason**, and expands to the linked node, shot, provider, attempt count and output reference
+  (preferring the durable `idbref://` stored in the node). Demo-engine runs are labelled “demo · not a real
+  generation”, and the list can be cleared in one click.
+
+![Run history: status / duration / cost (credits) / refunded / failure reason (the expanded failing row is a demo record written by the capture script)](./docs/screenshots/19c_canvas_run_history.png)
 
 **Honest boundaries**: Kling/Jimeng are not exposed in canvas mode yet (use the commerce workbench; buttons are
 honestly disabled without keys); the mock engine costs 0 credits; when ComfyUI is offline local repaint falls
@@ -539,14 +546,15 @@ companion server, no LLM key, `WLS_STORAGE=memory|sqlite`, ComfyUI offline); the
 `scripts/capture-screenshots.mjs` drives the **production build plus companion server** through real
 interactions and captures screenshots into `docs/screenshots/` (11 canvas + 1 commerce + 1 drama + the 14
 existing ones). The README, handbook and PDF all use these real screenshots — no design mock-ups.
-The caption of the “memory graph with data” screenshot states honestly that its demo data was written into
-local IndexedDB by the capture script.
+Both “with data” screenshots state their source honestly in the caption: the **memory graph** (60 feedback
+records written into local IndexedDB by the script) and the **run history** (a real six-shot render plus one
+seeded failed/refunded demo record, so the “cost · refunded · failure reason” columns are visible).
 
 ### Test-engineering summary (the T line)
 
 | Slice | Result |
 |---|---|
-| T1 E2E suite | `npm run e2e` 13 steps pass (real mouse paths, isolated storage); skips gracefully with exit 0 when Playwright is missing |
+| T1 E2E suite | `npm run e2e` 17 steps pass (real mouse paths, isolated storage); skips gracefully with exit 0 when Playwright is missing |
 | T2 Coverage baseline | Key pure-function layers **10/10 ≥ 80%** (the `feedback.ts` IndexedDB branch was added, reaching 100% line coverage); coverage is never faked |
 | T3 Performance baseline | 200 nodes 54.5 fps / 500 nodes 25.7 fps; memory graph with 500 records 79 ms; 3D chunk 957 kB / viewport ready in 352 ms; Skill Market with 100 entries 86 ms. **Found: the document contract caps at 200 nodes and silently stops persisting beyond it** (recorded as an optimization note; measure-only in this pass) |
 | T4 Cross-browser + a11y | chromium / webkit core flow **5/5 each**; axe serious findings went from 6 to **0** (tablist semantics + 8 contrast fixes), all four states clean |
@@ -576,6 +584,11 @@ scheduled; all can be handled incrementally:
    canvas engine (the user accepted this; no bypass is provided).
 9. **`npm run test:node` occasionally flaked with ECONNRESET**: fixed on the test side with `duplex:'half'`
    (four consecutive full runs, zero failures).
+10. **Refreshing within ~400 ms after a render finishes** → the canvas document's **debounced save has not
+    landed yet** → the node's `meta.artifacts` pointer is lost → the run history (and the node) cannot resolve
+    the `idbref://` reference. The window is very narrow (400 ms debounce) and **the asset itself is still in
+    IndexedDB** (`canvas-asset-<shotId>` key), so **re-running the shot restores it**; recorded honestly here,
+    with no compensation implemented this round.
 
 ---
 
