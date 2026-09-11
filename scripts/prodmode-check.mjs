@@ -121,7 +121,7 @@ function startStaticServer({ tls, port, distDir }) {
 }
 
 /**
- * 构建产物里是否已烘焙 tldraw license key（形如 `tldraw-2026-12-20/…`）。
+ * 构建产物里是否已烘焙 tldraw license key（形如 `tldraw-YYYY-MM-DD/<载荷>.<签名>`）。
  * 用它决定本套件的**预期分支**：
  *   - 未烘焙 → 生产环境应触发闸门（验证「如实提示」这条防线）；
  *   - 已烘焙 → 生产环境**不应**触发闸门（顺带验证 key 有效，可作为「key 过期/无效」的监控）。
