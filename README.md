@@ -16,6 +16,9 @@
 
 > 📖 **详尽实战手册请查阅**：[docs/HOW_TO_USE.md](./docs/HOW_TO_USE.md)（包含从零安装、ComfyUI 部署、剪映导入到踩坑排错的完整教程）。
 
+> 📄 **开源许可**：自有代码 [MIT](./LICENSE)；**第三方依赖各自许可**（tldraw 为商业许可、GSAP 为自有免费许可），
+> 完整清单与注意事项见 [`NOTICE`](./NOTICE)。
+
 ---
 
 ## ⚡ 快速开始
@@ -370,5 +373,18 @@ chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）�
 
 ---
 
-## 📄 License
-MIT License
+## 📄 开源许可（License）
+
+**本项目自有源代码以 [MIT License](./LICENSE) 发布**（`package.json` 的 `license` 字段为 `MIT`）。
+
+> ⚠️ **依赖各自许可，不随本项目 MIT 改变** —— 完整清单见 [`NOTICE`](./NOTICE)，其中两项需要特别注意：
+>
+> - **tldraw（画布引擎）是商业许可，不是开源许可**：免费/未授权使用时画布带水印，且**生产环境未配置
+>   license key 时渲染会在约 5 秒后停止**。本项目接受该限制，**不包含任何绕过许可校验或去水印的手段**；
+>   正式上线需自行购买 tldraw license 并配置 `licenseKey`，或替换为 MIT 许可的画布引擎。
+> - **GSAP 采用自有「标准免费」许可**（<https://gsap.com/standard-license>），并非 MIT。
+>
+> 随仓库分发的素材：Quaternius 通用动画库素体角色为 **CC0 1.0**（可商用、无再分发限制，见
+> `public/models/LICENSE.md`）；Mixamo 等第三方模型**不随仓库分发**，仅支持用户本机自行导入。
+>
+> `package.json` 保留 `"private": true` 以防误发布到 npm，不影响本项目的开源属性。

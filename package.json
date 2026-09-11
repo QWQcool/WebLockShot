@@ -2,6 +2,12 @@
   "name": "weblockshot",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
+  "description": "多 Agent 电商带货视频工作台 + Agent 创意画布（含 3D 运镜台 / Skill 市场 / MCP 反向驱动）",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QWQcool/WebLockShot.git"
+  },
   "type": "module",
   "bin": {
     "weblockshot": "server/weblockshot-server.mjs"

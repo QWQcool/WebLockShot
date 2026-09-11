@@ -1,0 +1,92 @@
+# NOTICE · 第三方依赖与素材许可清单
+
+> 更新：2026-09-11（与 `package.json` 对齐的实测快照，取自各包 `package.json` 的 `license` 字段）
+
+**本项目源代码以 MIT 许可发布（见 `LICENSE`）。第三方依赖与随仓库分发的素材各自适用其原有许可，
+本项目不改变、也不重新授权这些许可。** 下表为如实清单，请在使用 / 分发前自行确认最新条款。
+
+## ⚠️ 需要特别注意的两项
+
+### 1. tldraw —— **商业许可，非开源许可**
+
+- 包：`tldraw@5.4.0`（`license` 字段为 `SEE LICENSE IN LICENSE.md`，实际指向
+  <https://github.com/tldraw/tldraw/blob/main/LICENSE.md>）
+- 事实口径：
+  - 免费/未授权使用时，画布**带 tldraw 水印**；
+  - **生产环境未配置有效 license key 时，画布渲染会在约 5 秒后停止**（tldraw 的许可限制，非本项目缺陷）；
+  - 本项目**接受该限制**，不包含也不提供任何绕过许可校验或去水印的手段；
+  - 若要正式上线，需自行向 tldraw 购买 license 并配置 `licenseKey`，或替换为 MIT 许可的画布引擎。
+- 因此：**本项目 MIT 仅覆盖本仓库自有代码，不覆盖 tldraw**。
+
+### 2. GSAP —— 标准「免费使用」许可（非 MIT）
+
+- 包：`gsap@3.15.0` / `@gsap/react@2.1.2`
+- 许可：`Standard 'no charge' license: https://gsap.com/standard-license`
+- 说明：GSAP 采用自有许可（标准免费许可），并非 MIT/Apache 类开源许可。
+  本项目仅使用其标准免费范围内的核心能力，未使用任何需要付费会员的插件。
+
+## 依赖清单（实测快照）
+
+### 运行时依赖
+
+| 包 | 版本 | 许可 |
+|---|---|---|
+| `@gsap/react` | 2.1.2 | SEE LICENSE AT https://gsap.com/standard-license |
+| `@react-three/drei` | 10.7.8 | MIT |
+| `@react-three/fiber` | 9.7.0 | MIT |
+| `gsap` | 3.15.0 | Standard 'no charge' license: https://gsap.com/standard-license |
+| `msedge-tts` | 2.0.7 | MIT |
+| `pino` | 10.3.1 | MIT |
+| `react` | 19.2.8 | MIT |
+| `react-dom` | 19.2.8 | MIT |
+| `three` | 0.180.0 | MIT |
+| `tldraw` | 5.4.0 | 商业许可（见上） |
+| `zod` | 4.5.4 | MIT |
+
+### 开发依赖（不进入运行时产物）
+
+| 包 | 版本 | 许可 |
+|---|---|---|
+| `@testing-library/dom` | 10.4.1 | MIT |
+| `@testing-library/react` | 16.3.3 | MIT |
+| `@types/node` | 24.13.3 | MIT |
+| `@types/react` | 19.2.18 | MIT |
+| `@types/react-dom` | 19.2.5 | MIT |
+| `@types/three` | 0.180.0 | MIT |
+| `@vitejs/plugin-react` | 6.1.0 | MIT |
+| `axe-core` | 4.13.0 | MPL-2.0 |
+| `better-sqlite3` | 13.0.3 | MIT |
+| `jsdom` | 29.1.1 | MIT |
+| `oxlint` | 1.80.0 | MIT |
+| `sharp` | 0.35.4 | Apache-2.0 |
+| `typescript` | 6.0.3 | Apache-2.0 |
+| `vite` | 8.2.2 | MIT |
+| `vite-plugin-pwa` | 1.3.0 | MIT |
+| `vitest` | 5.0.0 | MIT |
+
+> `axe-core` 为 MPL-2.0：仅在开发期作为测试依赖注入页面执行扫描，不进入构建产物。
+> `sharp` / `typescript` 为 Apache-2.0：保留其许可与声明文件即可合规使用。
+
+## 随仓库分发的素材
+
+| 素材 | 位置 | 许可 / 来源 |
+|---|---|---|
+| Quaternius 通用动画库素体角色 | `public/models/quaternius-universal-character.glb` | **CC0 1.0**（公有领域，可商用、无需署名、无再分发限制）；作者 Quaternius，见同目录 `LICENSE.md` |
+| 商品预设图（SVG 部分） | `public/presets/*.svg` | 本项目自制矢量图，随 MIT 发布 |
+| 商品预设图（JPG 部分） | `public/presets/{clay_mask,hair_dryer,tech_bag}.jpg` | 随仓库分发的示例图；如用于对外发布请自行核实来源与授权 |
+| 创作场景配图 | `public/scenes/*.webp` | 六类创作场景卡片配图（用户提供/替换，用于界面展示）；对外发布前请自行核实授权 |
+| PWA 图标 | `public/pwa-*.png`、`public/favicon.svg`、`public/icons.svg` | 本项目自制，随 MIT 发布 |
+
+## 用户自行获取、不随仓库分发的资产
+
+- **Mixamo 角色模型**：Mixamo 原始文件**禁止再分发**。本项目的「导入自定义模型」入口只在本机
+  由用户自行加载，仓库内不含任何 Mixamo 资产。
+- **第三方视频/图像生成引擎**（可灵 / 即梦 / ComfyUI / Runway / Veo / Luma 等）：
+  本项目只实现 API 契约与本地调用，不附带任何引擎模型权重或素材；使用需遵守各服务条款。
+
+## 许可兼容性说明
+
+- 本项目自有代码 MIT，可与上述 MIT / Apache-2.0 / MPL-2.0（仅测试期）依赖共存。
+- **tldraw 与 GSAP 不是开源许可**：若你要把本项目用于生产环境，请先确认这两项的许可要求
+  （tldraw 需购买 license 或替换引擎；GSAP 需确认你的用法落在标准免费许可范围内）。
+- 本文件为工程性说明，不构成法律意见；正式对外发布建议由法务复核。
