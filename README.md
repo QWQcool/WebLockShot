@@ -142,6 +142,13 @@ flowchart TD
 访问：https://qwqcool.github.io/WebLockShot/  
 （密钥仅存储于浏览器 `sessionStorage`，不上传任何第三方服务器，自带 Mock 录制引擎与 0-Key 模板引擎，打开即用）。
 
+> **关于 tldraw license key（已随仓库公开）**：仓库根目录提交了 `.env.production`。
+> 按官方口径 license key「可以公开」（客户端本地验签、不请求许可服务器，且它本就在**每个访客的浏览器里**），
+> 提交它是为了让**任何人 clone 后 `npm run build` 都与线上画面一致（无水印）**。
+> ⚠️ 三点限制：它是本项目的**免费 trial（2026-12-20 到期，试用许可无宽限期）**；
+> 许可绑定域名；**下游使用者需自行申请许可，请不要把本 key 用于你自己的生产环境**。
+> 详见 [`NOTICE`](./NOTICE)。
+
 ### 2. 本地开发与私有算力直连
 ```bash
 # 1. 安装依赖

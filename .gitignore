@@ -15,6 +15,9 @@ dist-pages
 *.local
 .env
 .env.*
+# 例外：tldraw license key 官方明确「可以公开」（客户端本地验签，且本就在线上产物里），
+# 有意提交以便**任何人 clone 后构建都与线上画面一致（无水印）**。理由与限制见文件内注释与 NOTICE。
+!.env.production
 
 # Local-only notes (keep on disk, never commit)
 提示词存储.md

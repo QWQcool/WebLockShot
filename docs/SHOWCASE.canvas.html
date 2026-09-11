@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>WebLockShot · Agent 创意画布 · 能力展示</title><style>
+@page { size: A4; margin: 14mm 13mm 14mm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+html { font-size: 10.4pt; }
+body {
+  margin: 0;
+  font-family: "PingFang SC", "Microsoft YaHei", "Source Han Sans SC",
+               "Noto Sans CJK SC", system-ui, sans-serif;
+  color: #1f2430; line-height: 1.72; background: #fff;
+}
+
+/* ---------------- 封面 ---------------- */
+.cover {
+  border-top: 4pt solid #4f46e5;
+  padding: 9mm 0 6mm;
+  margin-bottom: 7mm;
+}
+.cover .kicker {
+  font-size: 9pt; letter-spacing: 2.4px; color: #4f46e5;
+  font-weight: 700; margin-bottom: 3mm;
+}
+.cover h1 {
+  font-size: 25pt; line-height: 1.28; font-weight: 800;
+  color: #14183a; margin: 0 0 4mm; letter-spacing: .4px;
+  border: none; padding: 0;
+}
+.cover .lead {
+  font-size: 11.6pt; line-height: 1.7; color: #3f4460;
+  margin: 0 0 5mm; text-align: left;
+}
+.cover .lead b { color: #4f46e5; }
+.cover-meta {
+  border-top: .7pt solid #e5e7eb; padding-top: 3.4mm;
+  font-size: 9pt; color: #565b73; line-height: 1.9;
+}
+.cover-meta span { display: block; }
+.cover-meta b { color: #1f2430; }
+/* 封面主视觉 = 文档里第一个 figure。
+   注意：它是 `.cover` 的**兄弟**而不是子节点——raw HTML 块内的 markdown 不会被解析，
+   所以封面文字在 <div class="cover"> 里，而紧随其后的正文/数据卡/截图都是普通 markdown 块。
+   首版写成 `.cover figure img` 于是完全没生效（截图仍是原始大小，被挤到第 2 页成孤立页）。 */
+body > figure:first-of-type { margin: 2.6mm 0 0; }
+body > figure:first-of-type img { max-height: 43mm; }
+body > figure:first-of-type figcaption { font-size: 7.8pt; line-height: 1.45; }
+
+/* ---------------- 数据卡 ---------------- */
+.stats {
+  display: flex; flex-wrap: wrap; gap: 2.6mm;
+  margin: 4mm 0 5mm;
+}
+.stat {
+  flex: 1 1 30%; min-width: 30%;
+  border: .7pt solid #dbe1ff; border-radius: 2mm;
+  background: linear-gradient(160deg, #f6f5ff, #eef2ff);
+  padding: 3mm 3.4mm; text-align: center;
+}
+.stat b {
+  display: block; font-size: 17pt; line-height: 1.2;
+  color: #4f46e5; font-weight: 800;
+}
+.stat span { font-size: 8.6pt; color: #4b5169; }
+
+/* ---------------- 标题 ---------------- */
+h1 { font-size: 19pt; line-height: 1.35; font-weight: 700; color: #1a1f36; margin: 0 0 3mm; }
+h2 {
+  font-size: 14.5pt; font-weight: 700; color: #fff;
+  background: linear-gradient(100deg, #4f46e5, #7c3aed);
+  padding: 2.6mm 4mm; margin: 0 0 4mm; border-radius: 1.5mm;
+  break-before: page; break-after: avoid;
+}
+h3 {
+  font-size: 12.2pt; font-weight: 700; color: #3730a3;
+  margin: 6mm 0 2.5mm; padding-left: 2.6mm;
+  border-left: 2.4pt solid #6366f1; line-height: 1.5; break-after: avoid;
+}
+p { margin: 0 0 2.4mm; text-align: justify; }
+
+/* ---------------- 列表 ---------------- */
+ul, ol { margin: 0 0 2.6mm; padding-left: 5.5mm; }
+li { margin-bottom: 1.2mm; }
+li > ul, li > ol { margin: 1.2mm 0; }
+ul { list-style: none; }
+ul > li { position: relative; }
+ul > li::before {
+  content: ""; position: absolute; left: -4mm; top: 3.1mm;
+  width: 1.6mm; height: 1.6mm; border-radius: 50%; background: #818cf8;
+}
+ol { list-style: decimal; }
+ol > li::marker { color: #4f46e5; font-weight: 700; }
+
+/* ---------------- 强调 / 代码 ---------------- */
+strong { color: #312e81; font-weight: 700; }
+em { color: #6b7280; }
+code {
+  font-family: Consolas, "Cascadia Mono", Menlo, monospace;
+  font-size: 9pt; background: #eef2ff; color: #3730a3;
+  padding: .3mm 1.2mm; border-radius: .8mm; border: .4pt solid #dbe1ff;
+}
+pre {
+  background: #0f172a; color: #e2e8f0; border-radius: 1.5mm;
+  padding: 3mm 3.5mm; margin: 3mm 0 3.5mm;
+  font-size: 8.8pt; line-height: 1.6; overflow: hidden; break-inside: avoid;
+}
+pre code { background: none; color: inherit; padding: 0; border: none; font-size: 8.8pt; }
+blockquote {
+  margin: 3mm 0 4mm; padding: 2.6mm 4mm;
+  background: #f5f3ff; border-left: 2.4pt solid #8b5cf6;
+  color: #4c4a63; border-radius: 0 1.5mm 1.5mm 0; break-inside: avoid;
+}
+blockquote p { margin: 0; }
+
+/* ---------------- 表格 ---------------- */
+table {
+  width: 100%; border-collapse: collapse; margin: 3mm 0 4mm;
+  font-size: 8.8pt; break-inside: avoid;
+}
+th { background: #4f46e5; color: #fff; font-weight: 700; padding: 1.8mm 2.2mm; text-align: left; line-height: 1.5; }
+td { padding: 1.6mm 2.2mm; border-bottom: .4pt solid #e5e7eb; line-height: 1.6; }
+tbody tr:nth-child(even) { background: #f8f8ff; }
+
+/* ---------------- 图片 ---------------- */
+figure { margin: 3mm 0 4mm; text-align: center; break-inside: avoid; }
+figure img {
+  max-width: 100%; max-height: 82mm; width: auto; height: auto;
+  border: .5pt solid #dcdfe6; border-radius: 1.5mm;
+  box-shadow: 0 1mm 3mm rgba(31,36,48,.13);
+}
+figcaption { margin-top: 1.8mm; font-size: 8.4pt; color: #6b7280; line-height: 1.5; }
+
+/* ---------------- 结语 ---------------- */
+.endnote {
+  margin-top: 5mm; padding: 3.4mm 4mm;
+  border: .8pt solid #c7d2fe; border-left: 3pt solid #4f46e5;
+  border-radius: 0 2mm 2mm 0; background: #f8faff;
+  font-size: 10pt; color: #2b3050;
+}
+a { color: #4f46e5; }
+</style></head>
+<body>
+<div class="cover">
+  <div class="kicker">项目能力展示 · Agent 创意画布</div>
+  <h1>WebLockShot · 一句话到成片工程</h1>
+  <p class="lead">在浏览器里跑完的创意生产工作台：在无限画布上用一句话布置 Agent 节点，
+  从脚本一路做到<b>可直接导入剪映继续剪辑</b>的成片工程。</p>
+  <div class="cover-meta">
+    <span>在线体验：<b>https://qwqcool.github.io/WebLockShot/</b></span>
+    <span>技术栈：React 19 · TypeScript 6 · Vite 8 · tldraw 5 · three.js · GSAP</span>
+    <span>形态：纯静态可部署 · 免安装 · 免 API Key 即可跑通全链路（演示引擎）</span>
+  </div>
+</div>
+
+<p>打开链接即可完整体验，<strong>不需要注册、不需要配置任何 Key</strong>：对话栏说一句话，画布上会自动长出一条
+Agent 节点链路；点几下就能拿到脚本、9:16 分镜预演、逐镜出片，最后打包出一份<strong>能导入剪映的工程文件</strong>。</p>
+<div class="stats">
+  <div class="stat"><b>9</b><span>类 Agent 节点</span></div>
+  <div class="stat"><b>6</b><span>个生成引擎契约</span></div>
+  <div class="stat"><b>45</b><span>个 3D 动画片段</span></div>
+  <div class="stat"><b>15</b><span>步实机 E2E</span></div>
+  <div class="stat"><b>429</b><span>项自动化测试</span></div>
+  <div class="stat"><b>50k+</b><span>行自有代码</span></div>
+</div>
+
+<p>这不是一个「界面原型」：它包含<strong>可运行的执行引擎、真实的两阶段结算事务、真实的文件产出</strong>，
+并且每一条能力都有对应的自动化测试与实机验证记录。</p>
+<blockquote>
+<p><strong>关于本文件的诚实声明</strong>：所有数字与截图均来自仓库内可复现的脚本实测，不含设计稿或手绘 mock。
+凡是尚未实现的能力，产品界面里同样会如实标注「未实现」，本文件也照实写出（见第五章）。</p>
+</blockquote>
+<figure><img alt="产品主界面：顶栏（模式切换 / Skill / 记忆图谱 / 连接器 / 创作场景 / 中英切换）+ 左侧节点面板 + 无限画布 + 底部对话栏 + 右下小地图" src="screenshots/16_canvas_workbench.png" /><figcaption>产品主界面：顶栏（模式切换 / Skill / 记忆图谱 / 连接器 / 创作场景 / 中英切换）+ 左侧节点面板 + 无限画布 + 底部对话栏 + 右下小地图</figcaption></figure>
+<h2>一、端到端链路：一句话 → 成片工程</h2>
+<p>这条链路不是流程图上的箭头，而是<strong>能在浏览器里点完</strong>的真实路径：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>用户动作</th>
+<th>系统实际做了什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 需求</td>
+<td>对话栏输入一句话（或点场景模板）</td>
+<td>LLM 编排；<strong>无 Key 时自动降级为演示编排并如实标注「非真实 LLM」</strong></td>
+</tr>
+<tr>
+<td>② 落位</td>
+<td>——</td>
+<td>按场景路由在画布上布置节点拓扑与连线（可一键整批撤销）</td>
+</tr>
+<tr>
+<td>③ 脚本</td>
+<td>点「生成脚本」</td>
+<td>ScriptWriter 产出脚本 + Critic 对立面评审（含评分与修改建议）</td>
+</tr>
+<tr>
+<td>④ 分镜</td>
+<td>点「生成分镜」</td>
+<td>拆成 6 镜，生成 9:16 的 <strong>GSAP 动态分镜预演</strong>（本地渲染，可播放）</td>
+</tr>
+<tr>
+<td>⑤ 出片</td>
+<td>点「逐镜出片」</td>
+<td>ExecutorEngine 串行队列逐镜执行；<strong>钱包先冻结、成功核销、失败全额退款</strong></td>
+</tr>
+<tr>
+<td>⑥ 交付</td>
+<td>点「打包剪映草稿」</td>
+<td>生成三轨对齐的 <code>draft_content.json</code> + 完整素材 zip，<strong>真实下载</strong></td>
+</tr>
+</tbody>
+</table>
+<figure><img alt="开场层：五类创作场景 tab + 大输入卡，首访叠加引导" src="screenshots/15_canvas_onboarding.png" /><figcaption>开场层：五类创作场景 tab + 大输入卡，首访叠加引导</figcaption></figure>
+<figure><img alt="对话栏一句话 → 自动布置节点拓扑（提示条如实标注「演示编排 · 非真实 LLM」）" src="screenshots/17_canvas_orchestration.png" /><figcaption>对话栏一句话 → 自动布置节点拓扑（提示条如实标注「演示编排 · 非真实 LLM」）</figcaption></figure>
+<figure><img alt="9:16 动态分镜预演：分镜节点内嵌 GSAP 播放器，逐镜可播放（本地预演 · 非成片）" src="screenshots/04_step3_gsap_storyboard.png" /><figcaption>9:16 动态分镜预演：分镜节点内嵌 GSAP 播放器，逐镜可播放（本地预演 · 非成片）</figcaption></figure>
+<h2>二、三个差异化能力</h2>
+<h3>2.1 3D 运镜台：把「运镜」变成可预演、可复用的本地能力</h3>
+<p>同类创意画布大多止步于 2D 出图。这里内置了一套<strong>本地 3D 预演台</strong>——全程在浏览器里用 three.js 渲染，
+<strong>不消耗任何积分、不依赖云端 GPU</strong>：</p>
+<ul>
+<li><strong>内置 CC0 素体</strong>：Quaternius Universal Animation Library，模型内嵌 <strong>45 个真实动画片段</strong>（实测值），
+  其中 8 个做成动作预设（待机 / 走路 / 慢跑 / 冲刺 / 跳舞 / 坐姿 / 跳跃 / 说话）；</li>
+<li><strong>六套程序化场景预设</strong>：商品台 / 影棚 / 客厅 / 卧室 / 户外台阶 / 展台，一键切换；</li>
+<li><strong>多机位 + 关键帧轨迹</strong>：机位可增删、可预览，导演视角参数可提取，关键帧驱动运镜；</li>
+<li><strong>首/尾帧导出</strong>：直接把摆好的画面接给「视频生成」节点做单镜直出，或接给「分镜预演」出自由镜数分镜。</li>
+</ul>
+<figure><img alt="3D 运镜台：CC0 素体 + 影棚场景预设 + 多机位 + 关键帧时间轴（本地渲染 · 0 灵感币）" src="screenshots/20_canvas_stage3d.png" /><figcaption>3D 运镜台：CC0 素体 + 影棚场景预设 + 多机位 + 关键帧时间轴（本地渲染 · 0 灵感币）</figcaption></figure>
+<h3>2.2 剪映 / CapCut 草稿 zip 一键交付</h3>
+<p>多数工具交付的是「一段 mp4」，拿到后想改就只能重做。这里交付的是<strong>可以继续剪的工程</strong>：</p>
+<ul>
+<li><strong>三轨对齐</strong>：视频轨 + 旁白音轨 + 花字字幕轨，时间轴<strong>微秒级对齐</strong>；</li>
+<li><strong>完整素材包</strong>：<code>draft_content.json</code> 与所用素材一起打包成 zip，解压放进剪映草稿目录即可打开；</li>
+<li><strong>两条落盘路径</strong>：纯前端直接下载 zip；伴生服务在线时还可一键解压到本机草稿目录。</li>
+</ul>
+<figure><img alt="剪映草稿导出：draft_content.json 三轨对齐 + 完整素材 zip（真实文件产出）" src="screenshots/13_jianying_zip_export.png" /><figcaption>剪映草稿导出：draft_content.json 三轨对齐 + 完整素材 zip（真实文件产出）</figcaption></figure>
+<h3>2.3 诚实标注 + 可验证工程</h3>
+<p>这一条看起来「不性感」，但它决定了这个项目<strong>能不能被信任</strong>：</p>
+<ul>
+<li><strong>不伪造能力</strong>：无 Key 时标注「演示编排 · 非真实 LLM」；未实现的节点标「未实现」；
+  空态不摆样例数据；第三方许可限制如实告知并给出官方解决路径（且<strong>不提供任何绕过手段</strong>）。</li>
+<li><strong>不伪造测试</strong>：15 步实机 E2E 走的是真实鼠标路径；测试环境不可用时<strong>优雅跳过并打印指引</strong>，不伪装通过。</li>
+<li><strong>不放过线上事故</strong>：两起线上事故（子路径资源 404 白屏、许可闸门致画布消失）在本地全套测试下<strong>都是绿的</strong>
+  ——因为本地形态与线上不同。修复后各自补了<strong>复现线上形态</strong>的回归套件（见第五章）。</li>
+</ul>
+<figure><img alt="记忆图谱：真实回流记录可视化；无数据时如实显示空态，不摆样例数据" src="screenshots/19b_canvas_memory_graph_data.png" /><figcaption>记忆图谱：真实回流记录可视化；无数据时如实显示空态，不摆样例数据</figcaption></figure>
+<h2>三、工程实现</h2>
+<h3>3.1 分层结构</h3>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>职责</th>
+<th>关键模块</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>入口层</td>
+<td>开场层 / 对话栏 / 场景模板</td>
+<td><code>ui/canvas/CanvasOnboarding</code>、<code>wls-chat-dock</code></td>
+</tr>
+<tr>
+<td>编排层</td>
+<td>一句话 → 节点拓扑</td>
+<td>场景路由 + LLM 编排（可降级演示编排）</td>
+</tr>
+<tr>
+<td>画布层</td>
+<td>无限画布 + 9 类节点</td>
+<td>tldraw 5 + 自研 <code>shapeUtils</code>、CanvasDoc 契约、localStorage 持久化 + 多标签同步</td>
+</tr>
+<tr>
+<td>执行层</td>
+<td>串行队列 + 结算</td>
+<td><code>director/executor</code>、<code>domain/wallet</code>（两阶段事务）</td>
+</tr>
+<tr>
+<td>能力层</td>
+<td>脚本 / 分镜 / 出片 / 重绘 / 3D</td>
+<td><code>ai/</code>（ScriptWriter + Critic）、<code>media/</code>（6 引擎契约）、<code>ui/stage3d/</code></td>
+</tr>
+<tr>
+<td>交付层</td>
+<td>产物卡 + 剪映工程</td>
+<td><code>export/jianyingDraft</code> + 零依赖 zip</td>
+</tr>
+<tr>
+<td>支撑层</td>
+<td>本地优先 / 可选伴生服务</td>
+<td>IndexedDB 大资产、<code>server/</code>（TTS / ffmpeg / sqlite / MCP）</td>
+</tr>
+</tbody>
+</table>
+<h3>3.2 几个值得说的工程决策</h3>
+<ul>
+<li><strong>本地优先</strong>：API Key 只存浏览器，画布与素材默认不离开本机；纯静态即可部署，伴生服务是<strong>可选项</strong>。</li>
+<li><strong>钱包全站唯一收口</strong>：画布生成与带货工作台走<strong>同一条</strong>钱包管线——冻结 → 核销 / 全额退款，
+  含幂等结算与 30 分钟 TTL 孤儿冻结自动回收。</li>
+<li><strong>节点连线带类型契约</strong>：非法连线会被拒绝并给出提示条，避免「连了但跑不通」。</li>
+<li><strong>3D 资源走统一 URL 解析器</strong>：子路径部署（GitHub Pages）下不会因写死根路径而 404（这条是事故换来的，见 4.2）。</li>
+<li><strong>零依赖伴生服务</strong>：<code>server/</code> 不引第三方运行时，剪映草稿落盘 / TTS / ffmpeg 合成 / MCP 桥接全用 Node 标准库。</li>
+</ul>
+<h3>3.3 代码规模（实测）</h3>
+<table>
+<thead>
+<tr>
+<th>部分</th>
+<th>文件数</th>
+<th>行数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前端 TS/TSX（<code>src/</code>）</td>
+<td>185</td>
+<td>33,899</td>
+</tr>
+<tr>
+<td>样式（<code>src/**/*.css</code>）</td>
+<td>8</td>
+<td>8,244</td>
+</tr>
+<tr>
+<td>伴生服务（<code>server/</code>）</td>
+<td>16</td>
+<td>5,187</td>
+</tr>
+<tr>
+<td>测试与工具脚本（<code>scripts/</code>）</td>
+<td>15</td>
+<td>3,315</td>
+</tr>
+</tbody>
+</table>
+<h2>四、质量与验证体系</h2>
+<h3>4.1 自动化测试矩阵（全部可本地复现）</h3>
+<table>
+<thead>
+<tr>
+<th>套件</th>
+<th>命令</th>
+<th>覆盖</th>
+<th>当前结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单元测试（node）</td>
+<td><code>npm test</code></td>
+<td>钱包事务 / 执行引擎 / 6 引擎契约 / 剪映草稿 / 3D 契约 / i18n / 画布契约</td>
+<td><strong>411 项，0 失败</strong></td>
+</tr>
+<tr>
+<td>组件测试（vitest）</td>
+<td><code>npm run test:ui</code></td>
+<td>画布关键组件渲染</td>
+<td><strong>18 项，0 失败</strong></td>
+</tr>
+<tr>
+<td>画布 E2E</td>
+<td><code>npm run e2e</code></td>
+<td>真实鼠标路径 15 步（含节点管线<strong>实跑</strong>与悬浮提示对比度守卫）</td>
+<td><strong>15/15</strong></td>
+</tr>
+<tr>
+<td>子路径部署回归</td>
+<td><code>npm run e2e:basepath</code></td>
+<td>复现 GitHub Pages <code>base=/WebLockShot/</code> 形态</td>
+<td><strong>全过</strong></td>
+</tr>
+<tr>
+<td>生产模式回归</td>
+<td><code>npm run e2e:prod</code></td>
+<td>HTTPS + 非回环域名，验证许可闸门与诚实提示</td>
+<td><strong>全过</strong></td>
+</tr>
+<tr>
+<td>降级 / 迁移矩阵</td>
+<td><code>npm run degrade</code></td>
+<td>六类能力缺失路径优雅降级</td>
+<td><strong>6/6</strong></td>
+</tr>
+<tr>
+<td>跨浏览器 + a11y</td>
+<td><code>npm run a11y</code></td>
+<td>chromium / webkit 双引擎 + axe-core（WCAG 2.0 A/AA）</td>
+<td>严重项 <strong>0</strong></td>
+</tr>
+<tr>
+<td>性能基准</td>
+<td><code>npm run perf</code></td>
+<td>画布交互与渲染基准</td>
+<td>见 <code>docs/perf.md</code></td>
+</tr>
+</tbody>
+</table>
+<h3>4.2 两起线上事故的复盘（这部分是加分项）</h3>
+<table>
+<thead>
+<tr>
+<th>事故</th>
+<th>现象</th>
+<th>根因</th>
+<th>修复与防回归</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>子路径资源 404</td>
+<td>线上点「加人物」<strong>整页白屏</strong></td>
+<td>3D 模型 URL 写死根绝对路径 <code>/models/…</code>，在 <code>/WebLockShot/</code> 子路径下 404，<code>useGLTF</code> 抛错且无兜底</td>
+<td>统一 <code>publicUrl</code> 解析器 + 根级/局部双重 ErrorBoundary + <strong>新增子路径部署回归套件</strong>；并做<strong>负向验收</strong>（还原错误写法 → 套件 5 项失败并复现 404）</td>
+</tr>
+<tr>
+<td>许可闸门致画布消失</td>
+<td>线上画布内容<strong>突然全部消失</strong></td>
+<td>tldraw 生产环境无 license key 时约 5 秒后停止渲染编辑器（本地 http/localhost 被豁免，<strong>所以本地永远测不出来</strong>）</td>
+<td>加如实提示条（挂在编辑器之外，闸门后仍可见）+ <strong>新增生产模式回归套件</strong>（HTTPS + 非回环域名复现线上形态，双向断言）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>这两条的价值不在「修好了」，而在于：<strong>定位到「本地测试面与线上形态不一致」这个系统性盲区</strong>，
+并把两种线上形态都纳入回归。此后同类问题在本地就会红。</p>
+</blockquote>
+<h2>五、已知边界与路线（如实写出）</h2>
+<p>工程能力也体现在<strong>敢写出自己没做什么</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th>现状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>移动端 / 触摸适配</td>
+<td><strong>尚未适配</strong>。实测 390×844 视口下顶栏被压成 223px 高、画布容器宽 969px 溢出视口（129 个元素横向溢出），画布区基本不可用。已列入待做清单（P0）</td>
+</tr>
+<tr>
+<td>图像生成节点</td>
+<td>占位（未实现），界面如实标注；补齐需接入文生图 / 图生图链路</td>
+</tr>
+<tr>
+<td>真实生成质量</td>
+<td>默认走<strong>演示引擎</strong>（不耗积分、可离线跑通全链路）；真实出片需自备引擎 Key 或本地 ComfyUI</td>
+</tr>
+<tr>
+<td>3D 动作预设</td>
+<td>8 个常用动作；「挥手 / 转身」在内置动画库里无对应片段，<strong>如实替代、不伪造</strong></td>
+</tr>
+<tr>
+<td>画布引擎许可</td>
+<td>tldraw 为商业许可（非开源）。当前用免费 trial，<strong>2026-12-20 到期</strong>；仓库已提交 <code>.env.production</code> 使任何人构建都无水印，但下游使用者需自行申请许可</td>
+</tr>
+<tr>
+<td>多人协作</td>
+<td>未做（单机本地优先；协作属 tldraw 付费能力）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>路线（按性价比排序）</strong>：移动端适配 → 节点执行历史面板（可回看的运行日志）→ MCP 工具清单产品化
+（让外部 Agent 驱动画布）→ 提示词库多来源导入。</p>
+<h2>六、60 秒上手</h2>
+<pre><code class="language-bash"># 在线直接体验（免安装、免 Key）
+https://qwqcool.github.io/WebLockShot/
+
+# 本地跑起来
+git clone https://github.com/QWQcool/WebLockShot.git
+cd WebLockShot &amp;&amp; npm install
+npm run dev            # 打开 http://localhost:5173
+
+# 质量门禁（可自行复现上面第五章的全部数字）
+npm test               # 单元测试
+npm run e2e            # 15 步实机 E2E
+npm run e2e:basepath   # 子路径部署回归
+npm run e2e:prod       # 生产模式回归
+</code></pre>
+<figure><img alt="中英双语：顶栏一键切换并持久化，英文界面同样完整可用（非截图贴图，真实 i18n 字典）" src="screenshots/23_canvas_en.png" /><figcaption>中英双语：顶栏一键切换并持久化，英文界面同样完整可用（非截图贴图，真实 i18n 字典）</figcaption></figure>
+<div class="endnote">
+<b>一句话总结</b>：这是一个「从一句话到可继续剪辑的成片工程」的端到端实现，
+自带 3D 本地预演与可验证的工程体系；它也清楚地知道并写下了自己还没做什么。
+</div>
+</body></html>
