@@ -552,10 +552,13 @@ test('R2 POST /api/render：超限 body → 413 JSON 响应（非连接重置）
     const base = `http://127.0.0.1:${port}`
     try {
       // 超限 body（> 1MB）：必须得到 413 JSON 响应而非 ECONNRESET / 永挂
+      // duplex:'half'：服务端提前回写 413 后停止发送请求体，避免「客户端仍在写 → 连接被重置」
+      // 的竞态把断言打成 ECONNRESET（实测全量并发跑时约 1/3 概率抖动）
       const big = await fetch(`${base}/api/render`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl: '/files/tts/v.mp4', pad: 'x'.repeat(2 * 1024 * 1024) }),
+        duplex: 'half',
       })
       assert.equal(big.status, 413)
       assert.ok((await big.json()).error.includes('上限'))
@@ -587,6 +590,8 @@ test('R2 PUT /api/sessions/:id：超限 body → 413（readBody 同族修复）'
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: { blob: 'x'.repeat(9 * 1024 * 1024) } }),
+        // 同 R2 render 用例：9MB 请求体 + 服务端提前 413 → 必须半关闭发送，否则偶发 ECONNRESET
+        duplex: 'half',
       })
       assert.equal(res.status, 413)
       // 413 由 readBody 直接回写，错误文案为通用「请求体超过上限」
