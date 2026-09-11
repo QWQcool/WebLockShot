@@ -85,7 +85,7 @@ export async function waitHealthy(base, deadlineMs = 20_000) {
  * 启动伴生服务（托管 dist）。
  * 注意：必须同时消费 stdout 与 stderr——只消费一路会让另一路写满 64KB 管道缓冲后阻塞进程。
  */
-export function startCompanionServer(port, { storage = 'memory', tmpDir = '.tmp-e2e' } = {}) {
+export function startCompanionServer(port, { storage = 'memory', tmpDir = '.tmp-e2e', env = {} } = {}) {
   const draftDir = join(ROOT, tmpDir, 'drafts')
   mkdirSync(draftDir, { recursive: true })
   const child = spawn(
@@ -93,7 +93,7 @@ export function startCompanionServer(port, { storage = 'memory', tmpDir = '.tmp-
     ['server/weblockshot-server.mjs', '--port', String(port), '--dist', join(ROOT, 'dist'), '--draft-dir', draftDir],
     {
       cwd: ROOT,
-      env: { ...process.env, WLS_STORAGE: storage, WLS_LOG_LEVEL: 'error' },
+      env: { ...process.env, WLS_STORAGE: storage, WLS_LOG_LEVEL: 'error', ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
     }
   )

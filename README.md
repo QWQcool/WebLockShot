@@ -362,6 +362,12 @@ npm run e2e -- --headed     # 有头模式（排障）
 chromium / webkit 双引擎跑画布核心链路 + axe-core（WCAG 2.0 A/AA）扫描四个界面状态，
 报告见 [`docs/a11y.md`](docs/a11y.md)（当前双引擎核心链路 **5/5**、axe 严重项 **0**）。
 
+### 降级 / 迁移矩阵（`npm run degrade`）
+
+实机验证六类能力缺失路径（旧单画布迁移、无 WebGL、无伴生服务、无 LLM Key、
+`WLS_STORAGE=memory|sqlite`、ComfyUI 离线）是否优雅降级并如实标注，
+矩阵见 [`docs/degrade-matrix.md`](docs/degrade-matrix.md)（当前 **6/6 通过**）。
+
 ---
 
 ## 📄 License
