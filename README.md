@@ -347,6 +347,11 @@ npm run e2e -- --skip-build # 复用现有 dist（快速回归）
 npm run e2e -- --headed     # 有头模式（排障）
 ```
 
+### 覆盖率基线（`npm run test:coverage`）
+
+关键纯函数层（画布契约 / 3D 摆台 / 记忆聚合 / 多画布 / 小地图 / MCP 操作）行覆盖率门槛 80%，
+基线表与口径见 [`docs/coverage.md`](docs/coverage.md)（实测 **10/10 达标**；`--strict` 可作 CI 卡点）。
+
 ---
 
 ## 📄 License
