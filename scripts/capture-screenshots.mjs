@@ -17,6 +17,15 @@
  * 用法：
  *   npm run shots                 # 构建（dist 缺失时）+ 采集
  *   npm run shots -- --skip-build
+ *   npm run shots -- --prod       # 线上形态（https + 非回环域名，无 tldraw 开发水印）← PDF / README 用这个
+ *
+ * `--prod`：用 https + 非回环域名拍摄，复现线上 GitHub Pages 形态。为什么需要它：
+ * tldraw 在**开发环境**（http 协议，或 https + 回环地址）会显示「Get a license for production」
+ * 开发水印，而线上（https + 公网域名 + 已配置 key）没有水印。若用默认的 127.0.0.1 形态拍，
+ * PDF / README 里会出现**访客看不到的水印**（与 capture-demo-gif.mjs 同一口径）。
+ * 该模式需要 dist 里已烘焙 license key（构建时注入 `VITE_TLDRAW_LICENSE_KEY`，仓库
+ * `.env.production` 已提交，`npm run build` 会自动加载），且**不启动伴生服务**——与真实线上一致
+ * （纯静态托管，无 /healthz 与 /api/*；连接器面板因此如实显示「纯前端模式 · 无功能可用」）。
  */
 import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -29,11 +38,16 @@ import {
   startCompanionServer,
   waitHealthy,
 } from './lib/browser-env.mjs'
+import { findOpenssl, makeCert, startStaticServer } from './lib/tls-static-server.mjs'
 
 const argv = process.argv.slice(2)
 const SKIP_BUILD = argv.includes('--skip-build')
+/** --prod：用 https + 非回环域名录制，复现线上形态（无 tldraw 开发水印） */
+const PROD = argv.includes('--prod')
 const VIEWPORT = { width: 1600, height: 900 }
 const OUT_DIR = join(ROOT, 'docs', 'screenshots')
+/** 生产形态用的非回环域名（与 capture-demo-gif / prodmode-check 同口径） */
+const SHOTS_HOST = 'wls.shots.test'
 
 const shots = []
 
@@ -46,15 +60,38 @@ async function main() {
   ensureDist({ skipBuild: SKIP_BUILD })
   mkdirSync(OUT_DIR, { recursive: true })
 
-  const port = randomPort(35_000)
-  const base = `http://127.0.0.1:${port}`
-  const server = startCompanionServer(port, { storage: 'memory', tmpDir: '.tmp-shots' })
+  let server = null
+  let staticServer = null
   let browser = null
+  let base = ''
 
   try {
-    if (!(await waitHealthy(base))) throw new Error(`伴生服务未就绪（${base}）\n${server.getLog().slice(-600)}`)
-    browser = await chromium.launch({ headless: true })
-    const context = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block', reducedMotion: 'reduce' })
+    if (PROD) {
+      const openssl = findOpenssl()
+      if (!openssl) skipEnv('实机截图采集（生产形态）', '未找到 openssl（生成自签证书需要；Git for Windows 自带）')
+      const port = randomPort(35_000)
+      const tls = makeCert(openssl, { host: SHOTS_HOST, tmpDir: join(ROOT, '.tmp-shots-tls') })
+      staticServer = await startStaticServer({ tls, port, distDir: join(ROOT, 'dist') })
+      base = `https://${SHOTS_HOST}:${port}`
+      console.log(`  · 生产形态（https + 非回环域名 · 无 tldraw 开发水印）：${base}`)
+    } else {
+      const port = randomPort(35_000)
+      base = `http://127.0.0.1:${port}`
+      server = startCompanionServer(port, { storage: 'memory', tmpDir: '.tmp-shots' })
+      if (!(await waitHealthy(base))) throw new Error(`伴生服务未就绪（${base}）\n${server.getLog().slice(-600)}`)
+      console.log(`  · 本机开发形态（http + 回环 · 会带 tldraw 开发水印）：${base}`)
+    }
+
+    browser = await chromium.launch({
+      headless: true,
+      args: PROD ? [`--host-resolver-rules=MAP ${SHOTS_HOST} 127.0.0.1`, '--ignore-certificate-errors'] : [],
+    })
+    const context = await browser.newContext({
+      viewport: VIEWPORT,
+      serviceWorkers: 'block',
+      reducedMotion: 'reduce',
+      ...(PROD ? { ignoreHTTPSErrors: true } : {}),
+    })
     const page = await context.newPage()
     page.setDefaultTimeout(30_000)
 
@@ -199,7 +236,8 @@ async function main() {
     await shot('25_drama_legacy.png', '剧情短剧粗剪台（legacy：保留兼容与零回归，新创作建议走 Agent 画布）')
   } finally {
     if (browser) await browser.close().catch(() => {})
-    server.child.kill()
+    if (server) server.child.kill()
+    if (staticServer) staticServer.close()
     await new Promise((r) => setTimeout(r, 150))
     try {
       rmSync(join(ROOT, '.tmp-shots'), { recursive: true, force: true })

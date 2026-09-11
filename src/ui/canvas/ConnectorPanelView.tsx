@@ -212,7 +212,7 @@ export const ConnectorPanelView: React.FC<Props> = ({ onClose }) => {
       <p className="cp-honest" role="note">
         ⚠️ 本期连接器<strong>仅接口 + 协议层 mock</strong>（不引 <code>@modelcontextprotocol/sdk</code>
         、不接真实第三方）：卡片可浏览，点击「＋」不会真正连接。真实接入需实际部署伴生服务并安装 SDK
-        （可选依赖，见 D8）。
+        （可选依赖）。
       </p>
 
       {notice && (
