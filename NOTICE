@@ -20,8 +20,11 @@
     但**本项目的画布数据不受影响**（IndexedDB / localStorage 照常保留）；
   - 本项目**接受该限制**，不包含也不提供任何绕过许可校验或去水印的手段；
     页面内已加**如实提示条**（说明原因 + 官方解决路径，见 `src/ui/canvas/TldrawLicenseNotice.tsx`）；
-  - 若要正式上线，需自行向 tldraw 购买 license 并配置 `VITE_TLDRAW_LICENSE_KEY`
+  - 若要正式上线，需自行取得 license 并配置 `VITE_TLDRAW_LICENSE_KEY`
     （构建期环境变量，Pages 工作流已预留 `TLDRAW_LICENSE_KEY` secret 透传），或替换为 MIT 许可的画布引擎。
+    **tldraw 对非商业项目提供免费档位**：hobby license（个人项目 / 原型 / 学生作品等，
+    须显示 `made with tldraw` 水印，<https://tldraw.dev/get-a-license/hobby>）与 100 天 trial license
+    （<https://tldraw.dev/community/license>）。
 - 因此：**本项目 MIT 仅覆盖本仓库自有代码，不覆盖 tldraw**。
 - 回归测试：`npm run e2e:prod`（HTTPS + 非回环主机名复现线上形态，验证闸门行为与提示条）。
 

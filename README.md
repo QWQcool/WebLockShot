@@ -463,6 +463,24 @@ npm run e2e:prod -- --skip-build
 > 本项目**不绕过、不去水印**（用户已拍板接受该限制，见 [NOTICE](./NOTICE)）；
 > 官方解决路径是在构建期注入 `VITE_TLDRAW_LICENSE_KEY`（Pages 工作流已预留 `TLDRAW_LICENSE_KEY` secret 透传）。
 
+#### 拿到合法 key（免费档位，无需付费）
+
+tldraw 为**非商业项目**提供免费许可，本项目这类「个人作品集 / 原型 demo」正好落在范围内：
+
+| 档位 | 费用 | 适用 | 义务 | 申请入口 |
+|---|---|---|---|---|
+| **Hobby**（推荐） | 免费 | 个人项目 / 早期实验 / 学生作品 / 研究 / 副业 / 原型 /「尚不构成商业业务的想法」 | 画布须显示 `made with tldraw` 水印 | <https://tldraw.dev/get-a-license/hobby> |
+| **Trial** | 免费 100 天 | 评估 | 试用期生产环境会向 tldraw 发送 license key 的哈希（不含用户数据与画布内容） | <https://tldraw.dev/community/license> |
+
+拿到 key 后**无需改代码**：仓库 Settings → Secrets and variables → Actions 新增 `TLDRAW_LICENSE_KEY`，
+下次推送（或手动触发 Pages 工作流）即生效。
+
+#### CI 门禁
+
+`.github/workflows/pages.yml` 的 `e2e` job 会在部署前跑三套实机套件（`e2e` / `e2e:basepath` / `e2e:prod`），
+`deploy` 依赖它 —— **线上形态回归不通过就不部署**。本地无 Playwright 时三套件仍优雅跳过（exit 0），
+但 CI 里会显式安装 Chromium，因此门禁始终真实生效。
+
 ### 覆盖率基线（`npm run test:coverage`）
 
 关键纯函数层（画布契约 / 3D 摆台 / 记忆聚合 / 多画布 / 小地图 / MCP 操作）行覆盖率门槛 80%，

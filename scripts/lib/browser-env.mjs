@@ -28,11 +28,18 @@ export function loadPlaywright() {
   } catch {
     /* npm 不可用时忽略 */
   }
-  const npxCache = join(process.env.LOCALAPPDATA || '', 'npm-cache', '_npx')
-  try {
-    for (const dir of readdirSync(npxCache)) candidates.push(join(npxCache, dir, 'node_modules'))
-  } catch {
-    /* 无 npx 缓存时忽略 */
+  // npx 缓存：Windows 在 %LOCALAPPDATA%\npm-cache\_npx，Linux/macOS 在 ~/.npm/_npx
+  const npxCaches = [
+    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'npm-cache', '_npx') : null,
+    process.env.HOME ? join(process.env.HOME, '.npm', '_npx') : null,
+    process.env.XDG_CACHE_HOME ? join(process.env.XDG_CACHE_HOME, 'npm', '_npx') : null,
+  ].filter(Boolean)
+  for (const npxCache of npxCaches) {
+    try {
+      for (const dir of readdirSync(npxCache)) candidates.push(join(npxCache, dir, 'node_modules'))
+    } catch {
+      /* 无该缓存目录时忽略 */
+    }
   }
   for (const base of candidates) {
     try {

@@ -36,8 +36,35 @@ jobs:
         run: npm run test:chaos
         continue-on-error: true
 
-  deploy:
+  # 实机回归（真实浏览器）：把「线上部署形态」纳入门禁
+  # —— 2026-09-11 两起线上事故（子路径资源 404 白屏 / tldraw 生产许可闸门致画布消失）
+  #    在本地全部套件下都是绿的，因为本地是「根路径 + http://127.0.0.1」，与线上形态不同。
+  e2e:
     needs: quality-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      # 跳过 npm ci 阶段隐式的浏览器下载，改由下一步显式安装（更快、更可控）
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium (Playwright)
+        run: npx playwright install --with-deps chromium
+      - name: Build (root base)
+        run: npm run build
+      - name: E2E · 画布核心链路
+        run: npm run e2e -- --skip-build
+      - name: E2E · 子路径部署形态（GitHub Pages base）
+        run: npm run e2e:basepath
+      - name: E2E · 生产模式（tldraw 许可闸门 + 诚实提示）
+        run: npm run e2e:prod -- --skip-build
+
+  deploy:
+    needs: [quality-gate, e2e]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
