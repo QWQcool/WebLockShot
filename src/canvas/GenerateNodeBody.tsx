@@ -21,7 +21,13 @@ import {
   type Artifact,
   type CanvasGenerateProviderId,
 } from './contract.ts'
-import { comfyEstimateText, comfyUIVideoProvider, withCacheBuster } from '../media/providers/comfyui.ts'
+import {
+  comfyEstimateText,
+  comfyRequiredWindowMinutes,
+  comfyUIVideoProvider,
+  withCacheBuster,
+} from '../media/providers/comfyui.ts'
+import { getPollingWindow } from '../domain/pollingConfig.ts'
 import {
   CANVAS_PROVIDER_LABELS,
   CANVAS_UNWIRED_ENGINES,
@@ -228,6 +234,18 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     canvasProviderId === 'comfyui'
       ? comfyEstimateText(comfyUIVideoProvider.getQualityTier(), story ? story.shots.length : 1)
       : ''
+  // 本地算力单镜可达 11 分钟（704×1280/121 帧/20 步实测 655s），**超过默认 10 分钟轮询窗口**：
+  // 超时的后果是「退款 + 标记失败，而上游其实还在跑并最终写出文件」的假失败。
+  // 因此 comfyui 出片时按引擎耗时把本次窗口抬到够用（只升不降、只影响本节点引擎实例）。
+  const comfyWindowMinutes =
+    canvasProviderId === 'comfyui'
+      ? comfyRequiredWindowMinutes(comfyUIVideoProvider.getQualityTier())
+      : 0
+  const currentWindowMinutes = (getPollingWindow().maxAttempts * getPollingWindow().intervalMs) / 60_000
+  const windowRaiseNote =
+    comfyWindowMinutes > currentWindowMinutes
+      ? `本次出片轮询窗口自动提升到 ${comfyWindowMinutes} 分钟（默认 ${currentWindowMinutes} 分钟会被 11 分钟镜头顶超时而误判失败）`
+      : ''
 
   /** 读取本节点当前 meta（getShape 返回宽型 shape，需窄化为 wls-node） */
   const readSelfMeta = (): Record<string, unknown> => {
@@ -336,6 +354,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     setConfirmOpen(false)
     setBusy(true)
     setError(null)
+    // 入队前抬高本实例轮询窗口：必须在 enqueueShots 之前，否则已入队任务仍按旧窗口跑
+    if (canvasProviderId === 'comfyui') engine.setPollingWindowMinutes(comfyWindowMinutes)
     // D3：3D 单镜直出分支——机位首帧作参考底图（image2video）+ 运镜文字作提示词（无 story 快照）
     if (stage3dFrame) {
       storyDigestRef.current = scriptDigest(stage3dFrame)
@@ -455,6 +475,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
             {' '}
             本地 ComfyUI 出片：产物为本机输出目录的 http 直链，需 ComfyUI 服务常驻（
             <code>--listen</code>）{comfyShotEstimateText ? `；${comfyShotEstimateText}` : ''}。
+            {windowRaiseNote ? <span className="wls-generate-window-note"> ⏱️ {windowRaiseNote}。</span> : null}
           </>
         ) : (
           <> 当前为离线演示引擎（Mock）：确定性合成、0 成本、不占用显卡。</>
@@ -500,6 +521,11 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
             {story ? `${story.shots.length} 镜` : '1 镜'} · {providerLabel}
             {comfyShotEstimateText ? ` · ${comfyShotEstimateText}` : ''} · 取消不扣费
           </div>
+          {windowRaiseNote && (
+            <div className="wls-generate-confirm-detail" data-testid="wls-generate-window-note">
+              ⏱️ {windowRaiseNote}
+            </div>
+          )}
           <div className="wls-generate-confirm-actions">
             <button
               type="button"

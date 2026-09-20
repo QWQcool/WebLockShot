@@ -44,6 +44,20 @@ export function setPollingWindow(window: PollingWindow): void {
   pollingWindow = { ...window }
 }
 
+/**
+ * **只升不降**地把窗口扩到至少 `minutes` 分钟（纯函数，不改全局配置）。
+ *
+ * 用途：本地 ComfyUI 算力单镜可达 11 分钟（RTX 3080 / 704×1280 / 121 帧 / 20 步实测 655s，
+ * 见 docs/comfyui-local.md），超过默认 10 分钟轮询窗口 —— 超时的后果是**退款 + 标记失败，
+ * 而上游其实还在跑并最终写出文件**，属于「结果正确但被判失败」的假失败。
+ *
+ * 刻意不提供「缩小」能力：调用方只能把窗口变大，避免误缩小影响别的引擎。
+ */
+export function pollingWindowAtLeast(minutes: number, base: PollingWindow = getPollingWindow()): PollingWindow {
+  const needed = Math.max(1, Math.round((minutes * 60_000) / base.intervalMs))
+  return needed > base.maxAttempts ? { intervalMs: base.intervalMs, maxAttempts: needed } : { ...base }
+}
+
 /** O9：轮询连续失败容忍上限（默认 3 次），网络抖动不再一次失败即判死 */
 export const POLL_FAILURE_TOLERANCE = 3
 

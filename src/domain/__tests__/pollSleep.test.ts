@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { pollSleep, createPollFailureTolerance, POLL_FAILURE_TOLERANCE } from '../pollingConfig.ts'
+import {
+  pollSleep,
+  createPollFailureTolerance,
+  pollingWindowAtLeast,
+  POLL_FAILURE_TOLERANCE,
+} from '../pollingConfig.ts'
 
 /** 无 document 的 Node 环境：pollSleep 应退化为纯 setTimeout 语义 */
 
@@ -33,6 +38,28 @@ test('O9 pollFailureTolerance：容忍上限可注入', () => {
   const t5 = createPollFailureTolerance(5)
   for (let i = 0; i < 4; i++) assert.equal(t5.onFailure(), false)
   assert.equal(t5.onFailure(), true)
+})
+
+// ---------------- 轮询窗口抬升（本地 ComfyUI 单镜可达 11 分钟，默认窗口 10 分钟） ----------------
+
+test('pollingWindowAtLeast：只升不降，按需求分钟数换算尝试次数', () => {
+  const base = { intervalMs: 3000, maxAttempts: 200 } // 默认 10 分钟
+  // 12 分钟需求 → 240 次尝试
+  assert.deepEqual(pollingWindowAtLeast(12, base), { intervalMs: 3000, maxAttempts: 240 })
+  // 负向：需求小于当前窗口时**绝不缩小**（否则会把别的引擎的窗口一起缩掉）
+  assert.deepEqual(pollingWindowAtLeast(2, base), base)
+  assert.deepEqual(pollingWindowAtLeast(10, base), base)
+  // 等价需求也不缩小
+  assert.deepEqual(pollingWindowAtLeast(10.0001, base), base)
+  // 非法输入不得产出 0 次尝试（那会让轮询直接判超时）
+  assert.ok(pollingWindowAtLeast(0, base).maxAttempts >= base.maxAttempts)
+  assert.ok(pollingWindowAtLeast(Number.NaN, base).maxAttempts >= base.maxAttempts)
+})
+
+test('pollingWindowAtLeast：不修改传入的 base（纯函数）', () => {
+  const base = { intervalMs: 3000, maxAttempts: 200 }
+  pollingWindowAtLeast(12, base)
+  assert.deepEqual(base, { intervalMs: 3000, maxAttempts: 200 })
 })
 
 test('pollSleep：正常等待后 resolve', async () => {

@@ -4,7 +4,7 @@ import { computeTaskKey } from '../../domain/shotJob.ts'
 import type { ShotJob } from '../../domain/shotJob.ts'
 import type { VisualPlan } from '../../domain/sellVisual.ts'
 import { ExecutorEngine } from '../nodes/executorNode.ts'
-import { setPollingWindow } from '../../domain/pollingConfig.ts'
+import { getPollingWindow, setPollingWindow } from '../../domain/pollingConfig.ts'
 import { walletManager } from '../../domain/wallet.ts'
 import type { VideoGenRequest, VideoProvider, PollResult } from '../../media/types.ts'
 
@@ -72,6 +72,57 @@ test('ExecutorEngine：任务排队与幂等防重（同镜连点两次只有 1 
   const jobs2 = await engine.enqueueShots(testVisualPlans, 'mock')
   assert.equal(jobs2.length, 2, '幂等防重保障：同意图重复提交不得新增重复任务')
   assert.equal(jobs1[0].taskKey, jobs2[0].taskKey, '已存在的任务保持原 taskKey 不变')
+})
+
+test('ExecutorEngine：轮询窗口可按引擎需求抬升（本地算力 11 分钟镜头不吃 10 分钟窗口的假失败）', async () => {
+  const saved = getPollingWindow()
+  try {
+    // 全局窗口只给 2 次尝试（≈10ms）：慢 provider 必然被判超时
+    setPollingWindow({ intervalMs: 5, maxAttempts: 2 })
+    let calls = 0
+    const slowProvider: VideoProvider = {
+      id: 'mock',
+      async submit() {
+        return { taskId: 'slow-1' }
+      },
+      async poll(): Promise<PollResult> {
+        calls++
+        // 前 4 次仍在跑（模拟 11 分钟长任务），第 5 次完成
+        return calls <= 4 ? { status: 'running' as const, progress: 20 } : { status: 'succeeded' as const, progress: 100 }
+      },
+      async getAsset(taskId: string) {
+        return { shotId: taskId, url: 'https://asset.local/slow.mp4', durationSec: 5 }
+      },
+      estimateCost() {
+        return '¥0'
+      },
+    }
+
+    // 负向对照：不加窗口 → 超时失败（这正是 high 档在修复前的行为）
+    const noOverride = new ExecutorEngine(slowProvider)
+    await noOverride.enqueueShots([testVisualPlans[0]], 'mock')
+    await new Promise((r) => setTimeout(r, 250))
+    assert.equal(
+      noOverride.getJobs().find((j) => j.shotId === 's1')?.status,
+      'failed',
+      '窗口不足时必须如实失败（对照组，证明这个测试真的在测窗口）'
+    )
+
+    // 正向：显式抬升窗口 → 同一个慢 provider 成功出片
+    calls = 0
+    const raised = new ExecutorEngine(slowProvider)
+    raised.setPollingWindowMinutes(1)
+    await raised.enqueueShots([testVisualPlans[1]], 'mock')
+    await new Promise((r) => setTimeout(r, 300))
+    assert.equal(
+      raised.getJobs().find((j) => j.shotId === 's2')?.status,
+      'succeeded',
+      '抬升窗口后长任务应出片成功'
+    )
+    assert.ok(calls >= 5, `应真的轮询到第 5 次才成功（实际 ${calls} 次）`)
+  } finally {
+    setPollingWindow(saved)
+  }
 })
 
 test('ExecutorEngine：单镜重试机制', async () => {

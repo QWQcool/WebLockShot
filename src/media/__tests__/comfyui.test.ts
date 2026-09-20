@@ -7,6 +7,7 @@ import {
   buildWan22Ti2vWorkflow,
   comboOptionsOf,
   comfyEstimateText,
+  comfyRequiredWindowMinutes,
   comfyTierBudget,
   comfyTierResolution,
   estimateShotSeconds,
@@ -330,6 +331,30 @@ test('custom 预设：未提供工作流 JSON 时必须报错，而不是偷偷�
     customWorkflowJson: '{ not json',
   })
   assert.throws(() => bad.buildWorkflow(REQ))
+})
+
+test('轮询窗口需求：high 档必须超过默认 10 分钟（否则 11 分钟镜头会被误判失败）', () => {
+  // 默认轮询窗口 10 分钟（pollingConfig.DEFAULT_POLL_WINDOW_MINUTES）
+  const DEFAULT_WINDOW_MINUTES = 10
+  assert.equal(comfyRequiredWindowMinutes('fast'), 3)
+  assert.equal(comfyRequiredWindowMinutes('standard'), 6)
+  assert.equal(comfyRequiredWindowMinutes('high'), 12)
+
+  // 核心回归：high 档需求必须严格大于默认窗口，否则「超时退款但上游还在跑」的假失败会复现
+  assert.ok(
+    comfyRequiredWindowMinutes('high') > DEFAULT_WINDOW_MINUTES,
+    'high 档需求必须超过默认窗口（实测 655s > 600s）'
+  )
+  // 负向：低档位不该无谓抬窗口
+  assert.ok(comfyRequiredWindowMinutes('fast') <= DEFAULT_WINDOW_MINUTES)
+  assert.ok(comfyRequiredWindowMinutes('standard') <= DEFAULT_WINDOW_MINUTES)
+  // 每个档位的窗口都必须覆盖自己的实测/估算耗时
+  for (const tier of ['fast', 'standard', 'high'] as const) {
+    assert.ok(
+      comfyRequiredWindowMinutes(tier) * 60 > estimateShotSeconds(tier),
+      `${tier} 档窗口不足以覆盖单镜耗时`
+    )
+  }
 })
 
 test('出片耗时估算：随档位单调递增，文案如实标注标定基准', () => {

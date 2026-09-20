@@ -9,7 +9,12 @@ import { runwayVideoProvider } from '../../media/providers/runway.ts'
 import { lumaVideoProvider } from '../../media/providers/luma.ts'
 import { walletManager } from '../../domain/wallet.ts'
 import { circuitBreaker, assertJobStatusTransition, assertJobRequeue } from '../../domain/fsm.ts'
-import { getPollingWindow, pollSleep } from '../../domain/pollingConfig.ts'
+import {
+  getPollingWindow,
+  pollSleep,
+  pollingWindowAtLeast,
+  type PollingWindow,
+} from '../../domain/pollingConfig.ts'
 import { idempotencyManager } from '../../domain/idempotency.ts'
 import { appendRunRecord } from '../../persist/runStore.ts'
 import type { RunRecordInput } from '../../domain/runRecord.ts'
@@ -68,9 +73,29 @@ export class ExecutorEngine {
   private listeners: Set<JobUpdateListener> = new Set()
   /** S3：执行历史上下文（由调用方注入；缺省 kind='generate'） */
   private runContext: RunContext = {}
+  /**
+   * 本次出片所需的最小轮询窗口（分钟）。由调用方按引擎实际耗时给出（画布 ComfyUI 场景），
+   * 与全局配置取「较大者」生效 —— 只升不降，且只影响本引擎实例，不污染 sell 单例。
+   */
+  private pollingWindowMinutes?: number
 
   constructor(customProvider?: VideoProvider) {
     this.customProvider = customProvider
+  }
+
+  /**
+   * 按需抬高本实例的轮询窗口（只升不降；传 undefined/0 表示沿用全局配置）。
+   * 必须在 `enqueueShots` 之前调用，否则已入队的任务仍按旧窗口跑。
+   */
+  setPollingWindowMinutes(minutes?: number) {
+    if (minutes && minutes > 0) this.pollingWindowMinutes = minutes
+  }
+
+  /** 实际生效的轮询窗口：全局配置与实例需求取较大者 */
+  private resolvePollingWindow(): PollingWindow {
+    const base = getPollingWindow()
+    if (!this.pollingWindowMinutes) return base
+    return pollingWindowAtLeast(this.pollingWindowMinutes, base)
   }
 
   setProvider(provider: VideoProvider) {
@@ -361,7 +386,7 @@ export class ExecutorEngine {
     this.notify()
 
     const provider = this.resolveProvider(job.provider)
-    const pollingWindow = getPollingWindow()
+    const pollingWindow = this.resolvePollingWindow()
 
     try {
       // 2. 提交至 provider

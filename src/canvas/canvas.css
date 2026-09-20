@@ -914,6 +914,12 @@
   line-height: 1.4;
 }
 
+/* 轮询窗口抬升提示：本地算力单镜可能超过默认窗口，需比正文更醒目（琥珀色而非灰字） */
+.wls-generate-window-note {
+  color: #b45309;
+  font-weight: 600;
+}
+
 .wls-generate-run {
   flex: none;
   border: none;

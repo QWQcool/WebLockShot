@@ -124,6 +124,17 @@ export function estimateShotSeconds(tier: ComfyQualityTier): number {
   return 660
 }
 
+/**
+ * 出片所需的最小轮询窗口（分钟）：单镜估算向上取整再留 1 分钟余量。
+ *
+ * 存在的理由：轮询窗口默认 10 分钟，而 high 档单镜实测 655s —— 窗口不够时 executor 会
+ * **超时退款并标记失败，而上游其实还在跑并最终写出文件**，属于假失败。
+ * 调用方用 `ExecutorEngine.setPollingWindowMinutes()` 只升不降地抬到该值。
+ */
+export function comfyRequiredWindowMinutes(tier: ComfyQualityTier): number {
+  return Math.ceil(estimateShotSeconds(tier) / 60) + 1
+}
+
 /** 出片前提示文案（镜数 × 单镜耗时），用于「点下去要等多久」的如实告知 */
 export function comfyEstimateText(tier: ComfyQualityTier, shots: number): string {
   const n = Math.max(1, shots)
