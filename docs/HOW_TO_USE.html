@@ -736,7 +736,67 @@ English: <a href="./HOW_TO_USE.canvas.en.md">HOW_TO_USE.canvas.en.md</a></p>
   画布文档里只存轻量引用。</li>
 <li><strong>成片交付</strong>：连入产物卡后一键打包剪映草稿 zip（纯前端下载），节点内显示钱包余额。</li>
 </ul>
-<h3 id="_20">运行历史（工具条「🕘 运行历史」）</h3>
+<h3 id="_20">出片引擎：画布用哪个（画布内不放下拉框）</h3>
+<p>引擎在「⚙️ API 设置 → 2. 视频生成引擎」统一配置，画布内<strong>隐式</strong>读它，并在 generate 节点上如实显示：</p>
+<table>
+<thead>
+<tr>
+<th>设置里选的引擎</th>
+<th>画布实际行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Mock 实验画布</strong></td>
+<td>离线演示引擎：确定性合成、0 成本、不占显卡</td>
+</tr>
+<tr>
+<td><strong>🔥 ComfyUI 私有算力</strong></td>
+<td><strong>真实本地算力出片</strong>（Wan 2.2 TI2V-5B，产物是 ComfyUI <code>/view</code> 的 http 直链）</td>
+</tr>
+<tr>
+<td>可灵 / 即梦 / Runway / Luma</td>
+<td>画布<strong>未接线</strong> → 回落 Mock，并在节点内如实列出这四个引擎「暂不可用」，不假装可用</td>
+</tr>
+</tbody>
+</table>
+<p>选 ComfyUI 时另有<strong>质量档</strong>（同一设置面板，10GB 显存档位）：</p>
+<table>
+<thead>
+<tr>
+<th>档位</th>
+<th>分辨率 × 帧数</th>
+<th>steps</th>
+<th>单镜实测/估算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>快速</td>
+<td>480×832 × 49（≈2.0s）</td>
+<td>8</td>
+<td>约 1 分钟（含冷启）</td>
+</tr>
+<tr>
+<td>标准</td>
+<td>704×1280 × 97（≈4.0s）</td>
+<td>16</td>
+<td>约 4 分钟（外推）</td>
+</tr>
+<tr>
+<td>高（原生）</td>
+<td>704×1280 × 121（≈5.0s）</td>
+<td>20</td>
+<td><strong>实测 10 分 55 秒</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>实测基准与节点参数核对记录见 <a href="./comfyui-local.md">comfyui-local.md</a>（含 6 镜≈1 小时的换算）。
+点「开始出片」前的确认弹层会先写出<strong>预计耗时</strong>与引擎名，不会让人干等黑屏。
+ComfyUI 产物依赖本机服务常驻；服务停了产物直链就播不了（这是如实的能力边界，不做本地转存伪装）。</p>
+</blockquote>
+<h3 id="_21">运行历史（工具条「🕘 运行历史」）</h3>
 <figure><img alt="运行历史：状态 / 耗时 / 费用（灵感币）/ 是否退款 / 失败原因" src="./screenshots/19c_canvas_run_history.png" /><figcaption>运行历史：状态 / 耗时 / 费用（灵感币）/ 是否退款 / 失败原因</figcaption></figure>
 <p>每次节点执行（逐镜出片 / 重试 / 重生成）都会落一条<strong>可审计记录</strong>，由执行器<strong>单一收口</strong>写入，
 滚动保留最近 200 条。面板里能看到：</p>
@@ -858,8 +918,13 @@ English: <a href="./HOW_TO_USE.canvas.en.md">HOW_TO_USE.canvas.en.md</a></p>
 <figure><img alt="英文界面" src="./screenshots/23_canvas_en.png" /><figcaption>英文界面</figcaption></figure>
 <h2 id="14">14. 诚实边界与已知限制</h2>
 <ol>
-<li><strong>可灵 / 即梦 / ComfyUI 未接入画布出片</strong>（请走带货工作台）；画布出片走 Mock / 演示引擎。</li>
-<li><strong>「单图直出」与 3D 台出片仅演示引擎</strong>，真实引擎链路待真实环境验证。</li>
+<li><strong>可灵 / 即梦 / Runway / Luma 未接入画布出片</strong>（可灵 / 即梦请走带货工作台）；画布出片走
+   <strong>Mock 演示引擎</strong>或<strong>本地 ComfyUI 真实算力</strong>（二选一，见上文「出片引擎」）。</li>
+<li><strong>本地 ComfyUI 只在 RTX 3080 10GB 上验证过 <code>wan2.2-ti2v-5b</code> 预设</strong>：5 秒 704×1280 单条约
+   <strong>11 分钟</strong>，且显存打满、依赖 offload（详见 <a href="./comfyui-local.md">comfyui-local.md</a>）。
+   预设 <code>wan2.1-i2v</code>（需 Kijai 插件）与 <code>minimax-h3</code>（需 32B 文本编码器，10GB 不可行）为
+   <strong>接口预留、本机未验证</strong>；设置面板「测试连接」会如实报出缺哪些节点与权重。
+   ComfyUI 产物是 <code>/view</code> http 直链，<strong>服务停了就播不了</strong>。</li>
 <li><strong>ComfyUI 离线</strong>时局部重绘降级演示模式并标注「非真实生成」。</li>
 <li><strong>记忆纯前端模式仅存本机</strong>；接入 <code>WLS_STORAGE=sqlite</code> 伴生服务后升级为服务端记忆。</li>
 <li><strong>画布文档契约上限 200 节点 / 400 边</strong>：超限后不再落盘（T3 实测，UI 暂无提示，见主手册遗留台账）。</li>
@@ -878,7 +943,7 @@ English: <a href="./HOW_TO_USE.canvas.en.md">HOW_TO_USE.canvas.en.md</a></p>
 English: <a href="./HOW_TO_USE.commerce.en.md">HOW_TO_USE.commerce.en.md</a></p>
 </blockquote>
 <hr />
-<h2 id="_21">目录</h2>
+<h2 id="_22">目录</h2>
 <ul>
 <li><a href="#1-六步爆款工作流">1. 六步爆款工作流</a></li>
 <li><a href="#2-两个独立工作室">2. 两个独立工作室</a></li>
@@ -1036,7 +1101,7 @@ English: <a href="./HOW_TO_USE.commerce.en.md">HOW_TO_USE.commerce.en.md</a></p>
 <hr />
 <h2 id="4-capcut">4. 剪映 / CapCut 草稿导入与声画自动对齐</h2>
 <p>在最后一步「✨ 审片交付」点击「📥 导出剪映电脑版草稿工程 (draft_content.json)」。</p>
-<h3 id="_22">对齐原理</h3>
+<h3 id="_23">对齐原理</h3>
 <ol>
 <li><strong>三轨微秒对齐（1s = 1,000,000us）</strong>：
    - <code>track_video</code>：6 镜视频无缝顺排；

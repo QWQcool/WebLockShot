@@ -408,9 +408,18 @@ export const artifactSchema = z.object({
 })
 export type Artifact = z.infer<typeof artifactSchema>
 
-/** generate 节点 meta 载荷：产物列表（仅终态，生成中不写 meta，刷新如实回 idle） */
+/**
+ * 画布已接通的出片引擎（白名单，非全集）：
+ * - mock：内置演示引擎（离线、确定性、0 成本）；
+ * - comfyui：本地 ComfyUI 算力（产物为 http 直链，符合 persistentUrlSchema）。
+ * 可灵/即梦/Runway/Luma 画布未接线，契约层直接拒绝，避免「选了却没生效」的静默偏差。
+ */
+export const CANVAS_GENERATE_PROVIDERS = ['mock', 'comfyui'] as const
+export type CanvasGenerateProviderId = (typeof CANVAS_GENERATE_PROVIDERS)[number]
+
+/** generate 节点 meta 载荷：产物列表（仅终态写 meta，生成中不写 meta，刷新如实回 idle） */
 export const generateMetaPayloadSchema = z.object({
-  providerId: z.literal('mock'),
+  providerId: z.enum(CANVAS_GENERATE_PROVIDERS),
   artifacts: z.array(artifactSchema).max(6),
   storyDigest: z.string(),
   /** B5：生成时的 Story 快照（deliver 打包剪映草稿所需，沿边读取） */

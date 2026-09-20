@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useEditor, useValue, type JsonObject, type TLShapeId } from 'tldraw'
 import { ExecutorEngine } from '../director/nodes/executorNode.ts'
 import type { ShotJob } from '../domain/shotJob.ts'
@@ -19,7 +19,15 @@ import {
   scriptDigest,
   writeGenerateMetaPayload,
   type Artifact,
+  type CanvasGenerateProviderId,
 } from './contract.ts'
+import { comfyEstimateText, comfyUIVideoProvider, withCacheBuster } from '../media/providers/comfyui.ts'
+import {
+  CANVAS_PROVIDER_LABELS,
+  CANVAS_UNWIRED_ENGINES,
+  getCanvasGenerateProviderSnapshot,
+  subscribeCanvasGenerateProvider,
+} from './generateProvider.ts'
 import {
   buildStage3dDirectPlan,
   readStage3DFrameSequence,
@@ -202,8 +210,24 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   directTitleRef.current = directTitle
   const stage3dFrameRef = useRef<Stage3DCameraFrame | null>(null)
   stage3dFrameRef.current = stage3dFrame
-  const costPerShot = walletManager.getCost('mock', 1)
+  // 画布生效引擎：读「⚙️ API 设置 → 2. 视频生成引擎」写入的 sessionStorage。
+  // 只认已接通白名单（mock / comfyui）；可灵/即梦/Runway/Luma 未接线 → 回落 mock 并如实注明。
+  // 响应式：设置面板切引擎后画布即时跟随（不带订阅的话节点不会重渲染，用户得手动刷新）
+  const canvasProviderId = useSyncExternalStore(
+    subscribeCanvasGenerateProvider,
+    getCanvasGenerateProviderSnapshot,
+    getCanvasGenerateProviderSnapshot
+  )
+  const providerRef = useRef<CanvasGenerateProviderId>(canvasProviderId)
+  providerRef.current = canvasProviderId
+  const providerLabel = CANVAS_PROVIDER_LABELS[canvasProviderId]
+  const costPerShot = walletManager.getCost(canvasProviderId, 1)
   const totalCost = costPerShot * (story?.shots.length ?? 0)
+  // ComfyUI 走真实本地算力，出片前必须如实告知等待时长（标定基准见 docs/comfyui-local.md）
+  const comfyShotEstimateText =
+    canvasProviderId === 'comfyui'
+      ? comfyEstimateText(comfyUIVideoProvider.getQualityTier(), story ? story.shots.length : 1)
+      : ''
 
   /** 读取本节点当前 meta（getShape 返回宽型 shape，需窄化为 wls-node） */
   const readSelfMeta = (): Record<string, unknown> => {
@@ -223,7 +247,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
       { shotId, order, status, ...(url ? { url } : {}), ...(err ? { error: err } : {}) },
     ].sort((a, b) => a.order - b.order)
     const nextMeta = writeGenerateMetaPayload(baseMeta, {
-      providerId: 'mock',
+      providerId: providerRef.current,
       artifacts: next,
       storyDigest: storyDigestRef.current,
       ...(storyRef.current ? { story: storyRef.current } : {}),
@@ -282,8 +306,11 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
           return
         }
       }
-      markArtifact(shotId, 'succeeded', `${ref}?v=${Date.now()}`)
-      createAssetCard(shotId, `${ref}?v=${Date.now()}`)
+      // 缓存破坏参数：ComfyUI 的 /view 直链自带 query，直接拼 `?v=` 会把 v 并进最后一个
+      // 查询参数（type=output?v=123）导致 404 —— 统一走 withCacheBuster 按需选 & / ?
+      const stamped = withCacheBuster(ref)
+      markArtifact(shotId, 'succeeded', stamped)
+      createAssetCard(shotId, stamped)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- markArtifact/createAssetCard 闭包仅依赖 editor 与 ref（稳定）
     [editor]
@@ -317,7 +344,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         revokeRefUrls()
         const ref = await hydrateRef(stage3dFrame.firstFrameRef)
         if (ref && ref.startsWith('blob:')) refUrlRef.current.push(ref)
-        await engine.enqueueShots([buildStage3dDirectPlan(stage3dFrame, ref)], 'mock')
+        await engine.enqueueShots([buildStage3dDirectPlan(stage3dFrame, ref)], canvasProviderId)
       } catch (err) {
         setError(`任务入队失败：${err instanceof Error ? err.message : '未知错误'}`)
         setBusy(false)
@@ -329,7 +356,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
       storyDigestRef.current = scriptDigest(directTitle)
       storyRef.current = null
       try {
-        await engine.enqueueShots(buildDirectShotPlans(directTitle), 'mock')
+        await engine.enqueueShots(buildDirectShotPlans(directTitle), canvasProviderId)
       } catch (err) {
         setError(`任务入队失败：${err instanceof Error ? err.message : '未知错误'}`)
         setBusy(false)
@@ -349,7 +376,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
           durationSec: shot.durationSec,
         })
       )
-      await engine.enqueueShots(plans, 'mock')
+      await engine.enqueueShots(plans, canvasProviderId)
     } catch (err) {
       setError(`任务入队失败：${err instanceof Error ? err.message : '未知错误'}`)
       setBusy(false)
@@ -391,7 +418,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         </div>
       ) : (
         <div className="wls-generate-hint">
-          连入 storyboard 节点逐镜出片，或连入 stage3d 执导帧 3D 单镜直出 / product 节点单图直出（演示引擎）
+          连入 storyboard 节点逐镜出片，或连入 stage3d 执导帧 3D 单镜直出 / product 节点单图直出（
+          {providerLabel}）
         </div>
       )}
 
@@ -406,10 +434,11 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         </div>
       )}
 
-      {/* 引擎与成本（诚实标注）：Mock 本身是合法引擎；单图/3D 单镜直出走演示引擎必须如实标注 */}
+      {/* 引擎与成本（诚实标注）：引擎由设置决定；未接通的引擎如实列出，不假装可用 */}
       <div className="wls-generate-engine">
-        <span className="wls-generate-engine-tag">
-          {stage3dDirectMode ? '⚡ 3D 单镜直出 · 演示引擎' : directMode ? '⚡ 单图直出 · 演示引擎' : 'Mock 实验画布'}
+        <span className="wls-generate-engine-tag" data-testid="wls-generate-engine-tag">
+          {providerLabel}
+          {stage3dDirectMode ? ' · ⚡ 3D 单镜直出' : directMode ? ' · ⚡ 单图直出' : ''}
         </span>
         <span className="wls-generate-cost">
           {story
@@ -419,11 +448,20 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
               : '— 灵感币'}
         </span>
       </div>
-      <div className="wls-generate-engine-note">
-        引擎在「⚙️ API 设置 → 2. 视频生成引擎」统一配置（画布内隐式，不暴露引擎下拉）；当前画布出片为演示引擎（Mock）——
-        可灵 / 即梦
-        {hasProviderKey('kling') || hasProviderKey('jimeng') ? '（已配置 Key，画布模式暂未开放）' : '（未配置 Key）'}
-        暂不可用
+      <div className="wls-generate-engine-note" data-testid="wls-generate-engine-note">
+        引擎在「⚙️ API 设置 → 2. 视频生成引擎」统一配置（画布内隐式，不暴露引擎下拉）。
+        {canvasProviderId === 'comfyui' ? (
+          <>
+            {' '}
+            本地 ComfyUI 出片：产物为本机输出目录的 http 直链，需 ComfyUI 服务常驻（
+            <code>--listen</code>）{comfyShotEstimateText ? `；${comfyShotEstimateText}` : ''}。
+          </>
+        ) : (
+          <> 当前为离线演示引擎（Mock）：确定性合成、0 成本、不占用显卡。</>
+        )}{' '}
+        {CANVAS_UNWIRED_ENGINES.join(' / ')}
+        {hasProviderKey('kling') || hasProviderKey('jimeng') ? '（已配置 Key，画布未接线）' : '（未配置 Key）'}
+        暂不可用。
       </div>
 
       <button
@@ -459,7 +497,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
             将消耗 {story ? totalCost : costPerShot} 灵感币
           </div>
           <div className="wls-generate-confirm-detail">
-            {story ? `${story.shots.length} 镜` : '1 镜'} · 演示引擎（Mock）· 取消不扣费
+            {story ? `${story.shots.length} 镜` : '1 镜'} · {providerLabel}
+            {comfyShotEstimateText ? ` · ${comfyShotEstimateText}` : ''} · 取消不扣费
           </div>
           <div className="wls-generate-confirm-actions">
             <button

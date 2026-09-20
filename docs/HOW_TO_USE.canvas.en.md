@@ -107,6 +107,30 @@ video generation, artifact card, local repaint, 3D camera stage, delivery.
 - **Delivery**: connect an artifact card to package a CapCut draft zip in the browser; the node shows the
   wallet balance.
 
+### Which render engine the canvas uses (there is no dropdown inside the canvas)
+
+The engine is configured in **⚙️ API settings → 2. Video generation engine**; the canvas reads it implicitly and
+shows it honestly on the generate node:
+
+| Engine selected in settings | What the canvas actually does |
+|---|---|
+| **Mock experimental canvas** | Offline demo engine: deterministic compositing, zero cost, no GPU |
+| **🔥 ComfyUI private compute** | **Real local rendering** (Wan 2.2 TI2V-5B; artifacts are ComfyUI `/view` http URLs) |
+| Kling / Jimeng / Runway / Luma | **Not wired into the canvas** → falls back to Mock, and the node lists these four as unavailable instead of pretending they work |
+
+When ComfyUI is selected there is also a **quality tier** (same panel, sized for 10 GB VRAM):
+
+| Tier | Resolution × frames | steps | Per shot |
+|---|---|---|---|
+| Fast | 480×832 × 49 (~2.0s) | 8 | ~1 minute (incl. cold start) |
+| Standard | 704×1280 × 97 (~4.0s) | 16 | ~4 minutes (extrapolated) |
+| High (native) | 704×1280 × 121 (~5.0s) | 20 | **measured 10m55s** |
+
+> Measured baselines and the node-parameter audit live in [comfyui-local.md](./comfyui-local.md) (Chinese).
+> The confirmation dialog before rendering states the **estimated duration** and the engine name.
+> ComfyUI artifacts are served by the local server: if the server stops, the URL no longer plays. That is an
+> honest capability boundary — this project does not hide it behind a fake local copy.
+
 ### Run history (toolbar “🕘 Run history”)
 
 ![Run history: status / duration / cost (credits) / refunded / failure reason](./screenshots/19c_canvas_run_history.png)
@@ -260,9 +284,15 @@ See [mcp.md](./mcp.md) for the endpoint details.
 
 ## 14. Honest boundaries and known limits
 
-1. **Kling / Jimeng / ComfyUI are not wired into canvas rendering** (use the commerce workbench); canvas
-   rendering uses the Mock / demo engine.
-2. **“Single-shot” and 3D-stage rendering only use the demo engine**; real engine paths await a live environment.
+1. **Kling / Jimeng / Runway / Luma are not wired into canvas rendering** (use the commerce workbench for
+   Kling / Jimeng); canvas rendering uses either the **Mock demo engine** or **local ComfyUI compute**
+   (see “Which render engine the canvas uses” above).
+2. **Local ComfyUI is only verified for the `wan2.2-ti2v-5b` preset on an RTX 3080 10 GB**: one 5-second
+   704×1280 clip takes about **11 minutes**, saturates VRAM, and relies on offload (see
+   [comfyui-local.md](./comfyui-local.md)). The `wan2.1-i2v` (needs the Kijai plugin) and `minimax-h3`
+   (needs a 32B text encoder — infeasible on 10 GB) presets are **interface-reserved and unverified here**;
+   the “test connection” button reports exactly which nodes and weights are missing. ComfyUI artifacts are
+   `/view` http URLs, so **they stop playing once the server is down**.
 3. **When ComfyUI is offline** local repaint falls back to the demo mode and says so.
 4. **Pure front-end memory is local-only**; connecting a companion server with `WLS_STORAGE=sqlite` upgrades it.
 5. **The canvas document contract caps at 200 nodes / 400 edges**: beyond that it stops persisting (measured in

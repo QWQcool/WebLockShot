@@ -618,10 +618,20 @@ test('B4 generate meta：产物列表往返（四态状态机一致），非法�
     readGenerateMetaPayload({ providerId: 'mock', storyDigest: 'd', artifacts: [{ shotId: 's', order: 1, status: 'done' }] }),
     null
   )
-  // providerId 只允许 mock（可灵/即梦画布未接通）
-  assert.equal(
-    readGenerateMetaPayload({ providerId: 'kling', storyDigest: 'd', artifacts: [] }),
-    null
+  // providerId 只允许画布已接通的 mock / comfyui（可灵/即梦/Runway/Luma 未接通 → 拒绝）
+  for (const unusable of ['kling', 'jimeng', 'runway', 'luma', '']) {
+    assert.equal(
+      readGenerateMetaPayload({ providerId: unusable, storyDigest: 'd', artifacts: [] }),
+      null,
+      `未接通引擎 ${unusable || '(空)'} 必须被契约拒绝`
+    )
+  }
+  assert.ok(
+    readGenerateMetaPayload({
+      providerId: 'comfyui',
+      storyDigest: 'd',
+      artifacts: [{ shotId: 's1', order: 1, status: 'succeeded', url: 'http://127.0.0.1:8188/view?filename=a.mp4' }],
+    })
   )
   // 超过 6 条拒绝
   const tooMany = {

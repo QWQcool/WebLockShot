@@ -1,4 +1,4 @@
-import { getEngineProxyBase } from '../../services/backend/proxyConfig.ts'
+import { localEngineProxyUrl } from '../../services/backend/proxyConfig.ts'
 import { COMFY_URL_STORAGE_KEY } from './comfyui.ts'
 
 /**
@@ -60,16 +60,22 @@ export type InpaintRunOptions = {
  * 纯函数：工作流装配（node --test 可跑）
  * ------------------------------------------------------------------ */
 
+/**
+ * 解析 inpaint 用的 ComfyUI base URL。与视频 Provider 同口径：
+ * 用户填写 > 本机同源反代（绝对 URL）> 直连默认。
+ * 本机必须走反代 —— ComfyUI 新版对回环 Host/Origin 做一致性校验，直连的 POST 一律 403。
+ */
 export function getComfyImageBaseUrl(overrideUrl?: string): string {
   if (overrideUrl) return overrideUrl.replace(/\/$/, '')
   if (typeof window !== 'undefined') {
     try {
       const stored = sessionStorage.getItem(COMFY_URL_STORAGE_KEY)
       if (stored && stored.trim()) return stored.trim().replace(/\/$/, '')
-      if (window.location.hostname === 'localhost') return getEngineProxyBase('comfyui')
     } catch {
-      // 受限环境回退默认
+      // 受限环境（隐私模式）继续往下走
     }
+    const viaProxy = localEngineProxyUrl('comfyui', window.location)
+    if (viaProxy) return viaProxy
   }
   return 'http://127.0.0.1:8188'
 }

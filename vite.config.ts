@@ -55,6 +55,15 @@ export default defineConfig({
         target: 'http://127.0.0.1:8188',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/comfyui/, ''),
+        // ComfyUI 新版会对「回环 Host + Origin」做一致性校验：只要两个头都在且域名不一致就 403
+        // （防任意网页 POST 到 127.0.0.1 排队任务）。dev 代理必须与伴生服务同口径地把
+        // origin/referer 摘掉，否则本地开发一样会被自家 ComfyUI 拒绝。
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin')
+            proxyReq.removeHeader('referer')
+          })
+        },
       },
     },
   },
