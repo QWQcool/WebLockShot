@@ -405,6 +405,12 @@ export const artifactSchema = z.object({
   /** 仅 succeeded 有值：idbref:// 引用（IndexedDB 大资产）或 http(s) 直链；blob: 不持久化 */
   url: z.string().optional(),
   error: z.string().optional(),
+  /**
+   * P0 产物持久化痕迹：true = url 指向本地 IndexedDB 副本（离线可播可打包）；
+   * false = 上游直链未能转存（清 output / 换机 / 服务停就失效），UI 需如实标注。
+   * 缺省 = 旧文档或演示产物（不复述），**不要**写成 undefined 键值（tldraw 会拒绝）。
+   */
+  persistedLocally: z.boolean().optional(),
 })
 export type Artifact = z.infer<typeof artifactSchema>
 
@@ -477,6 +483,12 @@ export const assetMetaPayloadSchema = z.object({
   baseUrl: persistentUrlSchema.optional(),
   /** A2：重绘版本堆叠（最新在前），上限 20 条，超出截断最旧并如实提示 */
   versions: z.array(assetVersionSchema).max(20).optional(),
+  /**
+   * P0 产物持久化痕迹：true = 已转存本地 IndexedDB（离线可播）；
+   * false = 仍是上游 http 直链，上游不可达即失效（UI 如实标注）。
+   * 缺省 = 旧文档 / 未涉及，**不要**写成 undefined 键值。
+   */
+  persistedLocally: z.boolean().optional(),
 })
 export type AssetMetaPayload = z.infer<typeof assetMetaPayloadSchema>
 

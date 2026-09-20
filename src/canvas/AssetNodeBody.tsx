@@ -163,6 +163,15 @@ export function AssetNodeBody({ shape }: { shape: WlsNodeShape }) {
         <span className="wls-asset-shot">{payload.shotId.split('-s').pop()?.toUpperCase() ?? 'S'} 镜</span>
         {payload.title && <span className="wls-asset-title">{payload.title}</span>}
       </div>
+      {/*
+        P0 诚实标注：产物只存了上游直链（转存本地失败）时，必须说明它依赖上游服务在线，
+        而不是让用户以为已经落到本地、换个机器也能播。
+      */}
+      {payload.persistedLocally === false && (
+        <div className="wls-asset-upstream-note" data-testid="asset-upstream-note" role="status">
+          ⚠️ 未转存本地 · 依赖上游服务在线（清空输出目录或换机后失效）
+        </div>
+      )}
     </div>
   )
 }

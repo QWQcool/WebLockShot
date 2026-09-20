@@ -920,6 +920,18 @@
   font-weight: 600;
 }
 
+/* P0 产物未转存本地的如实提示（产物卡内） */
+.wls-asset-upstream-note {
+  margin-top: 4px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #b45309;
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
 .wls-generate-run {
   flex: none;
   border: none;

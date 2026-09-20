@@ -642,6 +642,64 @@ test('B4 generate meta：产物列表往返（四态状态机一致），非法�
   assert.equal(readGenerateMetaPayload(tooMany), null)
 })
 
+test('P0 产物持久化痕迹：persistedLocally 可选往返；非法类型拒绝；缺省不产生该键', () => {
+  // artifact：true / false / 缺省 三种都合法
+  const base = { shotId: 's1', order: 1, status: 'succeeded' as const, url: 'idbref://a' }
+  const on = readGenerateMetaPayload({
+    providerId: 'comfyui',
+    storyDigest: 'd',
+    artifacts: [{ ...base, persistedLocally: true }],
+  })
+  assert.equal(on?.artifacts[0]?.persistedLocally, true)
+  const off = readGenerateMetaPayload({
+    providerId: 'comfyui',
+    storyDigest: 'd',
+    artifacts: [{ ...base, persistedLocally: false }],
+  })
+  assert.equal(off?.artifacts[0]?.persistedLocally, false)
+  const legacy = readGenerateMetaPayload({ providerId: 'mock', storyDigest: 'd', artifacts: [base] })
+  assert.equal(legacy?.artifacts[0]?.persistedLocally, undefined)
+  assert.equal('persistedLocally' in (legacy?.artifacts[0] ?? {}), false, '缺省时不应凭空产生该键')
+  // 负向：非布尔值拒绝（防止 'false' 字符串被当成已持久化判断）
+  assert.equal(
+    readGenerateMetaPayload({
+      providerId: 'mock',
+      storyDigest: 'd',
+      artifacts: [{ ...base, persistedLocally: 'yes' }],
+    }),
+    null
+  )
+
+  // asset 卡同口径
+  const assetOn = readAssetMetaPayload({
+    type: 'video',
+    url: 'idbref://canvas-asset-s1',
+    shotId: 's1',
+    createdAt: 1,
+    persistedLocally: true,
+  })
+  assert.equal(assetOn?.persistedLocally, true)
+  const assetOff = readAssetMetaPayload({
+    type: 'video',
+    url: 'http://127.0.0.1:8188/view?filename=a.mp4',
+    shotId: 's1',
+    createdAt: 1,
+    persistedLocally: false,
+  })
+  assert.equal(assetOff?.persistedLocally, false, '上游直链 + 未转存必须可如实表达')
+  assert.equal(
+    readAssetMetaPayload({ type: 'video', url: 'idbref://a', shotId: 's1', createdAt: 1, persistedLocally: 1 }),
+    null
+  )
+  // 写入路径不得把 undefined 键值带进 meta（tldraw jsonValue 会拒绝整个 shape）
+  const written = writeAssetMetaPayload(
+    {},
+    { type: 'video', url: 'idbref://a', shotId: 's1', createdAt: 1 } as never
+  )
+  assert.ok(written)
+  assert.equal('persistedLocally' in written, false)
+})
+
 test('B4 initialNodeY：默认居中；侵入对话栏避让带时上移；jitter 不越带', () => {
   // 视口高 720：center 360，bottom 720，避让带 150 → safeBottom 570
   assert.equal(initialNodeY(360, 160, 720), 280) // 280+160=440 < 570 → 居中不动

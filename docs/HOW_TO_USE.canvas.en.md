@@ -115,7 +115,7 @@ shows it honestly on the generate node:
 | Engine selected in settings | What the canvas actually does |
 |---|---|
 | **Mock experimental canvas** | Offline demo engine: deterministic compositing, zero cost, no GPU |
-| **🔥 ComfyUI private compute** | **Real local rendering** (Wan 2.2 TI2V-5B; artifacts are ComfyUI `/view` http URLs) |
+| **🔥 ComfyUI private compute** | **Real local rendering** (Wan 2.2 TI2V-5B). Artifacts are **copied into local IndexedDB** (`idbref://`) right after rendering, so they play and package offline |
 | Kling / Jimeng / Runway / Luma | **Not wired into the canvas** → falls back to Mock, and the node lists these four as unavailable instead of pretending they work |
 
 When ComfyUI is selected there is also a **quality tier** (same panel, sized for 10 GB VRAM):
@@ -128,8 +128,8 @@ When ComfyUI is selected there is also a **quality tier** (same panel, sized for
 
 > Measured baselines and the node-parameter audit live in [comfyui-local.md](./comfyui-local.md) (Chinese).
 > The confirmation dialog before rendering states the **estimated duration** and the engine name.
-> ComfyUI artifacts are served by the local server: if the server stops, the URL no longer plays. That is an
-> honest capability boundary — this project does not hide it behind a fake local copy.
+> Artifacts are copied into local IndexedDB right after rendering, so they keep playing and packaging even
+> when the ComfyUI server is down.
 
 ### Run history (toolbar “🕘 Run history”)
 
@@ -291,18 +291,21 @@ See [mcp.md](./mcp.md) for the endpoint details.
    704×1280 clip takes about **11 minutes**, saturates VRAM, and relies on offload (see
    [comfyui-local.md](./comfyui-local.md)). The `wan2.1-i2v` (needs the Kijai plugin) and `minimax-h3`
    (needs a 32B text encoder — infeasible on 10 GB) presets are **interface-reserved and unverified here**;
-   the “test connection” button reports exactly which nodes and weights are missing. ComfyUI artifacts are
-   `/view` http URLs, so **they stop playing once the server is down**.
-3. **When ComfyUI is offline** local repaint falls back to the demo mode and says so.
-4. **Pure front-end memory is local-only**; connecting a companion server with `WLS_STORAGE=sqlite` upgrades it.
-5. **The canvas document contract caps at 200 nodes / 400 edges**: beyond that it stops persisting (measured in
+   the “test connection” button reports exactly which nodes and weights are missing.
+3. **Artifact persistence**: rendered output is copied from the upstream URL into local IndexedDB
+   (`idbref://`) so it plays and packages offline. If that copy fails (upstream unreachable, CORS blocked,
+   over 256 MB, or browser quota exhausted) the run is **not** marked failed — the direct URL is kept and
+   the card says “⚠️ not stored locally · depends on the upstream server”, instead of pretending it is durable.
+4. **When ComfyUI is offline** local repaint falls back to the demo mode and says so.
+5. **Pure front-end memory is local-only**; connecting a companion server with `WLS_STORAGE=sqlite` upgrades it.
+6. **The canvas document contract caps at 200 nodes / 400 edges**: beyond that it stops persisting (measured in
    T3; the UI has no warning yet — see the main README's remaining-items list).
-6. **The tldraw free tier adds a watermark**, and in production without a license key rendering stops after
+7. **The tldraw free tier adds a watermark**, and in production without a license key rendering stops after
    roughly 5 seconds; this project provides no bypass.
-7. **i18n covers “key copy”**; node internals and some overlays are still Chinese.
-8. **MCP / connectors are mostly API-level** (plus the MCP badge and connector panel); deeper two-way
+8. **i18n covers “key copy”**; node internals and some overlays are still Chinese.
+9. **MCP / connectors are mostly API-level** (plus the MCP badge and connector panel); deeper two-way
    orchestration means calling the documented endpoints.
-9. **Refreshing within ~400 ms after a render finishes**: the canvas document's debounced save has not landed
+10. **Refreshing within ~400 ms after a render finishes**: the canvas document's debounced save has not landed
    yet → the node's `meta.artifacts` pointer is lost → the run history cannot resolve the `idbref://` reference
    (**the asset itself is still in IndexedDB**, so re-running the shot restores it). The window is very narrow;
    recorded honestly here, with no compensation this round.

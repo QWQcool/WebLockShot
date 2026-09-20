@@ -196,6 +196,28 @@ async function main() {
         const el = document.querySelector('.wls-node[data-kind="generate"]')
         return el ? (el.innerText || '').replace(/\s+/g, ' ') : ''
       })
+    /** 直读 IndexedDB 里的产物副本（P0 转存的实证：不是靠 URL 猜，而是看字节真的在本地） */
+    const readIdbAsset = (id) =>
+      page.evaluate((key) => {
+        return new Promise((resolve) => {
+          const req = indexedDB.open('weblockshot-assets', 1)
+          req.onerror = () => resolve(null)
+          req.onsuccess = () => {
+            const db = req.result
+            try {
+              const tx = db.transaction('assets', 'readonly')
+              const q = tx.objectStore('assets').get(key)
+              q.onsuccess = () => {
+                const blob = q.result
+                resolve(blob ? { size: blob.size, type: blob.type } : null)
+              }
+              q.onerror = () => resolve(null)
+            } catch {
+              resolve(null)
+            }
+          }
+        })
+      }, id)
 
     await step('① 进入画布（预置 ComfyUI 引擎）', async () => {
       await page.goto(base, { waitUntil: 'domcontentloaded' })
@@ -290,48 +312,80 @@ async function main() {
       console.log(`     · 真实出片完成，耗时 ${Math.round((Date.now() - t0) / 1000)}s`)
     })
 
-    await step('⑤ 产物是同源反代直链（绝对 http）且缓存参数拼接正确', async () => {
+    await step('⑤ P0 产物已转存本地 IndexedDB（不再只存上游直链）', async () => {
       const meta = await generateMeta()
       assert(meta?.providerId === 'comfyui', `meta.providerId 应为 comfyui，实际 ${meta?.providerId}`)
       const art = (meta?.artifacts ?? []).find((a) => a.status === 'succeeded')
       assert(art?.url, '未找到 succeeded 产物')
-      // 必须是**绝对** http 直链，否则 persistentUrlSchema 会拒绝入档（相对路径 /api/... 不合法）
-      assert(/^https?:\/\//.test(art.url), `产物不是绝对 http 直链：${art.url}`)
-      assert(new URL(art.url).pathname.startsWith('/api/comfyui/view'), `产物未走同源反代：${art.url}`)
-      assert(new URL(art.url).origin === base, `产物未指向本页同源（跨域会被 ComfyUI 403）：${art.url}`)
-      assert(art.url.includes('filename='), `产物直链缺 filename：${art.url}`)
-      // 负向：修复前拼 `?v=` 会得到 `...type=output?v=123`，ComfyUI 会 404
-      assert(!/type=output\?v=/.test(art.url), `缓存参数污染了 type 查询参数（会 404）：${art.url}`)
-      assert(/[&?]v=\d+/.test(art.url), `产物直链缺缓存破坏参数：${art.url}`)
+      assert(art.persistedLocally === true, '产物必须标记为已转存本地')
+      assert(art.url.startsWith('idbref://'), `产物应转为本地引用：${art.url}`)
+      // 负向（这就是本次修复的核心）：绝不能再把上游 http 直链写进 meta，
+      // 否则清 output 目录 / 换机 / 服务停就成死链，而这条 5 秒镜头是真实算力换来的
+      assert(!/^https?:\/\//.test(art.url), `产物仍是上游直链（未转存）：${art.url}`)
+      assert(!art.url.includes('/api/comfyui/view'), `产物 url 不应残留上游地址：${art.url}`)
+      // 缓存破坏参数仍在（idbref 带 ?v= 由 idbRefToId 剥离，用于强制重新 hydrate）
+      assert(/[&?]v=\d+/.test(art.url), `产物引用缺版本参数：${art.url}`)
+
+      const idb = await readIdbAsset('canvas-asset-direct-s1')
+      assert(idb, 'IndexedDB 里找不到产物副本')
+      assert(idb.size > 10_000, `本地副本体积异常（${idb.size} B），疑似空文件`)
+      assert(/^video\//.test(idb.type), `本地副本 MIME 不是视频：${idb.type}`)
+      console.log(`     · 本地副本 ${idb.size} B · ${idb.type}`)
     })
 
-    await step('⑥ 产物卡可播放（<video> 真实解码，不是死链）', async () => {
+    await step('⑥ 产物卡可播放（从本地副本解码，断网也能看）', async () => {
       await page.waitForSelector('.wls-node[data-kind="asset"]', { timeout: 15_000 })
       const metas = await assetMetas()
       assert(metas.length > 0, '未创建产物卡')
       const url = metas[0]?.url || ''
-      assert(new URL(url).pathname.startsWith('/api/comfyui/view'), `产物卡 url 未走同源反代：${url}`)
+      assert(url.startsWith('idbref://'), `产物卡 url 应为本地引用：${url}`)
+      assert(metas[0]?.persistedLocally === true, '产物卡应标记为已转存本地')
+      // 未转存提示不应出现（出现了说明走了回退分支）
+      assert(
+        (await page.locator('[data-testid=asset-upstream-note]').count()) === 0,
+        '不应出现「未转存本地」提示'
+      )
 
-      const decoded = await page.evaluate(async (u) => {
-        const v = document.createElement('video')
-        v.muted = true
-        v.preload = 'metadata'
-        v.src = u
-        return await new Promise((resolve) => {
-          const done = (r) => resolve(r)
-          v.onloadedmetadata = () => done({ ok: true, w: v.videoWidth, h: v.videoHeight, d: v.duration })
-          v.onerror = () => done({ ok: false, w: 0, h: 0, d: 0 })
-          setTimeout(() => done({ ok: false, w: 0, h: 0, d: 0, timeout: true }), 15_000)
-        })
-      }, url)
+      // 直接验**画布上真实渲染的** <video>：它由 AssetNodeBody 从 idbref hydrate 出来，
+      // 因此这一步同时证明「水合链路可用」与「本地副本是真视频」——
+      // 用 idbref 字符串新建 video 是加载不了的（这不是可播地址），不能拿它当探针。
+      const decoded = await page.evaluate(async () => {
+        const v = document.querySelector('.wls-asset-video')
+        if (!v) return { ok: false, reason: 'no-video-element' }
+        v.load()
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+        for (let i = 0; i < 60; i++) {
+          if (v.videoWidth > 0 && v.videoHeight > 0) {
+            return {
+              ok: true,
+              w: v.videoWidth,
+              h: v.videoHeight,
+              d: v.duration,
+              // blob: = 从本地 IndexedDB 副本解出的 objectURL（不是网络直链）
+              srcScheme: String(v.currentSrc || v.src).slice(0, 5),
+            }
+          }
+          if (v.error) return { ok: false, reason: `video error code=${v.error.code}` }
+          await wait(250)
+        }
+        return { ok: false, reason: 'timeout waiting metadata' }
+      })
       assert(decoded.ok, `产物视频无法解码（死链或非法容器）：${JSON.stringify(decoded)}`)
       assert(decoded.w > 0 && decoded.h > 0, `产物视频尺寸异常：${JSON.stringify(decoded)}`)
-      console.log(`     · 产物可解码 ${decoded.w}×${decoded.h} · ${decoded.d?.toFixed?.(2) ?? decoded.d}s`)
+      assert(
+        decoded.srcScheme === 'blob:',
+        `播放源应来自本地副本（blob:），实际 ${decoded.srcScheme} —— 说明仍在直连上游`
+      )
+      console.log(
+        `     · 产物可解码 ${decoded.w}×${decoded.h} · ${decoded.d?.toFixed?.(2) ?? decoded.d}s（源 ${decoded.srcScheme}）`
+      )
     })
 
-    await step('⑦ 负向验收：切回 mock 重新出片 → 产物必须变回非 http 引用', async () => {
-      const before = (await generateMeta())?.artifacts?.find((a) => a.status === 'succeeded')?.url || ''
-      assert(before.includes('/api/comfyui/view'), '前置产物不是 ComfyUI 直链，负向用例无意义')
+    await step('⑦ 负向验收：切回 mock 重新出片 → 引擎确实换路且本地副本被真正替换', async () => {
+      const beforeArt = (await generateMeta())?.artifacts?.find((a) => a.status === 'succeeded')
+      assert(beforeArt?.url?.startsWith('idbref://'), '前置产物不是本地引用，负向用例无意义')
+      const beforeBlob = await readIdbAsset('canvas-asset-direct-s1')
+      assert(beforeBlob, '前置产物在 IndexedDB 里不存在，负向用例无意义')
 
       // 与设置面板「保存」走**同一条**链路：写 sessionStorage + 派发应用内部广播信号
       // （sessionStorage 同标签页写入不会触发 storage 事件，所以必须显式广播，
@@ -371,11 +425,20 @@ async function main() {
         null,
         { timeout: 60_000 }
       )
-      const after = (await generateMeta())?.artifacts?.find((a) => a.status === 'succeeded')?.url || ''
+      // 两个引擎的产物都是 idbref（同 shotId → 同 key），URL 字符串相近，
+      // 所以用「本地副本字节真的变了」来证明：产物被 mock 的合成视频真正替换过
+      // （顺带证明 mock 分支也走完了转存，没有静默跳过）
+      const afterBlob = await readIdbAsset('canvas-asset-direct-s1')
+      assert(afterBlob, '切回 mock 后本地副本消失')
       assert(
-        !after.includes('/api/comfyui/view'),
-        `切回 mock 后产物仍是 ComfyUI 直链（引擎选择没生效）：${after}`
+        afterBlob.size !== beforeBlob.size,
+        `切回 mock 后本地副本字节未变化（${beforeBlob.size} → ${afterBlob.size}），引擎切换可能没生效`
       )
+      const afterMeta = await generateMeta()
+      assert(afterMeta?.providerId === 'mock', 'meta.providerId 应切换为 mock')
+      const afterArt = (afterMeta?.artifacts ?? []).find((a) => a.status === 'succeeded')
+      assert(afterArt?.persistedLocally === true, 'mock 产物也必须转存本地（同一条通路）')
+      console.log(`     · 本地副本已替换：${beforeBlob.size} B → ${afterBlob.size} B`)
     })
 
     await step('⑧ 无未捕获页面错误（真实网络路径不引入崩溃）', async () => {

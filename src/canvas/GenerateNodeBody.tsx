@@ -42,6 +42,7 @@ import {
 } from './stage3dFrames.ts'
 import { FrameThumb } from './FrameThumb.tsx'
 import { upsertAssetCard } from './assetCard.ts'
+import { persistUpstreamArtifact } from './assetPersist.ts'
 import type { WlsNodeShape } from './WlsNodeUtil.tsx'
 
 /**
@@ -254,15 +255,32 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     return s.props.meta as unknown as Record<string, unknown>
   }
 
-  /** 产物条目落盘（仅终态写 meta，与 B2/B3 读写模式一致） */
-  const markArtifact = (shotId: string, status: Artifact['status'], url?: string, err?: string) => {
+  /**
+   * 产物条目落盘（仅终态写 meta，与 B2/B3 读写模式一致）。
+   * `persistedLocally` 只在**明确知道**时传入：true=已转存本地、false=仍是上游直链；
+   * 缺省时整键省略（tldraw 的 jsonValue 拒绝 undefined 键值）。
+   */
+  const markArtifact = (
+    shotId: string,
+    status: Artifact['status'],
+    url?: string,
+    err?: string,
+    persistedLocally?: boolean
+  ) => {
     const order = Number(shotId.split('-s').pop()) || 1
     const baseMeta = readSelfMeta()
     const current = readGenerateMetaPayload(baseMeta)
     const list = current?.artifacts ?? []
     const next: Artifact[] = [
       ...list.filter((a) => a.shotId !== shotId),
-      { shotId, order, status, ...(url ? { url } : {}), ...(err ? { error: err } : {}) },
+      {
+        shotId,
+        order,
+        status,
+        ...(url ? { url } : {}),
+        ...(err ? { error: err } : {}),
+        ...(persistedLocally !== undefined ? { persistedLocally } : {}),
+      },
     ].sort((a, b) => a.order - b.order)
     const nextMeta = writeGenerateMetaPayload(baseMeta, {
       providerId: providerRef.current,
@@ -275,7 +293,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
   }
 
   /** 画布创建/更新产物卡：B5 起复用共享 upsertAssetCard（shotId 检索替换 + 新建后 zoomToFit） */
-  const createAssetCard = (shotId: string, url: string) => {
+  const createAssetCard = (shotId: string, url: string, persistedLocally?: boolean) => {
     const self = editor.getShape(shape.id)
     if (!self || self.type !== 'wls-node') return
     const story = upstreamRef.current?.story
@@ -291,6 +309,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
         url,
         shotId,
         createdAt: Date.now(),
+        // 整键省略而非写 undefined：tldraw 的 jsonValue 不接受 undefined 键值（会拒写整个 shape）
+        ...(persistedLocally !== undefined ? { persistedLocally } : {}),
         ...(shot?.line
           ? { title: shot.line.slice(0, 40) }
           : s3frame
@@ -302,12 +322,21 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     )
   }
 
-  /** 出片成功：blob 产物转存 IndexedDB → 产物条目持久化 → 画布创建产物卡 */
+  /**
+   * 出片成功：产物转存本地 IndexedDB → 产物条目持久化 → 画布创建产物卡。
+   *
+   * 三条来源分流：
+   * - `blob:`（Mock 引擎录制）：跨刷新必然失效，转存失败即如实判失败（原本就不可持久化）；
+   * - `http(s)`（本地 ComfyUI `/view`）：P0 转存为 `idbref://`；**转存失败不判失败**，
+   *   保留直链并标 `persistedLocally: false`，由 UI 如实提示「依赖上游服务在线」；
+   * - `idbref://`（已持久化）：直接用。
+   */
   const handleJobSucceeded = useCallback(
     async (job: ShotJob) => {
       if (!job.asset?.url) return
       const shotId = job.shotId
       let ref = job.asset.url
+      let persistedLocally: boolean | undefined
       if (job.asset.url.startsWith('blob:')) {
         // blob objectURL 跨刷新失效：立即转存 IndexedDB（转存失败则如实标记不可用）
         try {
@@ -315,6 +344,7 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
           const stored = await putBlobAsset(`canvas-asset-${shotId}`, blob)
           if (stored) {
             ref = stored
+            persistedLocally = true
           } else {
             markArtifact(shotId, 'failed', undefined, '产物转存 IndexedDB 失败，请重新生成')
             return
@@ -323,12 +353,22 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
           markArtifact(shotId, 'failed', undefined, '产物读取失败（blob 已失效），请重新生成')
           return
         }
+      } else {
+        // P0：上游直链（ComfyUI /view）转存本地 —— 否则清 output / 换机 / 服务停就成死链
+        const outcome = await persistUpstreamArtifact(job.asset.url, `canvas-asset-${shotId}`, {
+          ...(job.asset.sizeBytes ? { declaredSizeBytes: job.asset.sizeBytes } : {}),
+        })
+        ref = outcome.ref
+        persistedLocally = outcome.persistedLocally
+        if (!outcome.persistedLocally) {
+          console.warn(`[WebLockShot 产物持久化] ${shotId}: ${outcome.reason ?? '未转存'}`)
+        }
       }
       // 缓存破坏参数：ComfyUI 的 /view 直链自带 query，直接拼 `?v=` 会把 v 并进最后一个
       // 查询参数（type=output?v=123）导致 404 —— 统一走 withCacheBuster 按需选 & / ?
       const stamped = withCacheBuster(ref)
-      markArtifact(shotId, 'succeeded', stamped)
-      createAssetCard(shotId, stamped)
+      markArtifact(shotId, 'succeeded', stamped, undefined, persistedLocally)
+      createAssetCard(shotId, stamped, persistedLocally)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- markArtifact/createAssetCard 闭包仅依赖 editor 与 ref（稳定）
     [editor]
@@ -415,6 +455,8 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
     result !== null && stage3dFrame !== null && scriptDigest(stage3dFrame) !== result.storyDigest
   const artifacts = result?.artifacts ?? []
   const succeededCount = artifacts.filter((a) => a.status === 'succeeded').length
+  // P0：只存了上游直链（未转存本地）的产物条数 —— 如实汇总，不让人误以为已经落本地
+  const unpersistedCount = artifacts.filter((a) => a.status === 'succeeded' && a.persistedLocally === false).length
   const expectedShots = story ? story.shots.length : directMode || stage3dDirectMode ? 1 : 0
   const playing = artifacts.find((a) => a.shotId === playingArtifact && a.status === 'succeeded')
 
@@ -561,6 +603,11 @@ export function GenerateNodeBody({ shape }: { shape: WlsNodeShape }) {
           <div className="wls-generate-artifacts-head">
             产物 {succeededCount}/{expectedShots} 已出片
           </div>
+          {unpersistedCount > 0 && (
+            <div className="wls-generate-window-note" data-testid="wls-generate-unpersisted">
+              ⚠️ {unpersistedCount} 条产物未能转存本地，仅存上游直链（上游服务不可达即失效）
+            </div>
+          )}
           {(jobs.length > 0
             ? jobs.map((j) => ({
                 shotId: j.shotId,

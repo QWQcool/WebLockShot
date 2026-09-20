@@ -193,9 +193,26 @@ curl 'http://127.0.0.1:8188/view?filename=xxx.mp4&subfolder=&type=output'
   `mock` / `comfyui`（`src/canvas/generateProvider.ts`），未接通的
   `kling` / `jimeng` / `runway` / `luma` 回落 mock 并在节点内如实列出。
 - 产物契约：`generateMetaPayloadSchema.providerId` 由 `z.literal('mock')` 放宽为
-  `z.enum(['mock','comfyui'])`；`assetMetaPayloadSchema.url` 本就允许 http(s) 直链，
-  ComfyUI 的 `/view` URL 可原样入档（限服务在线时可播，这是如实的能力边界）。
+  `z.enum(['mock','comfyui'])`。
+- **产物持久化（P0）**：出片后把上游 `/view` 直链**转存本地 IndexedDB**（`src/canvas/assetPersist.ts`），
+  meta 里存 `idbref://`。这样清 output 目录 / 换机器 / ComfyUI 服务停掉都不影响播放与剪映打包 ——
+  而一条 5 秒镜头是 30s~11min 的真实算力换来的。转存**失败不判任务失败**：保留直链并写
+  `persistedLocally: false`，产物卡如实显示「⚠️ 未转存本地 · 依赖上游服务在线」。
 - 未改：`src/ai/`、`src/persist.ts`、`src/types.ts`（sell 6 镜管线红线，diff 为零）。
+
+### 产物持久化的边界（如实）
+
+| 情形 | 行为 |
+|---|---|
+| 正常（同源反代可拉取） | 转存 `idbref://`，`persistedLocally: true`；离线可播、可打包剪映草稿 |
+| 上游 4xx/5xx 或网络异常 | **不判失败**，保留直链 + `false` + 原因（console 与卡片都要能看到） |
+| 上游声明的体积 > 256MB | 直接不下载（省一次白下载），保留直链 + `false` |
+| 浏览器配额不足 / 隐私模式 | 保留直链 + `false` |
+| 产物 URL 不是 http(s)（如已是 idbref） | 无需转存，判 `true` |
+
+> `ASSET_PERSIST_MAX_BYTES = 256MB`：实测 5s / 704×1280 仅 1.29MB，256MB 是安全余量。
+> 转存走的是 `DeliverNodeBody` 早已支持的 `idbref://` 通路（打包前 hydrate 成 blob objectURL），
+> 所以**打包剪映草稿反而更稳**：以前直连上游，现在读本地副本。
 
 ---
 
